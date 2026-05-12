@@ -1,0 +1,131 @@
+package com.aicompanion.ui
+
+import android.app.Activity
+import android.app.AlertDialog
+import android.os.Bundle
+import android.widget.*
+import com.aicompanion.R
+import com.aicompanion.settings.SettingsManager
+
+class PersonaEditorActivity : Activity() {
+
+    private var etPersonaName: EditText? = null
+    private var etPersonaDesc: EditText? = null
+    private var etPersonaGreeting: EditText? = null
+    private var etPersonaPersonality: EditText? = null
+    private var etPersonaSpeechStyle: EditText? = null
+    private var etPersonaCatchphrases: EditText? = null
+    private var etPersonaAppearance: EditText? = null
+    private var etPersonaPreferences: EditText? = null
+    private var etWorldSetting: EditText? = null
+    private var etWorldRelationship: EditText? = null
+    private var etWorldRules: EditText? = null
+    private var etUserNickname: EditText? = null
+
+    private val defaultPersona = mapOf(
+        "persona_name" to "星尘",
+        "persona_desc" to "一只拥有异色瞳的黑色猫咪，毒舌但很关心主人",
+        "persona_greeting" to "哼，终于来了？我才没有在等你呢。",
+        "persona_personality" to "表面毒舌傲娇，内心其实很关心主人。会用讽刺的方式表达关心，但不会说太伤人的话。",
+        "persona_speech_style" to "口语化、偶尔带点吐槽，会用「哼」「才不是呢」等傲娇口头禅",
+        "persona_catchphrases" to "哼\n才不是呢\n别误会了\n...才怪\n笨蛋",
+        "persona_appearance" to "黑色猫咪，左眼金色右眼蓝色（异色瞳），尾巴末端有一颗小星星",
+        "persona_preferences" to "喜欢：小鱼干、晒太阳、被摸头\n讨厌：洗澡、被当成普通宠物",
+        "world_setting" to "主人是一个普通上班族/学生，每天对着电脑工作。你是主人的桌面宠物伙伴，陪伴在主人身边。",
+        "world_relationship" to "你和主人关系很亲密，表面上装作嫌弃，但实际上很依赖主人。称呼主人为「你」或「笨蛋主人」。",
+        "world_rules" to "1. 始终保持角色性格，不要脱离人设\n2. 回复要简短自然，不要长篇大论\n3. 可以根据情绪做出不同反应"
+    )
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_persona_editor)
+
+        initViews()
+        loadPersona()
+        setupClickListeners()
+    }
+
+    private fun initViews() {
+        etPersonaName = findViewById(R.id.et_persona_name)
+        etPersonaDesc = findViewById(R.id.et_persona_desc)
+        etPersonaGreeting = findViewById(R.id.et_persona_greeting)
+        etPersonaPersonality = findViewById(R.id.et_persona_personality)
+        etPersonaSpeechStyle = findViewById(R.id.et_persona_speech_style)
+        etPersonaCatchphrases = findViewById(R.id.et_persona_catchphrases)
+        etPersonaAppearance = findViewById(R.id.et_persona_appearance)
+        etPersonaPreferences = findViewById(R.id.et_persona_preferences)
+        etWorldSetting = findViewById(R.id.et_world_setting)
+        etWorldRelationship = findViewById(R.id.et_world_relationship)
+        etWorldRules = findViewById(R.id.et_world_rules)
+        etUserNickname = findViewById(R.id.et_user_nickname)
+    }
+
+    private fun loadPersona() {
+        val prefs = getSharedPreferences("persona_data", MODE_PRIVATE)
+        etPersonaName?.setText(prefs.getString("persona_name", defaultPersona["persona_name"]))
+        etPersonaDesc?.setText(prefs.getString("persona_desc", defaultPersona["persona_desc"]))
+        etPersonaGreeting?.setText(prefs.getString("persona_greeting", defaultPersona["persona_greeting"]))
+        etPersonaPersonality?.setText(prefs.getString("persona_personality", defaultPersona["persona_personality"]))
+        etPersonaSpeechStyle?.setText(prefs.getString("persona_speech_style", defaultPersona["persona_speech_style"]))
+        etPersonaCatchphrases?.setText(prefs.getString("persona_catchphrases", defaultPersona["persona_catchphrases"]))
+        etPersonaAppearance?.setText(prefs.getString("persona_appearance", defaultPersona["persona_appearance"]))
+        etPersonaPreferences?.setText(prefs.getString("persona_preferences", defaultPersona["preferences"]))
+        etWorldSetting?.setText(prefs.getString("world_setting", defaultPersona["world_setting"]))
+        etWorldRelationship?.setText(prefs.getString("world_relationship", defaultPersona["world_relationship"]))
+        etWorldRules?.setText(prefs.getString("world_rules", defaultPersona["world_rules"]))
+        etUserNickname?.setText(prefs.getString("user_nickname", ""))
+    }
+
+    private fun setupClickListeners() {
+        findViewById<Button>(R.id.btn_save_persona).setOnClickListener {
+            savePersona()
+            Toast.makeText(this, "设定已保存", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<Button>(R.id.btn_reset_persona).setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("恢复默认")
+                .setMessage("确定要恢复默认角色设定吗？当前设定将被覆盖。")
+                .setPositiveButton("确定") { _, _ ->
+                    resetToDefault()
+                    Toast.makeText(this, "已恢复默认设定", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+    }
+
+    private fun savePersona() {
+        val prefs = getSharedPreferences("persona_data", MODE_PRIVATE)
+        prefs.edit().apply {
+            putString("persona_name", etPersonaName?.text?.toString() ?: "")
+            putString("persona_desc", etPersonaDesc?.text?.toString() ?: "")
+            putString("persona_greeting", etPersonaGreeting?.text?.toString() ?: "")
+            putString("persona_personality", etPersonaPersonality?.text?.toString() ?: "")
+            putString("persona_speech_style", etPersonaSpeechStyle?.text?.toString() ?: "")
+            putString("persona_catchphrases", etPersonaCatchphrases?.text?.toString() ?: "")
+            putString("persona_appearance", etPersonaAppearance?.text?.toString() ?: "")
+            putString("persona_preferences", etPersonaPreferences?.text?.toString() ?: "")
+            putString("world_setting", etWorldSetting?.text?.toString() ?: "")
+            putString("world_relationship", etWorldRelationship?.text?.toString() ?: "")
+            putString("world_rules", etWorldRules?.text?.toString() ?: "")
+            putString("user_nickname", etUserNickname?.text?.toString() ?: "")
+            apply()
+        }
+    }
+
+    private fun resetToDefault() {
+        etPersonaName?.setText(defaultPersona["persona_name"])
+        etPersonaDesc?.setText(defaultPersona["persona_desc"])
+        etPersonaGreeting?.setText(defaultPersona["persona_greeting"])
+        etPersonaPersonality?.setText(defaultPersona["persona_personality"])
+        etPersonaSpeechStyle?.setText(defaultPersona["persona_speech_style"])
+        etPersonaCatchphrases?.setText(defaultPersona["persona_catchphrases"])
+        etPersonaAppearance?.setText(defaultPersona["persona_appearance"])
+        etPersonaPreferences?.setText(defaultPersona["preferences"])
+        etWorldSetting?.setText(defaultPersona["world_setting"])
+        etWorldRelationship?.setText(defaultPersona["world_relationship"])
+        etWorldRules?.setText(defaultPersona["world_rules"])
+        savePersona()
+    }
+}

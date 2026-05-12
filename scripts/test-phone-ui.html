@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI桌宠 - 手机端模拟器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .phone-frame {
+            width: 375px;
+            height: 700px;
+            background: white;
+            border-radius: 40px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.4);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .page {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .page.active {
+            display: flex;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 56px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: bold;
+            flex: 1;
+            text-align: center;
+        }
+
+        .header-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px;
+        }
+
+        .pet-status-bar {
+            background: #f8f9fa;
+            padding: 16px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .pet-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .pet-avatar {
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .pet-avatar.animate {
+            animation: bounce 0.5s ease;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .pet-details {
+            flex: 1;
+        }
+
+        .pet-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .pet-status {
+            font-size: 12px;
+            color: #4caf50;
+            margin-bottom: 8px;
+        }
+
+        .chips {
+            display: flex;
+            gap: 6px;
+        }
+
+        .chip {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            background: #f5f5f5;
+        }
+
+        .message {
+            margin-bottom: 12px;
+            display: flex;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.pet {
+            justify-content: flex-start;
+        }
+
+        .message-bubble {
+            max-width: 75%;
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.pet .message-bubble {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .message-time {
+            font-size: 10px;
+            color: #999;
+            margin-top: 4px;
+            padding: 0 4px;
+        }
+
+        .message.user .message-time {
+            text-align: right;
+        }
+
+        .message.pet .message-time {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .emotion-badge {
+            font-size: 10px;
+        }
+
+        .input-area {
+            padding: 12px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .input-row textarea {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            max-height: 80px;
+            font-family: inherit;
+        }
+
+        .input-row textarea:focus {
+            border-color: #667eea;
+        }
+
+        .btn-send {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-send:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-send:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-voice {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-voice:active {
+            background: #667eea;
+        }
+
+        .settings-page {
+            background: #f5f5f5;
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .settings-section {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .settings-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            flex: 1;
+        }
+
+        .setting-label h4 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .setting-label p {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .switch {
+            position: relative;
+            width: 50px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        .setting-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .radio-item input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #667eea;
+        }
+
+        .radio-item label {
+            font-size: 14px;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.02);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-outline {
+            background: white;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .memories-list {
+            background: white;
+            border-radius: 12px;
+            margin-top: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .memory-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .memory-item:last-child {
+            border-bottom: none;
+        }
+
+        .memory-text {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .memory-time {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            opacity: 0;
+            transition: all 0.3s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div id="chatPage" class="page active">
+            <div class="header">
+                <div style="width: 40px;"></div>
+                <h1>星尘 AI桌宠</h1>
+                <button class="header-btn" onclick="showPage('settingsPage')">⚙️</button>
+            </div>
+
+            <div class="pet-status-bar">
+                <div class="pet-info">
+                    <div class="pet-avatar" id="petAvatar">🐱</div>
+                    <div class="pet-details">
+                        <div class="pet-name">星尘</div>
+                        <div class="pet-status" id="petStatus">在线</div>
+                        <div class="chips">
+                            <span class="chip" id="chipEmotion">平静</span>
+                            <span class="chip" id="chipAction">待机</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="empty-state">点击发送消息开始聊天喵~</div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-row">
+                    <textarea id="messageInput" placeholder="输入消息..." rows="1"></textarea>
+                    <button class="btn-send" id="sendBtn" onclick="sendMessage()">发送</button>
+                    <button class="btn-voice" id="voiceBtn">🎤</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="settingsPage" class="page">
+            <div class="header">
+                <button class="header-btn" onclick="showPage('chatPage')">←</button>
+                <h1>设置</h1>
+                <div style="width: 40px;"></div>
+            </div>
+
+            <div class="settings-page">
+                <div class="settings-section">
+                    <div class="settings-title">服务配置</div>
+                    <label>后端服务器地址</label>
+                    <input type="text" class="setting-input" id="serverUrl" value="http://localhost:8001" />
+                    <label style="margin-top: 12px;">用户ID（匿名）</label>
+                    <input type="text" class="setting-input" id="userId" value="test_user" />
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">功能开关</div>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <h4>屏幕识别</h4>
+                            <p>仅获取应用类别，不读取文字</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="switchScreen">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <h4>语音识别</h4>
+                            <p>长按悬浮窗触发语音输入</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="switchVoice">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <h4>语音合成（TTS）</h4>
+                            <p>播放语音回复</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="switchTTS" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-label">
+                            <h4>离线模式</h4>
+                            <p>使用本地模型</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="switchOffline">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">交互设置</div>
+                    <div class="setting-label">
+                        <h4>唠叨频率</h4>
+                    </div>
+                    <div class="radio-group">
+                        <div class="radio-item">
+                            <input type="radio" name="nagFreq" value="off" id="nagOff">
+                            <label for="nagOff">关闭</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" name="nagFreq" value="low" id="nagLow">
+                            <label for="nagLow">低（偶尔提醒）</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" name="nagFreq" value="medium" id="nagMedium" checked>
+                            <label for="nagMedium">中（默认）</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" name="nagFreq" value="high" id="nagHigh">
+                            <label for="nagHigh">高（频繁互动）</label>
+                        </div>
+                    </div>
+
+                    <div class="setting-label" style="margin-top: 16px;">
+                        <h4>语言风格</h4>
+                    </div>
+                    <div class="radio-group">
+                        <div class="radio-item">
+                            <input type="radio" name="langStyle" value="normal" id="langNormal" checked>
+                            <label for="langNormal">正常（口语化）</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" name="langStyle" value="tsundere" id="langTsundere">
+                            <label for="langTsundere">毒舌傲娇</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" name="langStyle" value="cute" id="langCute">
+                            <label for="langCute">可爱卖萌</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">Live2D模型</div>
+                    <button class="btn btn-primary" onclick="showPage('modelsPage')">🎭 模型管理（切换皮套）</button>
+                    <p style="font-size:12px;color:#999;margin-top:4px;">导入、切换、编辑Live2D模型</p>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">记忆管理</div>
+                    <button class="btn btn-outline" onclick="loadMemories()">📝 查看记忆</button>
+                    <button class="btn btn-danger" onclick="deleteAllMemories()">🗑️ 清空所有记忆</button>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">关于</div>
+                    <div class="setting-label">
+                        <h4>AI桌宠伴侣 v1.0.0</h4>
+                        <p>星尘 - 异色瞳黑猫，毒舌但关心主人</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="memoriesPage" class="page">
+            <div class="header">
+                <button class="header-btn" onclick="showPage('settingsPage')">←</button>
+                <h1>记忆管理</h1>
+                <div style="width: 40px;"></div>
+            </div>
+
+            <div style="flex: 1; padding: 16px; background: #f5f5f5; overflow-y: auto;">
+                <div id="memoriesList">
+                    <div class="empty-state">暂无记忆记录</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="modelsPage" class="page">
+            <div class="header">
+                <button class="header-btn" onclick="showPage('settingsPage')">←</button>
+                <h1>Live2D模型管理</h1>
+                <div style="width: 40px;"></div>
+            </div>
+
+            <div style="flex: 1; padding: 16px; background: #f5f5f5; overflow-y: auto;">
+                <div class="settings-section">
+                    <div class="settings-title">当前模型</div>
+                    <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
+                        <div id="currentModelPreview" style="width:60px;height:60px;background:white;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:36px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">🐱</div>
+                        <div style="flex:1;">
+                            <div style="font-size:16px;font-weight:bold;" id="currentModelName">星尘（默认）</div>
+                            <div style="font-size:12px;color:#999;" id="currentModelDesc">异色瞳黑猫</div>
+                            <div style="font-size:12px;color:#667eea;" id="currentModelVersion">v1.0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:8px;margin-bottom:16px;">
+                    <button class="btn btn-primary" style="flex:1;" onclick="showToast('导入功能：选择模型文件夹')">📥 导入模型</button>
+                    <button class="btn btn-outline" style="flex:1;" onclick="scanModels()">🔍 扫描模型</button>
+                </div>
+
+                <div class="settings-title">我的模型库</div>
+                <div id="modelsList"></div>
+                <div id="emptyModels" class="empty-state">暂无其他模型<br>点击导入添加新皮套</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let API_BASE = 'http://localhost:8001';
+        let messages = [];
+        let isLoading = false;
+        let currentMemories = [];
+
+        const defaultModels = [
+            { id: 'stardust', name: '星尘', desc: '异色瞳黑猫，毒舌但关心主人', emoji: '🐱', active: true, version: '1.0', size: '15.2 MB' },
+            { id: 'shiro', name: '小白', desc: '温柔白猫，治愈系', emoji: '🐈', active: false, version: '1.0', size: '18.5 MB' },
+            { id: 'kuro', name: '小黑', desc: '酷酷的黑猫，不爱说话', emoji: '🐈‍⬛', active: false, version: '1.0', size: '12.8 MB' },
+            { id: 'miku', name: '初音', desc: '虚拟歌姬风格', emoji: '🎤', active: false, version: '2.0', size: '25.3 MB' }
+        ];
+
+        let models = [...defaultModels];
+
+        const emotionEmojis = {
+            'happy': '😺',
+            'angry': '😾',
+            'sad': '😿',
+            'surprised': '🙀',
+            'tsundere': '😼',
+            'neutral': '🐱'
+        };
+
+        const emotionNames = {
+            'happy': '开心',
+            'angry': '生气',
+            'sad': '伤心',
+            'surprised': '惊讶',
+            'tsundere': '傲娇',
+            'neutral': '平静'
+        };
+
+        const actionNames = {
+            'tail_flick': '摇尾巴',
+            'ear_twitch': '抖耳朵',
+            'blush': '脸红',
+            'stretch': '伸懒腰',
+            'yawn': '打哈欠',
+            'idle': '待机'
+        };
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function getTime() {
+            const now = new Date();
+            return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+        }
+
+        function updatePetDisplay(emotion, action) {
+            const avatar = document.getElementById('petAvatar');
+            const chipEmotion = document.getElementById('chipEmotion');
+            const chipAction = document.getElementById('chipAction');
+
+            avatar.textContent = emotionEmojis[emotion] || '🐱';
+            avatar.classList.add('animate');
+            setTimeout(() => avatar.classList.remove('animate'), 500);
+
+            chipEmotion.textContent = emotionNames[emotion] || emotion;
+            chipAction.textContent = actionNames[action] || action;
+        }
+
+        function addMessage(text, isUser, emotion, action) {
+            const container = document.getElementById('chatMessages');
+            
+            if (messages.length === 0) {
+                container.innerHTML = '';
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'pet'}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.textContent = text;
+
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = getTime();
+
+            if (!isUser && emotion) {
+                const emoji = document.createElement('span');
+                emoji.className = 'emotion-badge';
+                emoji.textContent = emotionEmojis[emotion] || '';
+                timeDiv.appendChild(emoji);
+            }
+
+            messageDiv.appendChild(bubble);
+            container.appendChild(messageDiv);
+            container.appendChild(timeDiv);
+
+            messages.push({ text, isUser, time: getTime() });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const message = input.value.trim();
+
+            if (!message || isLoading) return;
+
+            isLoading = true;
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<span class="loading"></span>';
+            input.value = '';
+
+            addMessage(message, true);
+
+            API_BASE = document.getElementById('serverUrl').value.trim();
+            const userId = document.getElementById('userId').value.trim();
+            const isOfflineMode = document.getElementById('switchOffline').checked;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/chat/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        message: message,
+                        app_category: null,
+                        is_offline_mode: isOfflineMode
+                    })
+                });
+
+                const data = await response.json();
+
+                addMessage(data.text, false, data.emotion, data.action);
+                updatePetDisplay(data.emotion, data.action);
+
+            } catch (error) {
+                addMessage('网络错误，请检查服务器地址是否正确', false, 'sad', 'idle');
+                console.error('Error:', error);
+            } finally {
+                isLoading = false;
+                sendBtn.disabled = false;
+                sendBtn.textContent = '发送';
+            }
+        }
+
+        async function loadMemories() {
+            API_BASE = document.getElementById('serverUrl').value.trim();
+            const userId = document.getElementById('userId').value.trim();
+
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/memory/list/${userId}?limit=20`);
+                const data = await response.json();
+
+                currentMemories = data.memories || [];
+
+                if (currentMemories.length === 0) {
+                    document.getElementById('memoriesList').innerHTML = '<div class="empty-state">暂无记忆记录</div>';
+                } else {
+                    const listHTML = currentMemories.map((mem, i) => `
+                        <div class="memory-item">
+                            <div class="memory-text">${mem.fact}</div>
+                            <div class="memory-time">${new Date(mem.timestamp).toLocaleString('zh-CN')}</div>
+                        </div>
+                    `).join('');
+                    document.getElementById('memoriesList').innerHTML = listHTML;
+                }
+
+                showPage('memoriesPage');
+            } catch (error) {
+                showToast('加载记忆失败');
+            }
+        }
+
+        async function deleteAllMemories() {
+            if (!confirm('确定要删除所有记忆吗？')) return;
+
+            API_BASE = document.getElementById('serverUrl').value.trim();
+            const userId = document.getElementById('userId').value.trim();
+
+            try {
+                await fetch(`${API_BASE}/api/v1/memory/delete`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        action: 'delete_all'
+                    })
+                });
+
+                showToast('记忆已清空');
+                currentMemories = [];
+            } catch (error) {
+                showToast('删除失败');
+            }
+        }
+
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        document.getElementById('messageInput').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+        });
+
+        updatePetDisplay('neutral', 'idle');
+
+        setTimeout(() => {
+            addMessage('主人好喵！我是星尘，今天想聊什么？', false, 'happy', 'idle');
+        }, 500);
+
+        function renderModelsList() {
+            const currentModel = models.find(m => m.active);
+            if (currentModel) {
+                document.getElementById('currentModelPreview').textContent = currentModel.emoji;
+                document.getElementById('currentModelName').textContent = currentModel.name + '（当前）';
+                document.getElementById('currentModelDesc').textContent = currentModel.desc;
+                document.getElementById('currentModelVersion').textContent = 'v' + currentModel.version;
+
+                const petAvatar = document.getElementById('petAvatar');
+                if (petAvatar) petAvatar.textContent = currentModel.emoji;
+            }
+
+            const otherModels = models.filter(m => !m.active);
+            const listContainer = document.getElementById('modelsList');
+            const emptyContainer = document.getElementById('emptyModels');
+
+            if (otherModels.length === 0) {
+                listContainer.innerHTML = '';
+                emptyContainer.style.display = 'block';
+                return;
+            }
+
+            emptyContainer.style.display = 'none';
+            listContainer.innerHTML = otherModels.map(model => `
+                <div class="settings-section" style="margin-bottom:8px;">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <div style="width:50px;height:50px;background:white;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;">
+                            ${model.emoji}
+                        </div>
+                        <div style="flex:1;">
+                            <div style="font-size:14px;font-weight:bold;">${model.name}</div>
+                            <div style="font-size:12px;color:#666;">${model.desc}</div>
+                            <div style="font-size:11px;color:#999;">${model.size} | v${model.version}</div>
+                        </div>
+                        <button onclick="switchModel('${model.id}')" style="padding:6px 14px;border:1px solid #667eea;background:white;color:#667eea;border-radius:18px;font-size:12px;cursor:pointer;">使用</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function switchModel(modelId) {
+            models = models.map(m => ({
+                ...m,
+                active: m.id === modelId
+            }));
+            renderModelsList();
+
+            const model = models.find(m => m.id === modelId);
+            showToast(`已切换到 ${model.name}`);
+
+            const petAvatar = document.getElementById('petAvatar');
+            if (petAvatar) {
+                petAvatar.textContent = model.emoji;
+                petAvatar.classList.add('animate');
+                setTimeout(() => petAvatar.classList.remove('animate'), 500);
+            }
+        }
+
+        function scanModels() {
+            showToast('扫描中...');
+            setTimeout(() => {
+                showToast('未找到新模型');
+            }, 1000);
+        }
+
+        renderModelsList();
+    </script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="4dp"
+    android:gravity="start">
+
+    <FrameLayout
+        android:id="@+id/bubble_pet"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_message_pet"
+        android:maxWidth="280dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_message_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#e8e8e8"
+                android:textSize="14sp"
+                android:lineSpacingExtra="2dp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="2dp"
+        android:layout_marginStart="4dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tv_message_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="10sp"
+            android:textColor="#999" />
+
+        <TextView
+            android:id="@+id/tv_emotion_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="10sp"
+            android:textColor="#667eea"
+            android:layout_marginStart="8dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/btn_feedback_like"
+            android:layout_width="24dp"
+            android:layout_height="18dp"
+            android:text="👍"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:layout_marginStart="8dp"
+            android:alpha="0.0" />
+
+        <TextView
+            android:id="@+id/btn_feedback_dislike"
+            android:layout_width="24dp"
+            android:layout_height="18dp"
+            android:text="👎"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:layout_marginStart="2dp"
+            android:alpha="0.0" />
+    </LinearLayout>
+
+</LinearLayout>

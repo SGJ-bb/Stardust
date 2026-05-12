@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI桌宠 - 测试模拟器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .pet-display {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .pet-avatar {
+            font-size: 80px;
+            transition: transform 0.3s ease;
+            display: inline-block;
+        }
+
+        .pet-avatar.happy { animation: bounce 0.5s ease; }
+        .pet-avatar.angry { animation: shake 0.5s ease; }
+        .pet-avatar.sad { animation: droop 0.5s ease; }
+        .pet-avatar.surprised { animation: jump 0.3s ease; }
+        .pet-avatar.tsundere { animation: blush 0.5s ease; }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
+        }
+
+        @keyframes droop {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px) rotate(-5deg); }
+        }
+
+        @keyframes jump {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        @keyframes blush {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.1) hue-rotate(10deg); }
+            100% { filter: brightness(1); }
+        }
+
+        .emotion-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .action-badge {
+            display: inline-block;
+            background: #764ba2;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 10px;
+            margin-left: 10px;
+            font-weight: bold;
+        }
+
+        .chat-messages {
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.pet {
+            justify-content: flex-start;
+        }
+
+        .message-bubble {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .message.user .message-bubble {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.pet .message-bubble {
+            background: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 10px;
+            color: #999;
+            margin-top: 4px;
+            padding: 0 4px;
+        }
+
+        .message.user .message-time { text-align: right; }
+
+        .input-area {
+            padding: 15px;
+            border-top: 2px solid #e9ecef;
+            background: #f8f9fa;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-row input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 24px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .input-row input:focus {
+            border-color: #667eea;
+        }
+
+        .input-row button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .input-row button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .input-row button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .settings {
+            padding: 15px;
+            border-top: 2px solid #e9ecef;
+            background: #f8f9fa;
+        }
+
+        .settings-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .settings select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .settings select:focus {
+            border-color: #667eea;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>星尘 AI桌宠</h1>
+            <p>异色瞳黑猫 | 毒舌但关心你喵~</p>
+        </div>
+
+        <div class="pet-display">
+            <div class="pet-avatar" id="petAvatar">🐱</div>
+            <div>
+                <span class="emotion-badge" id="emotionBadge">NEUTRAL</span>
+                <span class="action-badge" id="actionBadge">IDLE</span>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="empty-state">
+                点击发送消息开始聊天喵~
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-row">
+                <input type="text" id="messageInput" placeholder="输入消息..." onkeypress="if(event.key==='Enter')sendMessage()">
+                <button id="sendBtn" onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+
+        <div class="settings">
+            <div class="settings-row">
+                <select id="appCategory">
+                    <option value="unknown">未知App</option>
+                    <option value="social">社交类App</option>
+                    <option value="video">视频类App</option>
+                    <option value="shopping">购物类App</option>
+                    <option value="office">办公类App</option>
+                    <option value="game">游戏类App</option>
+                    <option value="music">音乐类App</option>
+                </select>
+                <select id="offlineMode">
+                    <option value="false">在线模式</option>
+                    <option value="true">离线模式</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001';
+        let messages = [];
+        let isLoading = false;
+
+        const emotionEmojis = {
+            'happy': '😺',
+            'angry': '😾',
+            'sad': '😿',
+            'surprised': '🙀',
+            'tsundere': '😼',
+            'neutral': '🐱'
+        };
+
+        const emotionNames = {
+            'happy': '开心',
+            'angry': '生气',
+            'sad': '伤心',
+            'surprised': '惊讶',
+            'tsundere': '傲娇',
+            'neutral': '平静'
+        };
+
+        const actionNames = {
+            'tail_flick': '摇尾巴',
+            'ear_twitch': '抖耳朵',
+            'blush': '脸红',
+            'stretch': '伸懒腰',
+            'yawn': '打哈欠',
+            'idle': '待机'
+        };
+
+        function getTime() {
+            const now = new Date();
+            return `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+        }
+
+        function updatePetDisplay(emotion, action) {
+            const avatar = document.getElementById('petAvatar');
+            const emotionBadge = document.getElementById('emotionBadge');
+            const actionBadge = document.getElementById('actionBadge');
+
+            avatar.textContent = emotionEmojis[emotion] || '🐱';
+            avatar.className = 'pet-avatar ' + emotion;
+
+            emotionBadge.textContent = emotionNames[emotion] || emotion;
+            actionBadge.textContent = actionNames[action] || action;
+        }
+
+        function addMessage(text, isUser, emotion, action) {
+            const container = document.getElementById('chatMessages');
+            
+            if (messages.length === 0) {
+                container.innerHTML = '';
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'pet'}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.textContent = text;
+
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = getTime();
+
+            messageDiv.appendChild(bubble);
+            container.appendChild(messageDiv);
+            container.appendChild(timeDiv);
+
+            messages.push({ text, isUser, time: getTime() });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const message = input.value.trim();
+
+            if (!message || isLoading) return;
+
+            isLoading = true;
+            sendBtn.disabled = true;
+            input.value = '';
+
+            addMessage(message, true);
+
+            const appCategory = document.getElementById('appCategory').value;
+            const isOfflineMode = document.getElementById('offlineMode').value === 'true';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/chat/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: 'test_user',
+                        message: message,
+                        app_category: appCategory,
+                        is_offline_mode: isOfflineMode
+                    })
+                });
+
+                const data = await response.json();
+
+                addMessage(data.text, false, data.emotion, data.action);
+                updatePetDisplay(data.emotion, data.action);
+
+            } catch (error) {
+                addMessage('网络错误，请稍后再试喵...', false, 'sad', 'idle');
+                console.error('Error:', error);
+            } finally {
+                isLoading = false;
+                sendBtn.disabled = false;
+                input.focus();
+            }
+        }
+
+        updatePetDisplay('neutral', 'idle');
+    </script>
+</body>
+</html>

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI桌宠 - Live2D模型预览</title>
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.3.2/dist/pixi.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/index.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            width: 900px;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 20px; margin-bottom: 4px; }
+        .header p { font-size: 12px; opacity: 0.8; }
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 0;
+        }
+        .preview-area {
+            background: #1a1a2e;
+            min-height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        #live2d-canvas {
+            width: 100%;
+            height: 500px;
+        }
+        .preview-placeholder {
+            color: #666;
+            text-align: center;
+            padding: 40px;
+        }
+        .preview-placeholder .icon { font-size: 80px; margin-bottom: 16px; }
+        .preview-placeholder p { color: #999; font-size: 14px; }
+        .sidebar {
+            background: #f8f9fa;
+            padding: 20px;
+            border-left: 1px solid #e9ecef;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        .model-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-bottom: 8px;
+        }
+        .model-item:hover { background: #f0f0ff; }
+        .model-item.active { background: #e3f2fd; border: 1px solid #667eea; }
+        .model-item-icon {
+            width: 40px;
+            height: 40px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+        .model-item-icon canvas { width: 100%; height: 100%; }
+        .model-item-details { flex: 1; }
+        .model-item-name { font-size: 13px; font-weight: bold; color: #333; }
+        .model-item-path { font-size: 10px; color: #999; word-break: break-all; }
+        .model-item-tags { margin-top: 4px; }
+        .tag { display: inline-block; padding: 2px 6px; border-radius: 8px; font-size: 10px; margin-right: 4px; }
+        .tag-blue { background: #e3f2fd; color: #1565c0; }
+        .tag-green { background: #e8f5e9; color: #2e7d32; }
+        .tag-orange { background: #fff3e0; color: #e65100; }
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: scale(1.02); }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-outline { background: white; color: #667eea; border: 1px solid #667eea; }
+        .info-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #666; font-size: 12px; }
+        .info-value { color: #333; font-size: 12px; font-weight: 500; }
+        .motion-controls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .motion-btn {
+            padding: 6px 12px;
+            border: 1px solid #e0e0e0;
+            background: white;
+            border-radius: 16px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .motion-btn:hover { background: #667eea; color: white; border-color: #667eea; }
+        .status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .status-loading { background: #fff3e0; color: #e65100; }
+        .status-ready { background: #e8f5e9; color: #2e7d32; }
+        .status-error { background: #ffebee; color: #c62828; }
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 20px;
+            font-size: 14px; opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 1000;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Live2D模型预览器</h1>
+            <p>支持Cubism 3/4格式模型 | PixiJS + live2d-cubism-sdk</p>
+        </div>
+        <div class="content">
+            <div class="preview-area">
+                <canvas id="live2d-canvas"></canvas>
+            </div>
+            <div class="sidebar">
+                <div class="section">
+                    <div class="section-title">模型状态</div>
+                    <span class="status status-loading" id="modelStatus">初始化中...</span>
+                    <div class="info-row" style="margin-top: 12px;">
+                        <span class="info-label">当前模型</span>
+                        <span class="info-value" id="currentModelName">无</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Cubism版本</span>
+                        <span class="info-value" id="currentVersion">-</span>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">选择模型</div>
+                    <div id="modelList"></div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">动作控制</div>
+                    <div class="motion-controls" id="motionControls">
+                        <button class="motion-btn" onclick="playMotion('idle')">待机</button>
+                        <button class="motion-btn" onclick="playMotion('tap')">点击</button>
+                        <button class="motion-btn" onclick="playMotion('flick')">滑动</button>
+                        <button class="motion-btn" onclick="playMotion('shake')">摇头</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">表情控制</div>
+                    <div class="motion-controls">
+                        <button class="motion-btn" onclick="setExpression('normal')">正常</button>
+                        <button class="motion-btn" onclick="setExpression('happy')">开心</button>
+                        <button class="motion-btn" onclick="setExpression('angry')">生气</button>
+                        <button class="motion-btn" onclick="setExpression('sad')">伤心</button>
+                        <button class="motion-btn" onclick="setExpression('surprise')">惊讶</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <button class="btn btn-primary" onclick="showToast('导入功能：选择Live2D文件夹')">📥 导入模型</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const models = [
+            {
+                id: 'stardust',
+                name: '星尘',
+                path: 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/shizuku/shizuku.model.json',
+                version: 'Cubism 2',
+                textures: 2,
+                motions: 8,
+                physics: true,
+                size: '45.2 MB'
+            },
+            {
+                id: 'hiyori',
+                name: 'Hiyori (官方Demo)',
+                path: 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/hiyori/hiyori_pro_t11.model3.json',
+                version: 'Cubism 4',
+                textures: 1,
+                motions: 16,
+                physics: true,
+                size: '28.5 MB'
+            }
+        ];
+
+        let app = null;
+        let currentModel = null;
+        let live2dModel = null;
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function initPixiApp() {
+            const canvas = document.getElementById('live2d-canvas');
+            app = new PIXI.Application({
+                view: canvas,
+                width: canvas.offsetWidth,
+                height: canvas.offsetHeight,
+                backgroundAlpha: 0,
+                autoStart: true
+            });
+
+            app.stage.interactive = true;
+            renderModelList();
+        }
+
+        async function loadModel(model) {
+            if (!app) {
+                showToast('初始化失败，请刷新页面');
+                return;
+            }
+
+            if (live2dModel) {
+                app.stage.removeChild(live2dModel);
+                live2dModel.destroy();
+                live2dModel = null;
+            }
+
+            document.getElementById('modelStatus').className = 'status status-loading';
+            document.getElementById('modelStatus').textContent = '加载中...';
+
+            try {
+                live2dModel = await PIXI.live2d.Live2DModel.from(model.path, {
+                    autoInteract: false,
+                    autoUpdate: true
+                });
+
+                live2dModel.anchor.set(0.5, 0.5);
+                
+                const scale = Math.min(
+                    (app.view.width * 0.8) / live2dModel.width,
+                    (app.view.height * 0.8) / live2dModel.height
+                );
+                live2dModel.scale.set(scale);
+                live2dModel.x = app.view.width / 2;
+                live2dModel.y = app.view.height / 2;
+
+                live2dModel.on('hit', (hitAreas) => {
+                    if (hitAreas.includes('body')) {
+                        playMotion('tap');
+                    }
+                });
+
+                app.stage.addChild(live2dModel);
+
+                document.getElementById('modelStatus').className = 'status status-ready';
+                document.getElementById('modelStatus').textContent = '已加载';
+                document.getElementById('currentModelName').textContent = model.name;
+                document.getElementById('currentVersion').textContent = model.version;
+
+                updateMotionButtons(live2dModel);
+                showToast(`已加载 ${model.name}`);
+
+            } catch (error) {
+                console.error('Load model error:', error);
+                document.getElementById('modelStatus').className = 'status status-error';
+                document.getElementById('modelStatus').textContent = '加载失败';
+                showToast('模型加载失败，可能是CORS或路径问题');
+            }
+        }
+
+        function playMotion(group) {
+            if (!live2dModel) {
+                showToast('请先加载模型');
+                return;
+            }
+
+            const motions = live2dModel.internalModel.settings.motions;
+            if (motions && motions[group]) {
+                live2dModel.motion(group);
+                showToast(`播放动作: ${group}`);
+            } else {
+                showToast(`模型没有 ${group} 动作`);
+            }
+        }
+
+        function setExpression(index) {
+            if (!live2dModel) {
+                showToast('请先加载模型');
+                return;
+            }
+
+            try {
+                live2dModel.expression(index);
+                showToast(`设置表情: ${index}`);
+            } catch (e) {
+                showToast('该模型不支持表情切换');
+            }
+        }
+
+        function updateMotionButtons(model) {
+            const controls = document.getElementById('motionControls');
+            const motions = model.internalModel.settings.motions;
+            if (motions) {
+                controls.innerHTML = Object.keys(motions).map(group => 
+                    `<button class="motion-btn" onclick="playMotion('${group}')">${group}</button>`
+                ).join('');
+            }
+        }
+
+        function renderModelList() {
+            const list = document.getElementById('modelList');
+            list.innerHTML = models.map((model, i) => `
+                <div class="model-item ${i === 0 ? 'active' : ''}" onclick="selectModel(${i}, this)">
+                    <div class="model-item-icon">
+                        <span style="font-size: 24px;">${model.textures > 2 ? '😈' : '🐱'}</span>
+                    </div>
+                    <div class="model-item-details">
+                        <div class="model-item-name">${model.name}</div>
+                        <div class="model-item-path">${model.path.substring(0, 40)}...</div>
+                        <div class="model-item-tags">
+                            <span class="tag tag-blue">${model.version}</span>
+                            <span class="tag tag-green">${model.motions}动作</span>
+                            <span class="tag tag-orange">${model.size}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            loadModel(models[0]);
+        }
+
+        function selectModel(index, element) {
+            document.querySelectorAll('.model-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            loadModel(models[index]);
+        }
+
+        window.addEventListener('load', initPixiApp);
+    </script>
+</body>
+</html>

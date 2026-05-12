@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI桌宠 - 模型管理测试</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .phone-frame {
+            width: 375px;
+            height: 700px;
+            background: white;
+            border-radius: 40px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.4);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .page { display: none; flex-direction: column; height: 100%; }
+        .page.active { display: flex; }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 56px;
+        }
+        .header h1 { font-size: 18px; font-weight: bold; flex: 1; text-align: center; }
+        .header-btn {
+            background: none; border: none; color: white; font-size: 20px; cursor: pointer; padding: 8px;
+        }
+        .content { flex: 1; overflow-y: auto; background: #f5f5f5; padding: 16px; }
+        .card {
+            background: white; border-radius: 12px; margin-bottom: 12px; padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .card-title { font-size: 14px; font-weight: bold; color: #333; margin-bottom: 12px; }
+        .model-preview {
+            width: 100%; height: 180px; background: #1a1a2e; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
+        }
+        .model-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .model-preview .placeholder { color: #666; font-size: 14px; text-align: center; }
+        .model-info { margin-top: 12px; }
+        .model-info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+        .model-info-row:last-child { border-bottom: none; }
+        .model-info-label { color: #666; font-size: 13px; }
+        .model-info-value { color: #333; font-size: 13px; font-weight: 500; }
+        .btn {
+            width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 14px;
+            font-weight: bold; cursor: pointer; margin-top: 8px; transition: transform 0.2s;
+        }
+        .btn:hover { transform: scale(1.02); }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-outline { background: white; color: #667eea; border: 1px solid #667eea; }
+        .btn-success { background: #4caf50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .file-list { margin-top: 8px; }
+        .file-item {
+            display: flex; align-items: center; padding: 8px 12px; background: #f8f9fa;
+            border-radius: 6px; margin-bottom: 4px; font-size: 12px;
+        }
+        .file-icon { margin-right: 8px; font-size: 14px; }
+        .file-name { flex: 1; color: #333; }
+        .file-size { color: #999; font-size: 11px; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-right: 4px; }
+        .tag-success { background: #e8f5e9; color: #2e7d32; }
+        .tag-warning { background: #fff3e0; color: #e65100; }
+        .tag-info { background: #e3f2fd; color: #1565c0; }
+        .status-badge {
+            display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;
+        }
+        .status-active { background: #e8f5e9; color: #2e7d32; }
+        .status-inactive { background: #f5f5f5; color: #999; }
+        .import-area {
+            border: 2px dashed #ccc; border-radius: 12px; padding: 30px; text-align: center;
+            cursor: pointer; transition: border-color 0.3s; margin-bottom: 16px;
+        }
+        .import-area:hover { border-color: #667eea; }
+        .import-area.highlight { border-color: #667eea; background: #f0f0ff; }
+        .import-icon { font-size: 40px; margin-bottom: 8px; }
+        .import-text { color: #666; font-size: 14px; }
+        .import-hint { color: #999; font-size: 12px; margin-top: 4px; }
+        .model-list-item {
+            display: flex; align-items: center; padding: 12px; background: white;
+            border-radius: 10px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .model-list-item.active { border: 2px solid #667eea; }
+        .model-thumb {
+            width: 50px; height: 50px; background: #f0f0f0; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; margin-right: 12px;
+            overflow: hidden;
+        }
+        .model-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .model-details { flex: 1; }
+        .model-name { font-size: 14px; font-weight: bold; color: #333; }
+        .model-path { font-size: 11px; color: #999; margin-top: 2px; word-break: break-all; }
+        .model-tags { margin-top: 4px; }
+        .toast {
+            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(100px);
+            background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 20px;
+            font-size: 14px; opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 1000;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div id="modelsPage" class="page active">
+            <div class="header">
+                <button class="header-btn" onclick="showToast('返回设置')">←</button>
+                <h1>Live2D模型管理</h1>
+                <div style="width: 40px;"></div>
+            </div>
+            <div class="content">
+                <div class="card">
+                    <div class="card-title">当前使用模型</div>
+                    <div class="model-preview" id="currentModelPreview">
+                        <div class="placeholder">
+                            <div style="font-size: 60px;">🐱</div>
+                            <div>星尘 - Live2D预览</div>
+                        </div>
+                    </div>
+                    <div class="model-info" id="currentModelInfo"></div>
+                    <span class="status-badge status-active">使用中</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">导入新模型</div>
+                    <div class="import-area" id="importArea">
+                        <div class="import-icon">📁</div>
+                        <div class="import-text">点击选择Live2D模型文件夹</div>
+                        <div class="import-hint">支持 .moc / .model.json / Cubism 3/4 格式</div>
+                    </div>
+                    <input type="file" id="fileInput" webkitdirectory directory multiple style="display:none" />
+                    <div id="importPreview" style="display:none;"></div>
+                </div>
+
+                <div class="card-title" style="padding: 0 0 8px 0;">模型库</div>
+                <div id="modelList"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const models = [
+            {
+                id: 'stardust',
+                name: '星尘',
+                path: 'C:/Users/SGJ/Desktop/models/stardust/',
+                version: 'Cubism 4',
+                textures: 2,
+                motions: 8,
+                physics: true,
+                size: '45.2 MB',
+                isActive: true,
+                files: ['stardust.moc3', 'stardust.model3.json', 'texture_00.png', 'texture_01.png', 'motions/idle.motion3.json', 'motions/tap.motion3.json', 'physics.json']
+            },
+            {
+                id: 'little_devil',
+                name: '小恶魔',
+                path: 'E:/小恶魔/vtuber/',
+                version: 'Cubism 4',
+                textures: 3,
+                motions: 12,
+                physics: true,
+                size: '78.5 MB',
+                isActive: false,
+                files: ['akuma.moc3', 'akuma.model3.json', 'texture_00.png', 'texture_01.png', 'texture_02.png', 'motions/fly.motion3.json', 'motions/laugh.motion3.json', 'physics.json']
+            },
+            {
+                id: 'neko_girl',
+                name: '猫娘小樱',
+                path: 'D:/Live2D/neko_sakura/',
+                version: 'Cubism 3',
+                textures: 2,
+                motions: 6,
+                physics: true,
+                size: '32.1 MB',
+                isActive: false,
+                files: ['sakura.moc', 'sakura.model.json', 'texture_00.png', 'texture_01.png', 'motions/nemui.motion.json', 'physics.json']
+            }
+        ];
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function renderCurrentModel() {
+            const model = models.find(m => m.isActive);
+            if (!model) return;
+
+            document.getElementById('currentModelPreview').innerHTML = `
+                <div class="placeholder">
+                    <div style="font-size: 60px;">${model.textures > 2 ? '😈' : '🐱'}</div>
+                    <div>${model.name} - Live2D预览</div>
+                </div>
+            `;
+
+            document.getElementById('currentModelInfo').innerHTML = `
+                <div class="model-info-row">
+                    <span class="model-info-label">模型名称</span>
+                    <span class="model-info-value">${model.name}</span>
+                </div>
+                <div class="model-info-row">
+                    <span class="model-info-label">文件路径</span>
+                    <span class="model-info-value" style="max-width:180px;word-break:break-all;">${model.path}</span>
+                </div>
+                <div class="model-info-row">
+                    <span class="model-info-label">Cubism版本</span>
+                    <span class="model-info-value">${model.version}</span>
+                </div>
+                <div class="model-info-row">
+                    <span class="model-info-label">纹理数量</span>
+                    <span class="model-info-value">${model.textures} 张</span>
+                </div>
+                <div class="model-info-row">
+                    <span class="model-info-label">动作数量</span>
+                    <span class="model-info-value">${model.motions} 个</span>
+                </div>
+                <div class="model-info-row">
+                    <span class="model-info-label">物理引擎</span>
+                    <span class="model-info-value">${model.physics ? '✅ 已配置' : '❌ 未配置'}</span>
+                </div>
+                <div class="model-info-row">
+                    <span class="model-info-label">占用空间</span>
+                    <span class="model-info-value">${model.size}</span>
+                </div>
+                <div class="model-info-row">
+                    <span class="model-info-label">核心文件</span>
+                    <span class="model-info-value">
+                        <span class="tag tag-success">.moc3</span>
+                        <span class="tag tag-info">model.json</span>
+                        <span class="tag tag-warning">physics</span>
+                    </span>
+                </div>
+            `;
+        }
+
+        function renderModelList() {
+            const list = document.getElementById('modelList');
+            list.innerHTML = models.filter(m => !m.isActive).map(model => `
+                <div class="model-list-item">
+                    <div class="model-thumb">
+                        <span style="font-size:28px;">${model.textures > 2 ? '😈' : '🐱'}</span>
+                    </div>
+                    <div class="model-details">
+                        <div class="model-name">${model.name}</div>
+                        <div class="model-path">${model.path}</div>
+                        <div class="model-tags">
+                            <span class="tag tag-info">${model.version}</span>
+                            <span class="tag tag-success">${model.textures}纹理</span>
+                            <span class="tag tag-warning">${model.motions}动作</span>
+                            <span class="tag tag-info">${model.size}</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="width:auto;padding:8px 16px;margin:0;" onclick="switchModel('${model.id}')">切换</button>
+                </div>
+            `).join('');
+        }
+
+        function switchModel(id) {
+            models.forEach(m => m.isActive = (m.id === id));
+            renderCurrentModel();
+            renderModelList();
+            const model = models.find(m => m.isActive);
+            showToast(`已切换到 ${model.name}`);
+        }
+
+        function handleFileSelect(files) {
+            if (!files || files.length === 0) return;
+
+            const fileArray = Array.from(files);
+            const hasModelJson = fileArray.some(f => f.name.endsWith('.model3.json') || f.name.endsWith('.model.json'));
+            const hasMoc = fileArray.some(f => f.name.endsWith('.moc3') || f.name.endsWith('.moc'));
+
+            if (!hasModelJson && !hasMoc) {
+                showToast('未检测到有效的Live2D模型文件');
+                return;
+            }
+
+            const mocFile = fileArray.find(f => f.name.endsWith('.moc3') || f.name.endsWith('.moc'));
+            const modelJsonFile = fileArray.find(f => f.name.endsWith('.model3.json') || f.name.endsWith('.model.json'));
+            const textureFiles = fileArray.filter(f => f.name.endsWith('.png') || f.name.endsWith('.jpg'));
+            const motionFiles = fileArray.filter(f => f.name.includes('motion'));
+
+            let totalSize = 0;
+            fileArray.forEach(f => totalSize += f.size);
+
+            const preview = document.getElementById('importPreview');
+            preview.style.display = 'block';
+            preview.innerHTML = `
+                <div class="card" style="margin-top:12px;">
+                    <div class="card-title">✅ 检测到Live2D模型</div>
+                    <div class="model-info">
+                        <div class="model-info-row">
+                            <span class="model-info-label">模型文件</span>
+                            <span class="model-info-value">${mocFile?.name || '未知'}</span>
+                        </div>
+                        <div class="model-info-row">
+                            <span class="model-info-label">配置文件</span>
+                            <span class="model-info-value">${modelJsonFile?.name || '未知'}</span>
+                        </div>
+                        <div class="model-info-row">
+                            <span class="model-info-label">纹理文件</span>
+                            <span class="model-info-value">${textureFiles.length} 张</span>
+                        </div>
+                        <div class="model-info-row">
+                            <span class="model-info-label">动作文件</span>
+                            <span class="model-info-value">${motionFiles.length} 个</span>
+                        </div>
+                        <div class="model-info-row">
+                            <span class="model-info-label">总大小</span>
+                            <span class="model-info-value">${(totalSize / 1024 / 1024).toFixed(1)} MB</span>
+                        </div>
+                    </div>
+                    <div class="file-list">
+                        ${fileArray.slice(0, 8).map(f => `
+                            <div class="file-item">
+                                <span class="file-icon">${getFileIcon(f.name)}</span>
+                                <span class="file-name">${f.name}</span>
+                                <span class="file-size">${(f.size / 1024).toFixed(1)} KB</span>
+                            </div>
+                        `).join('')}
+                        ${fileArray.length > 8 ? `<div class="file-item" style="color:#999;">... 还有 ${fileArray.length - 8} 个文件</div>` : ''}
+                    </div>
+                    <button class="btn btn-success" onclick="confirmImport()">确认导入</button>
+                </div>
+            `;
+        }
+
+        function getFileIcon(name) {
+            if (name.endsWith('.moc3') || name.endsWith('.moc')) return '🎭';
+            if (name.endsWith('.json')) return '📋';
+            if (name.endsWith('.png') || name.endsWith('.jpg')) return '🖼️';
+            if (name.includes('motion')) return '🎬';
+            if (name.includes('physics')) return '⚙️';
+            return '📄';
+        }
+
+        function confirmImport() {
+            showToast('模型导入成功！');
+            document.getElementById('importPreview').style.display = 'none';
+        }
+
+        document.getElementById('importArea').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            handleFileSelect(e.target.files);
+        });
+
+        document.getElementById('importArea').addEventListener('dragover', (e) => {
+            e.preventDefault();
+            document.getElementById('importArea').classList.add('highlight');
+        });
+
+        document.getElementById('importArea').addEventListener('dragleave', () => {
+            document.getElementById('importArea').classList.remove('highlight');
+        });
+
+        document.getElementById('importArea').addEventListener('drop', (e) => {
+            e.preventDefault();
+            document.getElementById('importArea').classList.remove('highlight');
+            if (e.dataTransfer.items) {
+                const files = [];
+                for (let i = 0; i < e.dataTransfer.items.length; i++) {
+                    const item = e.dataTransfer.items[i];
+                    if (item.kind === 'file') {
+                        files.push(item.getAsFile());
+                    }
+                }
+                handleFileSelect(files);
+            }
+        });
+
+        renderCurrentModel();
+        renderModelList();
+    </script>
+</body>
+</html>

@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0a0a1a">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#1a1a30"
+        android:elevation="4dp"
+        app:title="模型设置"
+        app:titleTextColor="#ffffff"
+        app:titleTextAppearance="@style/ToolbarTitleStyle"
+        app:navigationIcon="@android:drawable/ic_menu_close_clear_cancel"
+        app:navigationIconTint="#aabbdd" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?attr/actionBarSize">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="#1a1a30"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#2a2a4a">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="模型文件信息"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#c4b5fd" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="模型名称"
+                        android:textSize="13sp"
+                        android:textColor="#8899aa"
+                        android:layout_marginTop="14dp" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:boxBackgroundColor="#151525"
+                        app:boxStrokeColor="#2a2a4a"
+                        app:hintTextColor="#445566"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_model_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="#e0e0f0"
+                            android:textColorHint="#556677" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="模型描述"
+                        android:textSize="13sp"
+                        android:textColor="#8899aa"
+                        android:layout_marginTop="14dp" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:boxBackgroundColor="#151525"
+                        app:boxStrokeColor="#2a2a4a"
+                        app:hintTextColor="#445566"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_model_desc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="#e0e0f0"
+                            android:textColorHint="#556677" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="模型路径"
+                        android:textSize="13sp"
+                        android:textColor="#8899aa"
+                        android:layout_marginTop="14dp" />
+
+                    <TextView
+                        android:id="@+id/tv_model_path"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="12sp"
+                        android:textColor="#667788"
+                        android:padding="10dp"
+                        android:background="@drawable/bg_model_path"
+                        android:fontFamily="monospace" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="#1a1a30"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#2a2a4a">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="动作与表情映射"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#c4b5fd" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="配置Cubism参数映射"
+                        android:textSize="12sp"
+                        android:textColor="#667788"
+                        android:layout_marginTop="4dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_configure_params"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:text="配置参数映射"
+                        android:textSize="14sp"
+                        android:layout_marginTop="12dp"
+                        app:cornerRadius="22dp"
+                        app:strokeColor="#667eea"
+                        app:strokeWidth="1dp"
+                        android:textColor="#8899cc"
+                        app:backgroundTint="@android:color/transparent"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="#1a1a30"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#2a2a4a">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="渲染设置"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#c4b5fd" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="纹理质量"
+                        android:textSize="13sp"
+                        android:textColor="#8899aa"
+                        android:layout_marginTop="14dp" />
+
+                    <RadioGroup
+                        android:id="@+id/radio_texture_quality"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp">
+
+                        <RadioButton
+                            android:id="@+id/radio_tex_high"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="高 (512x512)"
+                            android:checked="true"
+                            android:textColor="#d0d0e0"
+                            android:buttonTint="#667eea" />
+
+                        <RadioButton
+                            android:id="@+id/radio_tex_medium"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="中 (256x256)"
+                            android:textColor="#8899aa"
+                            android:buttonTint="#667eea" />
+
+                        <RadioButton
+                            android:id="@+id/radio_tex_low"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="低 (128x128，省电)"
+                            android:textColor="#8899aa"
+                            android:buttonTint="#667eea" />
+                    </RadioGroup>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#2a2a4a"
+                        android:layout_marginVertical="14dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="帧率设置"
+                        android:textSize="13sp"
+                        android:textColor="#8899aa" />
+
+                    <RadioGroup
+                        android:id="@+id/radio_fps"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp">
+
+                        <RadioButton
+                            android:id="@+id/radio_fps_30"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="30 FPS（流畅）"
+                            android:checked="true"
+                            android:textColor="#d0d0e0"
+                            android:buttonTint="#667eea" />
+
+                        <RadioButton
+                            android:id="@+id/radio_fps_20"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="20 FPS（省电）"
+                            android:textColor="#8899aa"
+                            android:buttonTint="#667eea" />
+                    </RadioGroup>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_save_model_settings"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="保存设置"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="26dp"
+                app:backgroundTint="#667eea"
+                style="@style/Widget.MaterialComponents.Button" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

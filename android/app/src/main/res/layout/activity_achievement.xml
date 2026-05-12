@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0d1117">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#1a1a30"
+        android:elevation="4dp"
+        app:title="成就殿堂"
+        app:titleTextColor="#ffffff"
+        app:navigationIcon="@android:drawable/ic_menu_close_clear_cancel"
+        app:navigationIconTint="#aabbdd" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:padding="16dp"
+        android:background="#161b22">
+
+        <TextView
+            android:id="@+id/tv_achievement_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="已解锁 0/18"
+            android:textColor="#e6edf3"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            android:id="@+id/progress_achievement"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="120dp"
+            android:layout_height="6dp"
+            android:layout_marginStart="12dp"
+            android:max="100"
+            android:progress="0"
+            android:progressTint="#a78bfa"
+            android:background="#22ffffff" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/layout_category_tabs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="6dp"
+        android:background="#161b22">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_all"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="全部"
+            android:checkable="true"
+            android:checked="true"
+            style="@style/Widget.MaterialComponents.Chip.Filter" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_chat"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="💬 聊天"
+            android:checkable="true"
+            android:layout_marginStart="4dp"
+            style="@style/Widget.MaterialComponents.Chip.Filter" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_checkin"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="📅 打卡"
+            android:checkable="true"
+            android:layout_marginStart="4dp"
+            style="@style/Widget.MaterialComponents.Chip.Filter" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_affection"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="❤ 好感"
+            android:checkable="true"
+            android:layout_marginStart="4dp"
+            style="@style/Widget.MaterialComponents.Chip.Filter" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_feedback"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="👍 反馈"
+            android:checkable="true"
+            android:layout_marginStart="4dp"
+            style="@style/Widget.MaterialComponents.Chip.Filter" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cat_pomodoro"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="🍅 专注"
+            android:checkable="true"
+            android:layout_marginStart="4dp"
+            style="@style/Widget.MaterialComponents.Chip.Filter" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ListView
+            android:id="@+id/listview_achievements"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="#1c2128"
+            android:dividerHeight="1dp"
+            android:padding="8dp"
+            android:background="#0d1117" />
+
+        <TextView
+            android:id="@+id/tv_achievement_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="暂无此类成就"
+            android:textColor="#667788"
+            android:textSize="14sp"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

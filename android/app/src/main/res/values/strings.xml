@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI桌宠</string>
+    <string name="accessibility_service_description">用于识别当前前台应用的类别（社交、视频、办公等），以便桌宠做出合适的互动。我们不会读取或传输任何界面文字内容，仅获取应用包名进行本地分类。</string>
+</resources>
