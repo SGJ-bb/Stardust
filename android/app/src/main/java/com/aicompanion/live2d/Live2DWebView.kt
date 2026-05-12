@@ -303,10 +303,14 @@ class Live2DWebView @JvmOverloads constructor(
             localDir.mkdirs()
 
             addLog("Copying model to cache: ${localDir.absolutePath}")
+            var copyCount = 0
+            var skipCount = 0
             srcDir.walkTopDown().filter { it.isFile }.forEach { srcFile ->
                 try {
                     val relPath = srcFile.absolutePath.substring(srcDir.absolutePath.length).trimStart('/', '\\')
                     if (shouldSkipFile(relPath, srcFile.name)) {
+                        skipCount++
+                        addLog("SKIP: $relPath")
                         return@forEach
                     }
                     val dstFile = File(localDir, relPath)
@@ -316,10 +320,15 @@ class Live2DWebView @JvmOverloads constructor(
                             input.copyTo(output)
                         }
                     }
+                    copyCount++
+                    if (srcFile.name.endsWith(".png") || srcFile.name.endsWith(".moc3") || srcFile.name.endsWith(".json")) {
+                        addLog("COPY: $relPath (${srcFile.length()} bytes)")
+                    }
                 } catch (e: Exception) {
-                    addLog("Copy warn: ${e.message}")
+                    addLog("Copy warn: ${srcFile.name} - ${e.message}")
                 }
             }
+            addLog("Copy done: $copyCount files copied, $skipCount skipped")
 
             checkAndCompressTextures(localDir)
 
