@@ -271,8 +271,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupLive2DTouch() {
-        live2dView?.touchHandler = { event ->
-            if (!isModelLoaded) return@touchHandler false
+        val view = live2dView ?: return
+        view.touchHandler = lambda@{ event ->
+            if (!isModelLoaded) return@lambda false
             when (event.actionMasked) {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     touchDownX = event.x
@@ -301,7 +302,7 @@ class MainActivity : AppCompatActivity() {
                         live2dView?.translationY = (live2dView?.translationY ?: 0f) + dy
                         lastTouchRawX = event.rawX
                         lastTouchRawY = event.rawY
-                        return@touchHandler true
+                        return@lambda true
                     }
                     if (longPressPending) {
                         val dx = Math.abs(event.x - touchDownX)
@@ -324,12 +325,12 @@ class MainActivity : AppCompatActivity() {
                             .putFloat("model_offset_x", offsetX)
                             .putFloat("model_offset_y", offsetY)
                             .apply()
-                        return@touchHandler true
+                        return@lambda true
                     }
                     if (longPressPending) {
                         longPressPending = false
                         live2dView?.tapModel(event.x, event.y)
-                        return@touchHandler true
+                        return@lambda true
                     }
                     true
                 }
