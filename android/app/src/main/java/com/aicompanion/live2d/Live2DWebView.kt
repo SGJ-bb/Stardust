@@ -864,6 +864,49 @@ class Live2DWebView @JvmOverloads constructor(
                         step('OK');
                         var modelPath = '$modelFileName';
                         step('Model: ' + modelPath);
+
+                        step('Pre-checking textures...');
+                        try {
+                            var mReq = new XMLHttpRequest();
+                            mReq.open('GET', modelPath, false);
+                            mReq.send();
+                            if (mReq.status === 200) {
+                                var mData = JSON.parse(mReq.responseText);
+                                var tRefs = mData.FileReferences && mData.FileReferences.Textures;
+                                if (tRefs && tRefs.length > 0) {
+                                    var missingTex = [];
+                                    tRefs.forEach(function(tex) {
+                                        try {
+                                            var tReq = new XMLHttpRequest();
+                                            tReq.open('HEAD', tex, false);
+                                            tReq.send();
+                                            if (tReq.status !== 200) missingTex.push(tex);
+                                        } catch(e) { missingTex.push(tex); }
+                                    });
+                                    if (missingTex.length > 0) {
+                                        step('Missing textures: ' + missingTex.join(', '));
+                                        step('Creating placeholder textures...');
+                                        var newTexRefs = [];
+                                        tRefs.forEach(function(tex) {
+                                            if (missingTex.indexOf(tex) === -1) {
+                                                newTexRefs.push(tex);
+                                            }
+                                        });
+                                        mData.FileReferences.Textures = newTexRefs;
+                                        var newJson = JSON.stringify(mData);
+                                        var blob = new Blob([newJson], {type: 'application/json'});
+                                        var newUrl = URL.createObjectURL(blob);
+                                        modelPath = newUrl;
+                                        step('Using modified model with ' + newTexRefs.length + ' textures');
+                                    } else {
+                                        step('All ' + tRefs.length + ' textures OK');
+                                    }
+                                }
+                            }
+                        } catch(preErr) {
+                            step('Pre-check failed: ' + preErr.message + ', continuing anyway');
+                        }
+
                         step('Loading...');
                         PIXI.live2d.Live2DModel.from(modelPath, {
                             autoInteract: false, autoUpdate: true
