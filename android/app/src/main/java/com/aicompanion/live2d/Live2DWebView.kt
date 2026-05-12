@@ -398,6 +398,7 @@ class Live2DWebView @JvmOverloads constructor(
         if (fileName.equals("items_pinned_to_model.json", ignoreCase = true)) return true
         if (fileName.equals("items_pinned_to_model.zip", ignoreCase = true)) return true
         if (fileName.endsWith(".vtube.json")) return true
+        if (fileName.contains("Thumbs.db") || fileName.contains("Desktop.ini") || fileName.contains(".DS_Store")) return true
         return false
     }
 
@@ -543,26 +544,23 @@ class Live2DWebView @JvmOverloads constructor(
 
     private fun checkAndCompressTextures(modelDir: File) {
         try {
-            var compressed = 0
-            var reencoded = 0
-            var skipped = 0
             addLog("Preprocessing textures in: ${modelDir.name}, maxTextureSize=$maxTextureSize")
 
             val textureFiles = modelDir.walkTopDown()
                 .filter { it.isFile }
                 .filter { it.extension.equals("png", ignoreCase = true) || it.extension.equals("jpg", ignoreCase = true) || it.extension.equals("jpeg", ignoreCase = true) }
+                .filter { !it.absolutePath.contains("_backup") }
                 .toList()
 
             addLog("Found ${textureFiles.size} texture file(s)")
 
-            for (file in textureFiles) {
+            for ((index, file) in textureFiles.withIndex()) {
                 try {
                     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeFile(file.absolutePath, options)
 
                     if (options.outWidth <= 0 || options.outHeight <= 0) {
                         addLog("Cannot decode bounds: ${file.name}, skipping")
-                        skipped++
                         continue
                     }
 
@@ -571,7 +569,7 @@ class Live2DWebView @JvmOverloads constructor(
                     val needsResize = w > maxTextureSize || h > maxTextureSize
                     val needsReencode = w * h > 1024 * 1024
 
-                    addLog("Texture: ${file.name} ${w}x${h} resize=$needsResize reencode=$needsReencode")
+                    addLog("Texture[$index]: ${file.name} ${w}x${h} resize=$needsResize reencode=$needsReencode")
 
                     if (!needsResize && !needsReencode) continue
 
@@ -586,13 +584,6 @@ class Live2DWebView @JvmOverloads constructor(
                         targetH = h
                     }
 
-                    val backupDir = File(file.parentFile, "_backup")
-                    if (!backupDir.exists()) backupDir.mkdirs()
-                    val backupFile = File(backupDir, file.name)
-                    if (!backupFile.exists()) {
-                        file.copyTo(backupFile)
-                    }
-
                     val inSampleSize = calculateInSampleSize(options, targetW, targetH)
                     val decodeOpts = BitmapFactory.Options().apply {
                         inPreferredConfig = Bitmap.Config.ARGB_8888
@@ -601,9 +592,7 @@ class Live2DWebView @JvmOverloads constructor(
 
                     val bitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOpts)
                     if (bitmap == null) {
-                        addLog("Decode failed: ${file.name}, restoring backup")
-                        if (backupFile.exists()) backupFile.copyTo(file, overwrite = true)
-                        skipped++
+                        addLog("Decode failed: ${file.name}, keeping original")
                         continue
                     }
 
@@ -615,32 +604,47 @@ class Live2DWebView @JvmOverloads constructor(
                         bitmap
                     }
 
-                    ByteArrayOutputStream().use { baos ->
-                        val success = scaled.compress(Bitmap.CompressFormat.PNG, 100, baos)
-                        if (success) {
-                            file.writeBytes(baos.toByteArray())
-                            if (needsResize) {
-                                addLog("Resized: ${file.name} ${w}x${h} -> ${targetW}x${targetH}")
-                                compressed++
-                            } else {
-                                addLog("Re-encoded: ${file.name} ${w}x${h}")
-                                reencoded++
+                    val tempFile = File(file.parentFile, file.name + ".tmp")
+                    var compressSuccess = false
+                    try {
+                        ByteArrayOutputStream().use { baos ->
+                            compressSuccess = scaled.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                            if (compressSuccess) {
+                                tempFile.writeBytes(baos.toByteArray())
                             }
-                        } else {
-                            addLog("Compress failed: ${file.name}, restoring backup")
-                            if (backupFile.exists()) backupFile.copyTo(file, overwrite = true)
-                            skipped++
                         }
+                    } catch (e: Throwable) {
+                        addLog("Compress error ${file.name}: ${e.javaClass.simpleName}: ${e.message}")
+                        compressSuccess = false
                     }
+
                     scaled.recycle()
-                } catch (e: Exception) {
-                    addLog("Texture error ${file.name}: ${e.message}")
-                    skipped++
+
+                    if (compressSuccess && tempFile.exists() && tempFile.length() > 0) {
+                        try {
+                            tempFile.copyTo(file, overwrite = true)
+                            addLog("Compressed: ${file.name} ${w}x${h} -> ${targetW}x${targetH}")
+                        } catch (e: Throwable) {
+                            addLog("Replace error ${file.name}: ${e.message}")
+                        }
+                    } else {
+                        addLog("Compress failed: ${file.name}, keeping original")
+                    }
+
+                    if (tempFile.exists()) {
+                        try { tempFile.delete() } catch (_: Exception) {}
+                    }
+
+                    System.gc()
+                    Thread.sleep(50)
+
+                } catch (e: Throwable) {
+                    addLog("Texture error ${file.name}: ${e.javaClass.simpleName}: ${e.message}")
                 }
             }
-            addLog("Texture preprocessing done: compressed=$compressed reencoded=$reencoded skipped=$skipped")
-        } catch (e: Exception) {
-            addLog("Texture check error: ${e.message}")
+            addLog("Texture preprocessing done")
+        } catch (e: Throwable) {
+            addLog("Texture check error: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
