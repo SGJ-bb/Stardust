@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0d1117">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp"
+        android:background="#161b22">
+
+        <ImageButton
+            android:id="@+id/btn_memory_back"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_revert"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="返回"
+            app:tint="#8899cc" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="记忆管理"
+            android:textColor="#e6edf3"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:gravity="center" />
+
+        <ImageButton
+            android:id="@+id/btn_search_toggle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_search"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="搜索"
+            app:tint="#8899cc" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/layout_search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:paddingHorizontal="12dp"
+        android:background="#161b22"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/et_search_memory"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:hint="搜索记忆关键词..."
+            android:textColorHint="#667788"
+            android:textColor="#c9d1d9"
+            android:textSize="13sp"
+            android:background="@drawable/bg_model_path"
+            android:paddingHorizontal="12dp"
+            android:singleLine="true" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:orientation="horizontal"
+            android:layout_marginStart="8dp">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_all"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:text="全部"
+                android:checkable="true"
+                android:checked="true"
+                style="@style/Widget.MaterialComponents.Chip.Filter" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_today"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:text="今日"
+                android:checkable="true"
+                android:layout_marginStart="4dp"
+                style="@style/Widget.MaterialComponents.Chip.Filter" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/layout_memory_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:gravity="center_vertical"
+            android:background="#1c2128"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_memory_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#8b949e"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <ListView
+            android:id="@+id/listview_memories"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="0dp"
+            android:divider="#1c2128"
+            android:dividerHeight="1dp"
+            android:padding="0dp"
+            android:background="#0d1117"
+            android:clipToPadding="false" />
+
+        <TextView
+            android:id="@+id/tv_memory_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="还没有记忆呢\n多和我说说话就会产生记忆啦~"
+            android:textColor="#667788"
+            android:textSize="14sp"
+            android:visibility="gone"
+            android:lineSpacingExtra="6dp" />
+    </FrameLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_delete_all_memories"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_margin="12dp"
+        android:text="清空所有记忆"
+        android:textSize="14sp"
+        app:cornerRadius="24dp"
+        app:backgroundTint="#c0392b"
+        style="@style/Widget.MaterialComponents.Button" />
+</LinearLayout>

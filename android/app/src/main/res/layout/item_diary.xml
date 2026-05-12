@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tv_diary_mood"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="😊"
+            android:textSize="32sp"
+            android:layout_marginEnd="12dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_diary_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2024年1月1日"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_diary_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="日记内容预览..."
+                android:textSize="13sp"
+                android:maxLines="3"
+                android:ellipsize="end"
+                android:layout_marginTop="4dp"
+                android:lineSpacingExtra="3dp" />
+
+            <TextView
+                android:id="@+id/tv_diary_stats"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="[3条消息] 好感度30"
+                android:textSize="11sp"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1a2030"
+        android:layout_marginTop="10dp" />
+</LinearLayout>

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0f0f1a">
+
+    <com.aicompanion.live2d.Live2DWebView
+        android:id="@+id/live2d_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="200dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="#cc0f0f1a"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:orientation="horizontal">
+
+        <View
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:background="@drawable/status_dot_online"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/tv_model_info"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="调整模型位置和大小"
+            android:textColor="#ffffff"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_show_log"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:icon="@android:drawable/ic_menu_info_details"
+            app:iconTint="#8899cc"
+            app:cornerRadius="20dp"
+            app:backgroundTint="#22ffffff"
+            app:strokeWidth="0dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingBottom="24dp"
+        android:background="@drawable/bg_bottom_panel">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="长按模型拖动移动位置"
+            android:textColor="#8899cc"
+            android:textSize="13sp"
+            android:gravity="center"
+            android:paddingBottom="8dp"
+            android:letterSpacing="0.02" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="缩放"
+                android:textColor="#aabbdd"
+                android:textSize="14sp"
+                android:layout_marginEnd="8dp" />
+
+            <SeekBar
+                android:id="@+id/seekbar_scale"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:min="30"
+                android:max="300"
+                android:progress="100"
+                android:thumbTint="#ff6b9d"
+                android:progressTint="#667eea"
+                android:progressBackgroundTint="#334466" />
+
+            <TextView
+                android:id="@+id/tv_scale_value"
+                android:layout_width="50dp"
+                android:layout_height="wrap_content"
+                android:text="100%"
+                android:textColor="#ffffff"
+                android:textSize="14sp"
+                android:gravity="center" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_reset"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="重置"
+                android:textSize="14sp"
+                app:cornerRadius="24dp"
+                app:strokeColor="#667eea"
+                app:strokeWidth="2dp"
+                app:backgroundTint="@android:color/transparent"
+                android:textColor="#aabbdd"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_finish"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="完成并保存"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="12dp"
+            app:cornerRadius="26dp"
+            app:backgroundTint="#ff6b9d"
+            style="@style/Widget.MaterialComponents.Button" />
+    </LinearLayout>
+</FrameLayout>

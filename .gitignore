@@ -1,0 +1,51 @@
+# Android
+*.iml
+.gradle
+local.properties
+.idea
+.DS_Store
+build/
+captures
+.externalNativeBuild
+.cxx
+*.jks
+*.keystore
+*.log
+Thumbs.db
+
+# Android build outputs
+android/app/build/
+android/app/build_v2/
+android/app/build_v3/
+android/build/
+
+# APK files (build artifacts)
+*.apk
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Environment
+.env
+config/.env
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini

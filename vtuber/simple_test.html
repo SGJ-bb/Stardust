@@ -1,0 +1,45 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Live2D Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #live2d {
+            width: 300px;
+            height: 500px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple Live2D Test</h1>
+    <div id="live2d"></div>
+    
+    <!-- 引入Live2D库 -->
+    <script src="https://cdn.jsdelivr.net/npm/live2d-widget@3.0.5/lib/L2Dwidget.min.js"></script>
+    
+    <script>
+        // 简单的Live2D初始化
+        L2Dwidget.init({
+            "model": {
+                "jsonPath": "http://localhost:8000/小恶魔.model3.json"
+            },
+            "display": {
+                "position": "left",
+                "width": 300,
+                "height": 500,
+                "hOffset": 0,
+                "vOffset": 0
+            }
+        });
+        
+        console.log('Live2D widget initialized');
+    </script>
+</body>
+</html>

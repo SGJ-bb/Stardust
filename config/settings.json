@@ -1,0 +1,98 @@
+{
+  "app": {
+    "name": "AI Companion Desktop Pet",
+    "version": "1.0.0"
+  },
+  "personality": {
+    "name": "星尘",
+    "description": "异色瞳黑猫，毒舌但关心主人，讨厌无聊，喜欢吐槽屏幕内容。",
+    "speech_style": "简短、活泼、偶尔用喵结尾"
+  },
+  "emotion_mapping": {
+    "happy": {
+      "ParamEyeLOpen": 1.0,
+      "ParamEyeROpen": 1.0,
+      "ParamMouthOpenY": 0.3,
+      "ParamCheek": 0.0
+    },
+    "angry": {
+      "ParamEyeLOpen": 0.8,
+      "ParamEyeROpen": 0.8,
+      "ParamBrowLY": -0.3,
+      "ParamBrowRY": -0.3,
+      "ParamMouthOpenY": 0.5
+    },
+    "sad": {
+      "ParamEyeLOpen": 0.7,
+      "ParamEyeROpen": 0.7,
+      "ParamBrowLY": 0.2,
+      "ParamBrowRY": 0.2,
+      "ParamMouthOpenY": 0.0
+    },
+    "surprised": {
+      "ParamEyeLOpen": 1.2,
+      "ParamEyeROpen": 1.2,
+      "ParamMouthOpenY": 0.8
+    },
+    "tsundere": {
+      "ParamEyeLOpen": 0.9,
+      "ParamEyeROpen": 0.9,
+      "ParamCheek": 0.5,
+      "ParamMouthOpenY": 0.1
+    },
+    "neutral": {
+      "ParamEyeLOpen": 1.0,
+      "ParamEyeROpen": 1.0,
+      "ParamMouthOpenY": 0.0,
+      "ParamCheek": 0.0
+    }
+  },
+  "action_mapping": {
+    "tail_flick": {
+      "ParamBodyAngleZ": 0.5
+    },
+    "ear_twitch": {
+      "ParamHairFront": 0.3
+    },
+    "blush": {
+      "ParamCheek": 0.8
+    },
+    "stretch": {
+      "ParamBodyAngleY": 0.2,
+      "ParamBodyAngleZ": 0.2
+    },
+    "yawn": {
+      "ParamMouthOpenY": 1.0,
+      "ParamEyeLOpen": 0.5,
+      "ParamEyeROpen": 0.5
+    },
+    "idle": {}
+  },
+  "performance": {
+    "idle": {
+      "cpu_percent": 3,
+      "memory_mb": 180,
+      "battery_percent_per_hour": 1.5,
+      "fps": 10
+    },
+    "chat": {
+      "cpu_percent": 6,
+      "memory_mb": 200,
+      "battery_percent_per_hour": 3.5,
+      "fps": 30
+    },
+    "offline_voice": {
+      "cpu_percent": 18,
+      "memory_mb": 230,
+      "battery_percent_per_hour": 9,
+      "fps": 30
+    }
+  },
+  "privacy": {
+    "screen_text_never_leaves_device": true,
+    "only_category_sent": true,
+    "recording_requires_long_press": true,
+    "memory_deletable": true,
+    "account_anonymous_by_default": true
+  }
+}
