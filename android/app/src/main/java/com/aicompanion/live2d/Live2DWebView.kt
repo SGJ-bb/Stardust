@@ -52,9 +52,7 @@ class Live2DWebView @JvmOverloads constructor(
             val height = display.height
             val maxDim = maxOf(width, height)
             when {
-                maxDim >= 2560 -> 4096
-                maxDim >= 1440 -> 4096
-                maxDim >= 1080 -> 2048
+                maxDim >= 2560 -> 2048
                 else -> 2048
             }
         } catch (e: Exception) {
@@ -510,79 +508,101 @@ class Live2DWebView @JvmOverloads constructor(
     private fun checkAndCompressTextures(modelDir: File) {
         try {
             var compressed = 0
+            var reencoded = 0
             var skipped = 0
-            addLog("Checking textures in: ${modelDir.absolutePath}, maxTextureSize=$maxTextureSize")
-            modelDir.walkTopDown().filter { it.isFile && (it.extension.equals("png", ignoreCase = true) || it.extension.equals("jpg", ignoreCase = true) || it.extension.equals("jpeg", ignoreCase = true)) }.forEach { file ->
+            addLog("Preprocessing textures in: ${modelDir.name}, maxTextureSize=$maxTextureSize")
+
+            val textureFiles = modelDir.walkTopDown()
+                .filter { it.isFile }
+                .filter { it.extension.equals("png", ignoreCase = true) || it.extension.equals("jpg", ignoreCase = true) || it.extension.equals("jpeg", ignoreCase = true) }
+                .toList()
+
+            addLog("Found ${textureFiles.size} texture file(s)")
+
+            for (file in textureFiles) {
                 try {
                     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeFile(file.absolutePath, options)
 
                     if (options.outWidth <= 0 || options.outHeight <= 0) {
-                        addLog("Texture decode bounds failed: ${file.name}, skipping")
+                        addLog("Cannot decode bounds: ${file.name}, skipping")
                         skipped++
-                        return@forEach
+                        continue
                     }
 
-                    addLog("Texture: ${file.name} ${options.outWidth}x${options.outHeight}")
+                    val w = options.outWidth
+                    val h = options.outHeight
+                    val needsResize = w > maxTextureSize || h > maxTextureSize
+                    val needsReencode = w * h > 1024 * 1024
 
-                    val needsResize = options.outWidth > maxTextureSize || options.outHeight > maxTextureSize
-                    val needsReencode = file.extension.equals("png", ignoreCase = true) &&
-                            options.outWidth * options.outHeight > 2048 * 2048
+                    addLog("Texture: ${file.name} ${w}x${h} resize=$needsResize reencode=$needsReencode")
 
-                    if (needsResize || needsReencode) {
-                        val targetW = if (needsResize) {
-                            val scale = minOf(maxTextureSize.toFloat() / options.outWidth, maxTextureSize.toFloat() / options.outHeight)
-                            (options.outWidth * scale).toInt()
-                        } else options.outWidth
+                    if (!needsResize && !needsReencode) continue
 
-                        val targetH = if (needsResize) {
-                            val scale = minOf(maxTextureSize.toFloat() / options.outWidth, maxTextureSize.toFloat() / options.outHeight)
-                            (options.outHeight * scale).toInt()
-                        } else options.outHeight
+                    val targetW: Int
+                    val targetH: Int
+                    if (needsResize) {
+                        val scale = minOf(maxTextureSize.toFloat() / w, maxTextureSize.toFloat() / h)
+                        targetW = (w * scale).toInt()
+                        targetH = (h * scale).toInt()
+                    } else {
+                        targetW = w
+                        targetH = h
+                    }
 
-                        val backupDir = File(file.parentFile, "_backup")
-                        if (!backupDir.exists()) backupDir.mkdirs()
+                    val backupDir = File(file.parentFile, "_backup")
+                    if (!backupDir.exists()) backupDir.mkdirs()
+                    val backupFile = File(backupDir, file.name)
+                    if (!backupFile.exists()) {
+                        file.copyTo(backupFile)
+                    }
 
-                        val backupFile = File(backupDir, file.name)
-                        if (!backupFile.exists()) {
-                            file.copyTo(backupFile)
-                        }
+                    val inSampleSize = calculateInSampleSize(options, targetW, targetH)
+                    val decodeOpts = BitmapFactory.Options().apply {
+                        inPreferredConfig = Bitmap.Config.ARGB_8888
+                        this.inSampleSize = inSampleSize
+                    }
 
-                        val inSampleSize = calculateInSampleSize(options, targetW, targetH)
-                        val decodeOpts = BitmapFactory.Options().apply {
-                            inPreferredConfig = Bitmap.Config.ARGB_8888
-                            this.inSampleSize = inSampleSize
-                        }
-                        val bitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOpts)
-                        if (bitmap != null) {
-                            val scaled = if (bitmap.width != targetW || bitmap.height != targetH) {
-                                Bitmap.createScaledBitmap(bitmap, targetW, targetH, true)
+                    val bitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOpts)
+                    if (bitmap == null) {
+                        addLog("Decode failed: ${file.name}, restoring backup")
+                        if (backupFile.exists()) backupFile.copyTo(file, overwrite = true)
+                        skipped++
+                        continue
+                    }
+
+                    val scaled = if (bitmap.width != targetW || bitmap.height != targetH) {
+                        val result = Bitmap.createScaledBitmap(bitmap, targetW, targetH, true)
+                        if (bitmap !== result) bitmap.recycle()
+                        result
+                    } else {
+                        bitmap
+                    }
+
+                    ByteArrayOutputStream().use { baos ->
+                        val success = scaled.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                        if (success) {
+                            file.writeBytes(baos.toByteArray())
+                            if (needsResize) {
+                                addLog("Resized: ${file.name} ${w}x${h} -> ${targetW}x${targetH}")
+                                compressed++
                             } else {
-                                bitmap
+                                addLog("Re-encoded: ${file.name} ${w}x${h}")
+                                reencoded++
                             }
-                            ByteArrayOutputStream().use { baos ->
-                                scaled.compress(Bitmap.CompressFormat.PNG, 100, baos)
-                                file.writeBytes(baos.toByteArray())
-                            }
-                            if (bitmap !== scaled) bitmap.recycle()
-                            scaled.recycle()
-                            compressed++
-                            addLog("Compressed: ${file.name} ${options.outWidth}x${options.outHeight} -> ${targetW}x${targetH} (sample=$inSampleSize)")
                         } else {
-                            addLog("Decode failed for: ${file.name}")
-                            if (backupFile.exists()) {
-                                backupFile.copyTo(file, overwrite = true)
-                            }
+                            addLog("Compress failed: ${file.name}, restoring backup")
+                            if (backupFile.exists()) backupFile.copyTo(file, overwrite = true)
                             skipped++
                         }
                     }
+                    scaled.recycle()
                 } catch (e: Exception) {
-                    addLog("Texture process error ${file.name}: ${e.message}")
+                    addLog("Texture error ${file.name}: ${e.message}")
                     skipped++
                 }
             }
-            if (compressed > 0) addLog("Compressed $compressed texture(s)")
-            if (skipped > 0) addLog("Skipped $skipped texture(s)")
+            addLog("Texture preprocessing done: compressed=$compressed reencoded=$reencoded skipped=$skipped")
         } catch (e: Exception) {
             addLog("Texture check error: ${e.message}")
         }
@@ -787,6 +807,15 @@ class Live2DWebView @JvmOverloads constructor(
                         var w = window.innerWidth;
                         var h = window.innerHeight;
                         canvasW = w; canvasH = h;
+
+                        try {
+                            var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                            if (gl) {
+                                var maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+                                step('GL maxTextureSize=' + maxTex);
+                            }
+                        } catch(e) { step('GL probe failed: ' + e.message); }
+
                         app = new PIXI.Application({
                             view: canvas, width: w, height: h, backgroundAlpha: 0,
                             antialias: true, autoStart: true,
