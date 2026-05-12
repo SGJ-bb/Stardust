@@ -436,21 +436,30 @@ class Live2DWebView @JvmOverloads constructor(
             if (texturesKey != null) {
                 val textures = fileRefs.optJSONArray(texturesKey)
                 if (textures != null) {
+                    val validTextures = org.json.JSONArray()
+                    var removedCount = 0
                     for (i in 0 until textures.length()) {
                         val texPath = textures.optString(i)
                         if (texPath.isNotEmpty()) {
                             val texFile = File(modelDir, texPath)
-                            if (!texFile.exists()) {
+                            if (texFile.exists()) {
+                                validTextures.put(texPath)
+                            } else {
                                 val found = findFileByName(texFile.name, modelDir)
                                 if (found != null) {
                                     val newPath = found.relativeTo(modelDir).path.replace("\\", "/")
-                                    textures.put(i, newPath)
+                                    validTextures.put(newPath)
                                     fixedRefs.add("$texPath -> $newPath")
                                 } else {
-                                    missingFiles.add(texPath)
+                                    addLog("Missing texture removed: $texPath")
+                                    removedCount++
                                 }
                             }
                         }
+                    }
+                    if (removedCount > 0) {
+                        fileRefs.put(texturesKey, validTextures)
+                        addLog("Removed $removedCount missing texture(s), ${validTextures.length()} remaining")
                     }
                 }
             }
@@ -469,13 +478,16 @@ class Live2DWebView @JvmOverloads constructor(
                 }
             }
 
-            if (fixedRefs.isNotEmpty()) {
+            if (fixedRefs.isNotEmpty() || missingFiles.isNotEmpty()) {
                 modelJsonFile.writeText(json.toString(2))
+            }
+
+            if (fixedRefs.isNotEmpty()) {
                 addLog("Fixed refs: ${fixedRefs.joinToString(", ")}")
             }
 
             if (missingFiles.isNotEmpty()) {
-                addLog("Missing files: ${missingFiles.joinToString(", ")}")
+                addLog("Missing critical files: ${missingFiles.joinToString(", ")}")
             }
 
             val texCount = texturesKey?.let { fileRefs.optJSONArray(it)?.length() } ?: 0
@@ -864,49 +876,6 @@ class Live2DWebView @JvmOverloads constructor(
                         step('OK');
                         var modelPath = '$modelFileName';
                         step('Model: ' + modelPath);
-
-                        step('Pre-checking textures...');
-                        try {
-                            var mReq = new XMLHttpRequest();
-                            mReq.open('GET', modelPath, false);
-                            mReq.send();
-                            if (mReq.status === 200) {
-                                var mData = JSON.parse(mReq.responseText);
-                                var tRefs = mData.FileReferences && mData.FileReferences.Textures;
-                                if (tRefs && tRefs.length > 0) {
-                                    var missingTex = [];
-                                    tRefs.forEach(function(tex) {
-                                        try {
-                                            var tReq = new XMLHttpRequest();
-                                            tReq.open('HEAD', tex, false);
-                                            tReq.send();
-                                            if (tReq.status !== 200) missingTex.push(tex);
-                                        } catch(e) { missingTex.push(tex); }
-                                    });
-                                    if (missingTex.length > 0) {
-                                        step('Missing textures: ' + missingTex.join(', '));
-                                        step('Creating placeholder textures...');
-                                        var newTexRefs = [];
-                                        tRefs.forEach(function(tex) {
-                                            if (missingTex.indexOf(tex) === -1) {
-                                                newTexRefs.push(tex);
-                                            }
-                                        });
-                                        mData.FileReferences.Textures = newTexRefs;
-                                        var newJson = JSON.stringify(mData);
-                                        var blob = new Blob([newJson], {type: 'application/json'});
-                                        var newUrl = URL.createObjectURL(blob);
-                                        modelPath = newUrl;
-                                        step('Using modified model with ' + newTexRefs.length + ' textures');
-                                    } else {
-                                        step('All ' + tRefs.length + ' textures OK');
-                                    }
-                                }
-                            }
-                        } catch(preErr) {
-                            step('Pre-check failed: ' + preErr.message + ', continuing anyway');
-                        }
-
                         step('Loading...');
                         PIXI.live2d.Live2DModel.from(modelPath, {
                             autoInteract: false, autoUpdate: true
