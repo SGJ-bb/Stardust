@@ -330,7 +330,27 @@ class Live2DWebView @JvmOverloads constructor(
             }
             addLog("Copy done: $copyCount files copied, $skipCount skipped")
 
+            // Validate cache integrity
+            val cacheFiles = localDir.walkTopDown().filter { it.isFile }.toList()
+            addLog("Cache validation: ${cacheFiles.size} files in cache dir ${localDir.name}")
+            val modelJsonInCache = cacheFiles.find { it.name.endsWith(".model3.json") || it.name.endsWith(".model.json") }
+            if (modelJsonInCache == null) {
+                addLog("ERROR: No model JSON found in cache after copy!")
+                onModelLoaded?.invoke(false)
+                return
+            }
+            val mocInCache = cacheFiles.find { it.name.endsWith(".moc3") || it.name.endsWith(".moc") }
+            if (mocInCache == null) {
+                addLog("WARN: No .moc3/.moc file found in cache")
+            }
+            val texturesInCache = cacheFiles.filter { it.extension.lowercase() in listOf("png", "jpg", "jpeg") }
+            addLog("Cache contents: modelJson=${modelJsonInCache.name}, moc=${mocInCache?.name ?: "NONE"}, textures=${texturesInCache.size}")
+
             checkAndCompressTextures(localDir)
+
+            val postCompressTextures = localDir.walkTopDown().filter { it.isFile && it.extension.lowercase() in listOf("png", "jpg", "jpeg") }.toList()
+            addLog("Post-compress: ${postCompressTextures.size} texture files remain")
+            postCompressTextures.forEach { addLog("  TEX: ${it.relativeTo(localDir).path.replace("\\", "/")} ${it.length()}B") }
 
             val cachedModelJson = findModelJsonRecursive(localDir)
             if (cachedModelJson == null) {
