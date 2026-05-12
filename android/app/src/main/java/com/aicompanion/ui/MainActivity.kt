@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.Collections
 import java.util.Date
 import java.util.Locale
 
@@ -107,7 +108,7 @@ class MainActivity : AppCompatActivity() {
     private var currentUserMood = ""
     private var currentUserMoodName = ""
     private var isModelLoaded = false
-    private var errorLogs = mutableListOf<String>()
+    private val logHistory = Collections.synchronizedList(mutableListOf<String>())
 
     private var longPressPending = false
     private var dragActive = false
@@ -225,6 +226,10 @@ class MainActivity : AppCompatActivity() {
             if (isDestroyed) return@setOnModelLoaded
             runOnUiThread {
                 if (!success) {
+                    val failedLog = live2dView?.getLog() ?: ""
+                    logHistory.add("[${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())}] 模型加载失败:")
+                    failedLog.lines().takeLast(20).forEach { logHistory.add("  $it") }
+
                     val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
                     val currentPath = prefs.getString("active_model_path", "")
                     if (!currentPath.isNullOrEmpty()) {
@@ -545,7 +550,7 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 chatAdapter?.setTypingIndicator(false)
-                errorLogs.add("${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())} sendToLLM: ${e.message}")
+                logHistory.add("[ERROR] ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())} sendToLLM: ${e.message}")
                 addPetMessage("出错了: ${e.message}", Emotion.SAD, Action.IDLE)
                 Log.e(TAG, "sendToLLM error: ${e.message}", e)
             } finally {
@@ -696,12 +701,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showLogViewer() {
-        val log = live2dView?.getLog() ?: "无日志"
-        val errorLog = errorLogs.joinToString("\n")
+        val currentLog = live2dView?.getLog() ?: "无日志"
+        val historyLog = logHistory.joinToString("\n").takeLast(2000)
+        val fullLog = buildString {
+            append("=== Live2D 日志 ===\n")
+            append(currentLog.takeLast(3000))
+            append("\n\n=== 历史错误 ===\n")
+            append(historyLog)
+        }
+
+        val scrollView = android.widget.ScrollView(this).apply {
+            val textView = android.widget.TextView(this@MainActivity).apply {
+                text = fullLog
+                textSize = 11f
+                setPadding(32, 24, 32, 24)
+                setTextIsSelectable(true)
+            }
+            addView(textView)
+        }
+
         android.app.AlertDialog.Builder(this)
             .setTitle("📋 运行日志")
-            .setMessage((log + "\n\n--- Errors ---\n" + errorLog).takeLast(3000))
-            .setPositiveButton("关闭", null)
+            .setView(scrollView)
+            .setPositiveButton("复制全部") { _, _ ->
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("日志", fullLog))
+                Toast.makeText(this@MainActivity, "日志已复制到剪贴板", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("关闭", null)
             .show()
     }
 
