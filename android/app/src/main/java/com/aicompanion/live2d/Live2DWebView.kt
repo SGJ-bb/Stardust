@@ -301,8 +301,7 @@ class Live2DWebView @JvmOverloads constructor(
             srcDir.walkTopDown().filter { it.isFile }.forEach { srcFile ->
                 try {
                     val relPath = srcFile.absolutePath.substring(srcDir.absolutePath.length).trimStart('/', '\\')
-                    if (relPath.startsWith("_backup") || relPath.contains("/_backup/") || relPath.contains("\\_backup\\") ||
-                        relPath.endsWith(".baiduyun.uploading.cfg") || relPath.contains(".baiduyun.uploading.cfg")) {
+                    if (shouldSkipFile(relPath, srcFile.name)) {
                         return@forEach
                     }
                     val dstFile = File(localDir, relPath)
@@ -330,22 +329,7 @@ class Live2DWebView @JvmOverloads constructor(
             modelBasePath = modelDir.absolutePath
             textureCache.clear()
 
-            val missingFiles = mutableListOf<String>()
-            val content = cachedModelJson.readText()
-            val json = org.json.JSONObject(content)
-            val fileRefs = json.optJSONObject("FileReferences") ?: json.optJSONObject("file_references")
-            if (fileRefs != null) {
-                listOf("Moc", "moc").forEach { key ->
-                    val mocFile = fileRefs.optString(key)
-                    if (mocFile.isNotEmpty() && !File(modelDir, mocFile).exists()) {
-                        missingFiles.add(mocFile)
-                    }
-                }
-            }
-
-            if (missingFiles.isNotEmpty()) {
-                addLog("Missing files: ${missingFiles.joinToString(", ")}")
-            }
+            validateAndFixModel(cachedModelJson, modelDir)
 
             val html = buildLive2DHtml(cachedModelJson.name)
             val htmlFile = File(modelDir, "view.html")
@@ -366,6 +350,118 @@ class Live2DWebView @JvmOverloads constructor(
         } catch (e: Exception) {
             addLog("Exception: ${e.message}")
             onModelLoaded?.invoke(false)
+        }
+    }
+
+    private fun shouldSkipFile(relPath: String, fileName: String): Boolean {
+        if (relPath.startsWith("_backup") || relPath.contains("/_backup/") || relPath.contains("\\_backup\\")) return true
+        if (fileName.endsWith(".baiduyun.uploading.cfg")) return true
+        if (fileName.endsWith(".cfg") && !fileName.endsWith(".cdi3.json")) return true
+        if (fileName.endsWith(".tmp") || fileName.endsWith(".temp")) return true
+        if (fileName.endsWith(".bak")) return true
+        if (fileName.startsWith(".") && !fileName.endsWith(".model3.json") && !fileName.endsWith(".model.json")) return true
+        if (fileName.contains(".uploading.")) return true
+        if (fileName.equals("items_pinned_to_model.json", ignoreCase = true)) return true
+        if (fileName.equals("items_pinned_to_model.zip", ignoreCase = true)) return true
+        if (fileName.endsWith(".vtube.json")) return true
+        return false
+    }
+
+    private fun validateAndFixModel(modelJsonFile: File, modelDir: File) {
+        try {
+            val content = modelJsonFile.readText()
+            val json = org.json.JSONObject(content)
+            val fileRefs = json.optJSONObject("FileReferences") ?: json.optJSONObject("file_references")
+
+            if (fileRefs == null) {
+                addLog("WARN: No FileReferences in model JSON")
+                return
+            }
+
+            val missingFiles = mutableListOf<String>()
+            val fixedRefs = mutableListOf<String>()
+
+            listOf("Moc", "moc").forEach { key ->
+                val mocFile = fileRefs.optString(key)
+                if (mocFile.isNotEmpty()) {
+                    val mocPath = File(modelDir, mocFile)
+                    if (!mocPath.exists()) {
+                        val found = findFileByName(mocPath.name, modelDir)
+                        if (found != null) {
+                            fileRefs.put(key, found.relativeTo(modelDir).path.replace("\\", "/"))
+                            fixedRefs.add("$mocFile -> ${found.relativeTo(modelDir).path.replace("\\", "/")}")
+                        } else {
+                            missingFiles.add(mocFile)
+                        }
+                    }
+                }
+            }
+
+            val texturesKey = listOf("Textures", "textures").firstOrNull { fileRefs.has(it) }
+            if (texturesKey != null) {
+                val textures = fileRefs.optJSONArray(texturesKey)
+                if (textures != null) {
+                    for (i in 0 until textures.length()) {
+                        val texPath = textures.optString(i)
+                        if (texPath.isNotEmpty()) {
+                            val texFile = File(modelDir, texPath)
+                            if (!texFile.exists()) {
+                                val found = findFileByName(texFile.name, modelDir)
+                                if (found != null) {
+                                    val newPath = found.relativeTo(modelDir).path.replace("\\", "/")
+                                    textures.put(i, newPath)
+                                    fixedRefs.add("$texPath -> $newPath")
+                                } else {
+                                    missingFiles.add(texPath)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            listOf("Physics", "physics").forEach { key ->
+                val physFile = fileRefs.optString(key)
+                if (physFile.isNotEmpty()) {
+                    val physPath = File(modelDir, physFile)
+                    if (!physPath.exists()) {
+                        val found = findFileByName(physPath.name, modelDir)
+                        if (found != null) {
+                            fileRefs.put(key, found.relativeTo(modelDir).path.replace("\\", "/"))
+                            fixedRefs.add("$physFile -> ${found.relativeTo(modelDir).path.replace("\\", "/")}")
+                        }
+                    }
+                }
+            }
+
+            if (fixedRefs.isNotEmpty()) {
+                modelJsonFile.writeText(json.toString(2))
+                addLog("Fixed refs: ${fixedRefs.joinToString(", ")}")
+            }
+
+            if (missingFiles.isNotEmpty()) {
+                addLog("Missing files: ${missingFiles.joinToString(", ")}")
+            }
+
+            val texCount = texturesKey?.let { fileRefs.optJSONArray(it)?.length() } ?: 0
+            val mocExists = listOf("Moc", "moc").any { key ->
+                val moc = fileRefs.optString(key)
+                moc.isNotEmpty() && File(modelDir, moc).exists()
+            }
+            addLog("Validation: moc=$mocExists textures=$texCount dir=${modelDir.name}")
+
+        } catch (e: Exception) {
+            addLog("Validate error: ${e.message}")
+        }
+    }
+
+    private fun findFileByName(fileName: String, searchDir: File): File? {
+        return try {
+            searchDir.walkTopDown()
+                .filter { it.isFile && it.name.equals(fileName, ignoreCase = true) }
+                .firstOrNull()
+        } catch (e: Exception) {
+            null
         }
     }
 
