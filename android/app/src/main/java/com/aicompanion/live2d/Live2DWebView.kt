@@ -128,6 +128,8 @@ class Live2DWebView @JvmOverloads constructor(
                 override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                     val url = request?.url?.toString() ?: return null
                     try {
+                        if (url.startsWith("data:")) return null
+
                         if (url.startsWith("file:///android_asset/")) {
                             val raw = url.removePrefix("file:///android_asset/")
                             val path = URLDecoder.decode(raw, "UTF-8")
@@ -149,6 +151,7 @@ class Live2DWebView @JvmOverloads constructor(
                             val file = File(pathPart)
                             if (file.exists() && file.isFile) {
                                 val mime = getMime(file.name)
+                                addLog("SERVE: ${file.name} mime=$mime enc=${getEncoding(mime)} size=${file.length()}")
                                 return WebResourceResponse(mime, getEncoding(mime), file.inputStream())
                             }
 
@@ -164,6 +167,7 @@ class Live2DWebView @JvmOverloads constructor(
                             var foundFile = resolveResourcePath(requestedPath, modelDir)
                             if (foundFile != null && foundFile.exists()) {
                                 val mime = getMime(foundFile.name)
+                                addLog("SERVE(resolved): ${foundFile.name} mime=$mime size=${foundFile.length()}")
                                 return WebResourceResponse(mime, getEncoding(mime), foundFile.inputStream())
                             }
 
@@ -172,6 +176,7 @@ class Live2DWebView @JvmOverloads constructor(
                                 foundFile = resolveResourcePath(requestedPath, parentDir)
                                 if (foundFile != null && foundFile.exists()) {
                                     val mime = getMime(foundFile.name)
+                                    addLog("SERVE(parent): ${foundFile.name} mime=$mime size=${foundFile.length()}")
                                     return WebResourceResponse(mime, getEncoding(mime), foundFile.inputStream())
                                 }
                             }
@@ -180,6 +185,7 @@ class Live2DWebView @JvmOverloads constructor(
                             foundFile = resolveResourcePath(justName, modelDir)
                             if (foundFile != null && foundFile.exists()) {
                                 val mime = getMime(foundFile.name)
+                                addLog("SERVE(name): ${foundFile.name} mime=$mime size=${foundFile.length()}")
                                 return WebResourceResponse(mime, getEncoding(mime), foundFile.inputStream())
                             }
 
@@ -187,6 +193,7 @@ class Live2DWebView @JvmOverloads constructor(
                                 foundFile = resolveResourcePath(justName, parentDir)
                                 if (foundFile != null && foundFile.exists()) {
                                     val mime = getMime(foundFile.name)
+                                    addLog("SERVE(parentName): ${foundFile.name} mime=$mime size=${foundFile.length()}")
                                     return WebResourceResponse(mime, getEncoding(mime), foundFile.inputStream())
                                 }
                             }
