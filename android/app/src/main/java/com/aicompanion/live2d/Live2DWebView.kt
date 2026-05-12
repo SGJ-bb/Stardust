@@ -301,7 +301,8 @@ class Live2DWebView @JvmOverloads constructor(
             srcDir.walkTopDown().filter { it.isFile }.forEach { srcFile ->
                 try {
                     val relPath = srcFile.absolutePath.substring(srcDir.absolutePath.length).trimStart('/', '\\')
-                    if (relPath.startsWith("_backup") || relPath.contains("/_backup/") || relPath.contains("\\_backup\\")) {
+                    if (relPath.startsWith("_backup") || relPath.contains("/_backup/") || relPath.contains("\\_backup\\") ||
+                        relPath.endsWith(".baiduyun.uploading.cfg") || relPath.contains(".baiduyun.uploading.cfg")) {
                         return@forEach
                     }
                     val dstFile = File(localDir, relPath)
@@ -414,6 +415,7 @@ class Live2DWebView @JvmOverloads constructor(
         try {
             var compressed = 0
             var skipped = 0
+            addLog("Checking textures in: ${modelDir.absolutePath}, maxTextureSize=$maxTextureSize")
             modelDir.walkTopDown().filter { it.isFile && (it.extension.equals("png", ignoreCase = true) || it.extension.equals("jpg", ignoreCase = true) || it.extension.equals("jpeg", ignoreCase = true)) }.forEach { file ->
                 try {
                     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -424,6 +426,8 @@ class Live2DWebView @JvmOverloads constructor(
                         skipped++
                         return@forEach
                     }
+
+                    addLog("Texture: ${file.name} ${options.outWidth}x${options.outHeight}")
 
                     val needsResize = options.outWidth > maxTextureSize || options.outHeight > maxTextureSize
                     val needsReencode = file.extension.equals("png", ignoreCase = true) &&
@@ -448,10 +452,14 @@ class Live2DWebView @JvmOverloads constructor(
                             file.copyTo(backupFile)
                         }
 
-                        val decodeOpts = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+                        val inSampleSize = calculateInSampleSize(options, targetW, targetH)
+                        val decodeOpts = BitmapFactory.Options().apply {
+                            inPreferredConfig = Bitmap.Config.ARGB_8888
+                            this.inSampleSize = inSampleSize
+                        }
                         val bitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOpts)
                         if (bitmap != null) {
-                            val scaled = if (targetW != options.outWidth || targetH != options.outHeight) {
+                            val scaled = if (bitmap.width != targetW || bitmap.height != targetH) {
                                 Bitmap.createScaledBitmap(bitmap, targetW, targetH, true)
                             } else {
                                 bitmap
@@ -463,7 +471,7 @@ class Live2DWebView @JvmOverloads constructor(
                             if (bitmap !== scaled) bitmap.recycle()
                             scaled.recycle()
                             compressed++
-                            addLog("Compressed: ${file.name} ${options.outWidth}x${options.outHeight} -> ${targetW}x${targetH}")
+                            addLog("Compressed: ${file.name} ${options.outWidth}x${options.outHeight} -> ${targetW}x${targetH} (sample=$inSampleSize)")
                         } else {
                             addLog("Decode failed for: ${file.name}")
                             if (backupFile.exists()) {
@@ -482,6 +490,20 @@ class Live2DWebView @JvmOverloads constructor(
         } catch (e: Exception) {
             addLog("Texture check error: ${e.message}")
         }
+    }
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 
     private fun copyModelFromAssets(modelJsonPath: String) {
@@ -699,13 +721,28 @@ class Live2DWebView @JvmOverloads constructor(
                             }
                         }).catch(function(e) {
                             var errMsg = e.message || e.toString();
-                            if (e.stack) errMsg += '\\nStack: ' + e.stack.substring(0, 500);
+                            if (e.stack) errMsg += '\\nStack: ' + e.stack.substring(0, 800);
                             err('Load failed: ' + errMsg);
                             try {
                                 var req = new XMLHttpRequest();
                                 req.open('GET', modelPath, false);
                                 req.send();
                                 step('Model JSON status: ' + req.status + ' len:' + req.responseText.length);
+                                var modelData = JSON.parse(req.responseText);
+                                var texRefs = modelData.FileReferences && modelData.FileReferences.Textures;
+                                if (texRefs && texRefs.length > 0) {
+                                    step('Textures referenced: ' + texRefs.length);
+                                    texRefs.forEach(function(tex, idx) {
+                                        try {
+                                            var tReq = new XMLHttpRequest();
+                                            tReq.open('HEAD', tex, false);
+                                            tReq.send();
+                                            step('Texture[' + idx + '] ' + tex + ' status=' + tReq.status);
+                                        } catch(texEx) {
+                                            step('Texture[' + idx + '] ' + tex + ' ERROR: ' + texEx.message);
+                                        }
+                                    });
+                                }
                             } catch(ex) { step('Model JSON check failed: ' + ex.message); }
                             if (window.Live2DBridge) window.Live2DBridge.onModelLoaded(false);
                         });
