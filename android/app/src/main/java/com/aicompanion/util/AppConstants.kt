@@ -12,7 +12,8 @@ object AppConstants {
     }
 
     object Live2D {
-        const val DEFAULT_MODEL_PATH = "vtuber/小恶魔.model3.json"
+        const val DEFAULT_MODEL_PATH = "vtuber/PurpleBird/PurpleBird.model3.json"
+        const val DEFAULT_MODEL_NAME = "PurpleBird"
         const val MAX_TEXTURE_SIZE = 2048
         const val DEFAULT_SCALE = 1.0f
         const val DEFAULT_OFFSET_X = 0.0f

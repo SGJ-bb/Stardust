@@ -95,7 +95,7 @@ class ApiClient(
         return try {
             if (chatApiUrl.isBlank()) {
                 Log.e(TAG, "sendChat: API URL is empty!")
-                return null
+                return ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = "API地址为空，请在设置中配置API地址")
             }
             val body = requestBody.toString().toRequestBody(jsonMediaType)
             val requestBuilder = Request.Builder()
@@ -112,7 +112,16 @@ class ApiClient(
                 if (!response.isSuccessful) {
                     val errBody = response.body?.string()?.take(200) ?: ""
                     Log.e(TAG, "Chat failed: HTTP ${response.code} ${response.message} body=$errBody")
-                    return null
+                    val errMsg = when (response.code) {
+                        401 -> "API密钥无效，请检查设置中的API Key"
+                        403 -> "无权限访问，请检查API密钥权限"
+                        404 -> "接口地址不存在，请检查API地址是否正确"
+                        429 -> "请求过于频繁或已超出配额"
+                        in 400..499 -> "请求错误(HTTP ${response.code})，请检查模型名称「$useModel」是否正确"
+                        in 500..599 -> "服务端错误(HTTP ${response.code})，请稍后重试"
+                        else -> "连接失败(HTTP ${response.code})"
+                    }
+                    return ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = errMsg)
                 }
                 val bodyStr = response.body?.string() ?: "{}"
                 Log.d(TAG, "sendChat: response ${bodyStr.length} chars")
@@ -120,7 +129,13 @@ class ApiClient(
             }
         } catch (e: Exception) {
             Log.e(TAG, "sendChat error: ${e.javaClass.simpleName}: ${e.message}", e)
-            null
+            val errMsg = when {
+                e.message?.contains("Unable to resolve host") == true -> "无法解析域名，请检查网络和API地址"
+                e.message?.contains("timeout") == true -> "连接超时，请检查网络和API地址"
+                e.message?.contains("SSL") == true -> "SSL证书错误"
+                else -> "连接失败: ${e.message}"
+            }
+            ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = errMsg)
         }
     }
 
@@ -186,29 +201,56 @@ class ApiClient(
     fun testConnection(listener: (success: Boolean, message: String) -> Unit) {
         Thread {
             try {
-                val testUrl = if (chatApiUrl.endsWith("/chat/completions")) {
-                    chatApiUrl.replace("/chat/completions", "/models")
-                } else {
-                    chatApiUrl
+                if (chatApiUrl.isBlank()) {
+                    listener(false, "API地址为空，请在设置中配置")
+                    return@Thread
                 }
 
+                val testMessages = JSONArray()
+                testMessages.put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", "回复一个字：好")
+                })
+                testMessages.put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", "测试连接")
+                })
+
+                val requestBody = JSONObject().apply {
+                    put("model", modelName ?: "gpt-4o-mini")
+                    put("messages", testMessages)
+                    put("max_tokens", 10)
+                }
+
+                val body = requestBody.toString().toRequestBody(jsonMediaType)
                 val requestBuilder = Request.Builder()
-                    .url(testUrl)
-                    .get()
+                    .url(chatApiUrl)
+                    .post(body)
+                    .header("Content-Type", "application/json")
 
                 if (!apiKey.isNullOrEmpty()) {
                     requestBuilder.header("Authorization", "Bearer $apiKey")
                 }
 
                 val response = client.newCall(requestBuilder.build()).execute()
+                val bodyStr = response.body?.string() ?: ""
                 if (response.isSuccessful) {
-                    listener(true, "连接成功！API可用")
+                    val json = JSONObject(bodyStr)
+                    val choices = json.optJSONArray("choices")
+                    if (choices != null && choices.length() > 0) {
+                        listener(true, "✅ 连接成功！API可用")
+                    } else {
+                        listener(false, "响应格式异常（缺少choices），但连接可达，请检查模型名称是否正确")
+                    }
                 } else {
                     val code = response.code
-                    val msg = when (code) {
-                        401 -> "API密钥无效，请检查"
-                        403 -> "无权限访问，请检查API密钥权限"
-                        404 -> "接口地址不存在，请确认API地址"
+                    val msg = when {
+                        code == 401 -> "API密钥无效，请检查"
+                        code == 403 -> "无权限访问，请检查API密钥权限"
+                        code == 404 -> "接口地址不存在，请确认API地址是否正确"
+                        code == 429 -> "请求过于频繁或已超出配额"
+                        code >= 400 && code < 500 -> "请求错误: HTTP $code，请检查模型名称「${modelName ?: "未设置"}」是否正确"
+                        code >= 500 -> "服务端错误: HTTP $code"
                         else -> "连接失败: HTTP $code"
                     }
                     listener(false, msg)
@@ -216,7 +258,7 @@ class ApiClient(
             } catch (e: Exception) {
                 val msg = when {
                     e.message?.contains("Unable to resolve host") == true -> "无法解析域名，请检查网络和API地址"
-                    e.message?.contains("timeout") == true -> "连接超时，请检查网络"
+                    e.message?.contains("timeout") == true -> "连接超时，请检查网络和API地址"
                     e.message?.contains("SSL") == true -> "SSL证书错误"
                     else -> "连接失败: ${e.message}"
                 }
@@ -269,7 +311,11 @@ class ApiClient(
             }
             Log.d(TAG, "sendProactiveChat: POST $chatApiUrl model=$useModel")
             client.newCall(requestBuilder.build()).execute().use { response ->
-                if (!response.isSuccessful) return null
+                if (!response.isSuccessful) {
+                    val errBody = response.body?.string()?.take(200) ?: ""
+                    Log.e(TAG, "sendProactiveChat failed: HTTP ${response.code} body=$errBody")
+                    return ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = "AI主动聊天失败(HTTP ${response.code})")
+                }
                 val bodyStr = response.body?.string() ?: "{}"
                 parseOpenAIResponse(bodyStr)
             }

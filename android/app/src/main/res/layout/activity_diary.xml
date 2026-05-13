@@ -41,6 +41,24 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="搜索"
             app:tint="#8899cc" />
+
+        <ImageButton
+            android:id="@+id/btn_import_diary"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_upload"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="导入"
+            app:tint="#8899cc" />
+
+        <ImageButton
+            android:id="@+id/btn_export_diary"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_share"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="导出"
+            app:tint="#8899cc" />
     </LinearLayout>
 
     <LinearLayout
@@ -79,7 +97,7 @@
                 android:text="全部"
                 android:checkable="true"
                 android:checked="true"
-                style="@style/Widget.MaterialComponents.Chip.Filter" />
+                style="@style/Widget.Material3.Chip.Filter" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chip_mood_happy"
@@ -88,16 +106,16 @@
                 android:text="🥰"
                 android:checkable="true"
                 android:layout_marginStart="4dp"
-                style="@style/Widget.MaterialComponents.Chip.Filter" />
+                style="@style/Widget.Material3.Chip.Filter" />
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_mood_calm"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:text="😌"
-                android:checkable="true"
-                android:layout_marginStart="4dp"
-                style="@style/Widget.MaterialComponents.Chip.Filter" />
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_mood_calm"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="😌"
+            android:checkable="true"
+            android:layout_marginStart="4dp"
+            style="@style/Widget.Material3.Chip.Filter" />
         </LinearLayout>
     </LinearLayout>
 

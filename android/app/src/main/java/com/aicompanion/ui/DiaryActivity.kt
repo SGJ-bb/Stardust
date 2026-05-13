@@ -1,11 +1,13 @@
 package com.aicompanion.ui
 
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.aicompanion.R
 import com.aicompanion.diary.DiaryEntry
@@ -22,6 +24,8 @@ class DiaryActivity : AppCompatActivity() {
     private lateinit var layoutSearch: LinearLayout
     private lateinit var etSearch: EditText
     private lateinit var btnSearchToggle: ImageButton
+    private lateinit var btnExport: ImageButton
+    private lateinit var btnImport: ImageButton
     private lateinit var btnBack: ImageButton
     private lateinit var chipAll: com.google.android.material.chip.Chip
     private lateinit var chipHappy: com.google.android.material.chip.Chip
@@ -32,6 +36,10 @@ class DiaryActivity : AppCompatActivity() {
     private var filterMood: String? = null
     private val displayDateFormat = SimpleDateFormat("yyyy年M月d日", Locale.getDefault())
     private val parseDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    private val importDiaryLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) handleImport(uri)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,6 +57,8 @@ class DiaryActivity : AppCompatActivity() {
         layoutSearch = findViewById(R.id.layout_diary_search)
         etSearch = findViewById(R.id.et_search_diary)
         btnSearchToggle = findViewById(R.id.btn_search_diary)
+        btnImport = findViewById(R.id.btn_import_diary)
+        btnExport = findViewById(R.id.btn_export_diary)
         btnBack = findViewById(R.id.btn_diary_back)
         chipAll = findViewById(R.id.chip_mood_all)
         chipHappy = findViewById(R.id.chip_mood_happy)
@@ -67,6 +77,12 @@ class DiaryActivity : AppCompatActivity() {
                 loadDiaries()
             }
         }
+
+        btnImport.setOnClickListener {
+            importDiaryLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+        }
+
+        btnExport.setOnClickListener { showExportDialog() }
 
         etSearch.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
@@ -112,6 +128,75 @@ class DiaryActivity : AppCompatActivity() {
             listView.visibility = View.VISIBLE
             tvEmpty.visibility = View.GONE
             listView.adapter = DiaryAdapter(diaries)
+        }
+    }
+
+    private fun showExportDialog() {
+        val diaries = diaryManager.getAllDiaries()
+        if (diaries.isEmpty()) {
+            Toast.makeText(this, "还没有日记可以导出", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val options = arrayOf("Markdown 格式（可读）", "JSON 格式（兼容）")
+        android.app.AlertDialog.Builder(this)
+            .setTitle("导出日记（共${diaries.size}篇）")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> exportMarkdown(diaries)
+                    1 -> exportJson(diaries)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun exportMarkdown(diaries: List<DiaryEntry>) {
+        val content = diaryManager.exportToMarkdown(diaries)
+        val filename = "diary_export_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.md"
+        diaryManager.shareExport(content, filename, "text/markdown")
+        Toast.makeText(this, "正在生成 Markdown 导出...", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun exportJson(diaries: List<DiaryEntry>) {
+        val content = diaryManager.exportToJson(diaries)
+        val filename = "diary_export_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.json"
+        diaryManager.shareExport(content, filename, "application/json")
+        Toast.makeText(this, "正在生成 JSON 导出...", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun handleImport(uri: Uri) {
+        try {
+            val inputStream = contentResolver.openInputStream(uri)
+            val jsonContent = inputStream?.bufferedReader()?.readText() ?: ""
+            inputStream?.close()
+
+            if (jsonContent.isBlank()) {
+                Toast.makeText(this, "文件内容为空", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            Toast.makeText(this, "正在导入日记...", Toast.LENGTH_SHORT).show()
+            val result = diaryManager.importFromJson(jsonContent)
+
+            loadDiaries()
+
+            val msg = buildString {
+                append("导入完成：成功 ${result.imported} 篇")
+                if (result.skipped > 0) append("，跳过 ${result.skipped} 篇（已存在）")
+                if (result.errors.isNotEmpty()) {
+                    append("\n错误：${result.errors.take(3).joinToString("；")}")
+                    if (result.errors.size > 3) append("...等${result.errors.size}条")
+                }
+            }
+            android.app.AlertDialog.Builder(this)
+                .setTitle("导入结果")
+                .setMessage(msg)
+                .setPositiveButton("确定", null)
+                .show()
+
+        } catch (e: Exception) {
+            Toast.makeText(this, "导入失败: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 

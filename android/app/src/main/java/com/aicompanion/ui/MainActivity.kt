@@ -236,7 +236,7 @@ class MainActivity : AppCompatActivity() {
                         Log.w(TAG, "Custom model failed, falling back to default")
                         prefs.edit().remove("active_model_path").apply()
                         lastLoadedModelPath = null
-                        live2dView?.loadLive2DModelFromAssets("vtuber/小恶魔.model3.json")
+                        live2dView?.loadLive2DModelFromAssets("vtuber/PurpleBird/PurpleBird.model3.json")
                     } else {
                         Toast.makeText(this@MainActivity, "皮套加载失败", Toast.LENGTH_LONG).show()
                     }
@@ -263,15 +263,15 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     prefs.edit().remove("active_model_path").apply()
                     lastLoadedModelPath = null
-                    webView.loadLive2DModelFromAssets("vtuber/小恶魔.model3.json")
+                    webView.loadLive2DModelFromAssets("vtuber/PurpleBird/PurpleBird.model3.json")
                 }
             } else {
                 lastLoadedModelPath = null
-                webView.loadLive2DModelFromAssets("vtuber/小恶魔.model3.json")
+                webView.loadLive2DModelFromAssets("vtuber/PurpleBird/PurpleBird.model3.json")
             }
         } catch (e: Exception) {
             Log.e(TAG, "loadLive2DModel failed: ${e.message}", e)
-            try { webView.loadLive2DModelFromAssets("vtuber/小恶魔.model3.json") } catch (_: Exception) {}
+            try { webView.loadLive2DModelFromAssets("vtuber/PurpleBird/PurpleBird.model3.json") } catch (_: Exception) {}
         }
     }
 
@@ -538,13 +538,18 @@ class MainActivity : AppCompatActivity() {
                 chatAdapter?.setTypingIndicator(false)
 
                 if (response != null) {
-                    addPetMessage(response.text, response.emotion, response.action)
-                    if (sm.isTTSEnabled && response.audioUrl != null) {
-                        voiceManager?.playSpeech(response.audioUrl, response.emotion)
-                    } else if (sm.isTTSEnabled) {
-                        voiceManager?.speak(response.text, response.emotion)
+                    if (response.errorMessage != null) {
+                        chatAdapter?.setTypingIndicator(false)
+                        addPetMessage("呜...${response.errorMessage}", Emotion.SAD, Action.IDLE)
+                    } else {
+                        addPetMessage(response.text, response.emotion, response.action)
+                        if (sm.isTTSEnabled && response.audioUrl != null) {
+                            voiceManager?.playSpeech(response.audioUrl, response.emotion)
+                        } else if (sm.isTTSEnabled) {
+                            voiceManager?.speak(response.text, response.emotion)
+                        }
+                        updatePetDisplay(response)
                     }
-                    updatePetDisplay(response)
                 } else {
                     addPetMessage("呜...连接不上AI，请检查API设置", Emotion.SAD, Action.IDLE)
                 }
@@ -572,13 +577,46 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun getPersonaInfo(): Pair<String, String> {
-        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-        val name = prefs.getString("ai_name", "星尘") ?: "星尘"
-        val prompt = prefs.getString("ai_prompt", "") ?: ""
-        val userCall = prefs.getString("user_call_name", "") ?: ""
+        val personaPrefs = getSharedPreferences("persona_data", MODE_PRIVATE)
+        val appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+
+        val name = personaPrefs.getString("persona_name", null)
+            ?: appPrefs.getString("ai_name", "星尘") ?: "星尘"
+
+        val userCall = personaPrefs.getString("user_nickname", null)
+            ?: appPrefs.getString("user_call_name", "") ?: ""
+
         val fullPrompt = buildString {
-            append(prompt)
-            if (userCall.isNotEmpty()) append("\n你称呼用户为「$userCall」。")
+            val promptFromPersona = buildString {
+                val desc = personaPrefs.getString("persona_desc", "") ?: ""
+                val personality = personaPrefs.getString("persona_personality", "") ?: ""
+                val speechStyle = personaPrefs.getString("persona_speech_style", "") ?: ""
+                val catchphrases = personaPrefs.getString("persona_catchphrases", "") ?: ""
+                val appearance = personaPrefs.getString("persona_appearance", "") ?: ""
+                val preferences = personaPrefs.getString("persona_preferences", "") ?: ""
+                val worldSetting = personaPrefs.getString("world_setting", "") ?: ""
+                val worldRelationship = personaPrefs.getString("world_relationship", "") ?: ""
+                val worldRules = personaPrefs.getString("world_rules", "") ?: ""
+
+                append("你是「$name」。")
+                if (desc.isNotBlank()) append("\n简介：$desc")
+                if (appearance.isNotBlank()) append("\n外貌：$appearance")
+                if (personality.isNotBlank()) append("\n性格：$personality")
+                if (speechStyle.isNotBlank()) append("\n说话风格：$speechStyle")
+                if (catchphrases.isNotBlank()) append("\n常用口头禅：$catchphrases")
+                if (preferences.isNotBlank()) append("\n喜好：$preferences")
+                if (worldSetting.isNotBlank()) append("\n世界观设定：$worldSetting")
+                if (worldRelationship.isNotBlank()) append("\n你和用户的关系：$worldRelationship")
+                if (worldRules.isNotBlank()) append("\n规则：$worldRules")
+            }
+            if (promptFromPersona.isNotBlank()) {
+                append(promptFromPersona)
+            } else {
+                append("你是「$name」，一个可爱的AI桌宠。")
+                val oldPrompt = appPrefs.getString("ai_prompt", "") ?: ""
+                if (oldPrompt.isNotBlank()) append("\n$oldPrompt")
+            }
+            if (userCall.isNotBlank()) append("\n你称呼用户为「$userCall」。")
             val style = settingsManager?.languageStyle?.name?.lowercase() ?: "normal"
             when (style) {
                 "tsundere" -> append("\n你是傲娇性格，嘴上不饶人但内心关心用户。")
@@ -818,21 +856,31 @@ class MainActivity : AppCompatActivity() {
         if (isDestroyed || isFinishing) return
         val client = apiClient ?: return
         val sm = settingsManager ?: return
-        if (sm.chatApiUrl.isBlank()) return
 
         messageScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
                     val persona = getPersonaInfo()
                     val customPrompt = "现在用户没有主动找你聊天，但你想主动找用户搭话。\n规则：像朋友一样自然地搭话，不要用问句结尾，保持1-2句话。语气要可爱自然，不要重复之前说过的话。"
-                    client.sendProactiveChat(persona.first, persona.second, customPrompt, "（用户正在忙自己的事情，你突然想找ta搭话）")
+                    if (sm.chatApiUrl.isNotBlank()) {
+                        client.sendProactiveChat(persona.first, persona.second, customPrompt, "（用户正在忙自己的事情，你突然想找ta搭话）")
+                    } else null
                 }
-                if (response != null && response.text.isNotBlank()) {
+                if (response != null && response.text.isNotBlank() && response.errorMessage == null) {
                     addPetMessage(response.text, response.emotion, response.action)
                     updatePetDisplay(response)
+                } else {
+                    val fallback = proactiveEngine?.getIdlePhrase()
+                    if (fallback != null && !isDestroyed) {
+                        addPetMessage(fallback.first, fallback.second, fallback.third)
+                    }
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "Proactive chat failed: ${e.message}")
+                val fallback = proactiveEngine?.getIdlePhrase()
+                if (fallback != null && !isDestroyed) {
+                    addPetMessage(fallback.first, fallback.second, fallback.third)
+                }
             }
         }
     }
@@ -855,7 +903,8 @@ class MainActivity : AppCompatActivity() {
         if (prefs.getBoolean("first_launch", true)) {
             prefs.edit().putBoolean("first_launch", false).apply()
             showTutorial()
-            addPetMessage("你好呀！我是星尘，你的AI伙伴~", Emotion.HAPPY, Action.TAIL_FLICK)
+            val name = getPersonaInfo().first
+            addPetMessage("你好呀！我是${name}，你的AI伙伴~", Emotion.HAPPY, Action.TAIL_FLICK)
         }
     }
 
@@ -959,6 +1008,7 @@ class MainActivity : AppCompatActivity() {
         longPressRunnable?.let { handler.removeCallbacks(it) }
         messageScope.cancel()
         voiceManager?.cleanup()
+        live2dView?.cleanup()
         super.onDestroy()
     }
 }

@@ -79,7 +79,7 @@
                                 android:id="@+id/tv_current_model_name"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="小恶魔"
+                                android:text="PurpleBird"
                                 android:textSize="16sp"
                                 android:textStyle="bold"
                                 android:textColor="#e0e0f0" />
@@ -88,7 +88,7 @@
                                 android:id="@+id/tv_current_model_desc"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="小恶魔风格，活泼可爱"
+                                android:text="紫鸟，默认模型"
                                 android:textSize="12sp"
                                 android:textColor="#8899aa"
                                 android:layout_marginTop="4dp" />

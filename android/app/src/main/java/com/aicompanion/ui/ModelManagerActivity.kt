@@ -365,15 +365,110 @@ class ModelManagerActivity : Activity() {
     }
 
     private fun importJsonModel(uri: Uri, fileName: String, targetDir: File) {
-        contentResolver.openInputStream(uri)?.use { input ->
-            val targetFile = File(targetDir, fileName)
-            targetFile.outputStream().use { output ->
-                input.copyTo(output)
+        try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                val targetFile = File(targetDir, fileName)
+                targetFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
             }
-        }
 
-        Toast.makeText(this, "仅导入了 .json 文件，缺少 .moc3 和纹理等关联文件\n\n请使用「选择模型文件夹」方式导入完整模型", Toast.LENGTH_LONG).show()
-        targetDir.deleteRecursively()
+            try {
+                val jsonContent = File(targetDir, fileName).readText()
+                val json = org.json.JSONObject(jsonContent)
+                val fileRefs = json.optJSONObject("FileReferences") ?: json.optJSONObject("file_references")
+                if (fileRefs != null) {
+                    val referencedFiles = mutableListOf<String>()
+                    listOf("Moc", "moc").forEach { key ->
+                        val f = fileRefs.optString(key)
+                        if (f.isNotEmpty()) referencedFiles.add(f)
+                    }
+                    fileRefs.optJSONArray("Textures")?.let { arr ->
+                        for (i in 0 until arr.length()) referencedFiles.add(arr.optString(i))
+                    }
+                    fileRefs.optJSONArray("textures")?.let { arr ->
+                        for (i in 0 until arr.length()) referencedFiles.add(arr.optString(i))
+                    }
+                    listOf("Physics", "physics", "DisplayInfo", "displayInfo").forEach { key ->
+                        val f = fileRefs.optString(key)
+                        if (f.isNotEmpty()) referencedFiles.add(f)
+                    }
+                    fileRefs.optJSONArray("Expressions")?.let { arr ->
+                        for (i in 0 until arr.length()) {
+                            val obj = arr.optJSONObject(i)
+                            val f = obj?.optString("File", obj.optString("file", "")) ?: ""
+                            if (f.isNotEmpty()) referencedFiles.add(f)
+                        }
+                    }
+                    fileRefs.optJSONObject("Motions")?.let { motions ->
+                        motions.keys().forEach { group ->
+                            motions.optJSONArray(group)?.let { arr ->
+                                for (i in 0 until arr.length()) {
+                                    val obj = arr.optJSONObject(i)
+                                    val f = obj?.optString("File", obj.optString("file", "")) ?: ""
+                                    if (f.isNotEmpty()) referencedFiles.add(f)
+                                    val s = obj?.optString("Sound", obj.optString("sound", "")) ?: ""
+                                    if (s.isNotEmpty()) referencedFiles.add(s)
+                                }
+                            }
+                        }
+                    }
+
+                    val parentDir = uri.path?.let { File(it).parentFile }
+                    var copiedCount = 0
+                    for (ref in referencedFiles) {
+                        val refFile = File(targetDir, ref)
+                        if (!refFile.exists()) {
+                            val refFileName = File(ref).name
+                            val foundInParent = parentDir?.walkTopDown()
+                                ?.filter { it.isFile && it.name == refFileName }
+                                ?.firstOrNull()
+                            if (foundInParent != null) {
+                                refFile.parentFile?.mkdirs()
+                                foundInParent.copyTo(refFile, overwrite = true)
+                                copiedCount++
+                            }
+                        }
+                    }
+                    if (copiedCount > 0) {
+                        Log.d(TAG, "Auto-copied $copiedCount referenced file(s) alongside JSON")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not parse JSON for auto-copy: ${e.message}")
+            }
+
+            val modelJsonFile = findModelJson(targetDir)
+            if (modelJsonFile != null) {
+                val mm = modelManager ?: return
+                val name = targetDir.name
+                val model = Live2DModel(
+                    id = name,
+                    name = name,
+                    description = "用户导入模型（仅JSON）",
+                    modelPath = modelJsonFile.absolutePath,
+                    texturePath = "",
+                    physicsPath = "",
+                    motionPath = "",
+                    version = "3",
+                    sizeMB = targetDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } / 1024f / 1024f,
+                    isActive = true
+                )
+                mm.setActiveModel(name)
+                mm.addModel(model)
+                val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                prefs.edit().putString("active_model_path", modelJsonFile.absolutePath).apply()
+                Toast.makeText(this, "模型导入成功（部分文件可能缺失，建议使用文件夹导入）", Toast.LENGTH_LONG).show()
+                loadModels()
+            } else {
+                Toast.makeText(this, "仅导入了 .json 文件，缺少 .moc3 和纹理等关联文件\n\n请使用「选择模型文件夹」方式导入完整模型", Toast.LENGTH_LONG).show()
+                targetDir.deleteRecursively()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "importJsonModel error", e)
+            Toast.makeText(this, "导入失败: ${e.message}", Toast.LENGTH_LONG).show()
+            targetDir.deleteRecursively()
+        }
     }
 
     private fun importZip(uri: Uri, targetDir: File) {
