@@ -78,7 +78,7 @@ class ModelAdjustActivity : Activity() {
                 } else {
                     if (!customModelPath.isNullOrEmpty()) {
                         prefs.edit().remove("active_model_path").apply()
-                        live2dView.loadLive2DModelFromAssets("vtuber/小恶魔.model3.json")
+                        live2dView.loadLive2DModelFromAssets("vtuber/PurpleBird/PurpleBird.model3.json")
                         tvModelInfo.text = "自定义模型加载失败，已恢复默认"
                     } else {
                         tvModelInfo.text = "模型加载失败"
@@ -93,10 +93,10 @@ class ModelAdjustActivity : Activity() {
                 live2dView.loadLive2DModelFromPath(customModelPath)
             } else {
                 prefs.edit().remove("active_model_path").apply()
-                live2dView.loadLive2DModelFromAssets("vtuber/小恶魔.model3.json")
+                live2dView.loadLive2DModelFromAssets("vtuber/PurpleBird/PurpleBird.model3.json")
             }
         } else {
-            live2dView.loadLive2DModelFromAssets("vtuber/小恶魔.model3.json")
+            live2dView.loadLive2DModelFromAssets("vtuber/PurpleBird/PurpleBird.model3.json")
         }
     }
 
@@ -262,6 +262,7 @@ class ModelAdjustActivity : Activity() {
 
     override fun onDestroy() {
         longPressRunnable?.let { mainHandler.removeCallbacks(it) }
+        live2dView.cleanup()
         super.onDestroy()
     }
 

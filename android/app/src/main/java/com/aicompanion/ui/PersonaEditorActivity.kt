@@ -112,6 +112,39 @@ class PersonaEditorActivity : Activity() {
             putString("user_nickname", etUserNickname?.text?.toString() ?: "")
             apply()
         }
+
+        val appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        appPrefs.edit().apply {
+            putString("ai_name", etPersonaName?.text?.toString() ?: "星尘")
+            putString("user_call_name", etUserNickname?.text?.toString() ?: "")
+            val prompt = buildString {
+                val name = etPersonaName?.text?.toString() ?: "星尘"
+                val desc = etPersonaDesc?.text?.toString() ?: ""
+                val personality = etPersonaPersonality?.text?.toString() ?: ""
+                val speechStyle = etPersonaSpeechStyle?.text?.toString() ?: ""
+                val catchphrases = etPersonaCatchphrases?.text?.toString() ?: ""
+                val appearance = etPersonaAppearance?.text?.toString() ?: ""
+                val preferences = etPersonaPreferences?.text?.toString() ?: ""
+                val worldSetting = etWorldSetting?.text?.toString() ?: ""
+                val worldRelationship = etWorldRelationship?.text?.toString() ?: ""
+                val worldRules = etWorldRules?.text?.toString() ?: ""
+                val nickname = etUserNickname?.text?.toString() ?: ""
+
+                append("你是「$name」。")
+                if (desc.isNotBlank()) append("\n简介：$desc")
+                if (appearance.isNotBlank()) append("\n外貌：$appearance")
+                if (personality.isNotBlank()) append("\n性格：$personality")
+                if (speechStyle.isNotBlank()) append("\n说话风格：$speechStyle")
+                if (catchphrases.isNotBlank()) append("\n常用口头禅：$catchphrases")
+                if (preferences.isNotBlank()) append("\n喜好：$preferences")
+                if (worldSetting.isNotBlank()) append("\n世界观设定：$worldSetting")
+                if (worldRelationship.isNotBlank()) append("\n你和用户的关系：$worldRelationship")
+                if (worldRules.isNotBlank()) append("\n规则：$worldRules")
+                if (nickname.isNotBlank()) append("\n你称呼用户为「$nickname」。")
+            }
+            putString("ai_prompt", prompt.toString())
+            apply()
+        }
     }
 
     private fun resetToDefault() {

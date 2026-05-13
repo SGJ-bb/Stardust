@@ -9,7 +9,7 @@
 .cxx
 local.properties
 
-# Android build outputs
+# Android build outputs (keep APK if manually copied to apk/)
 /app/build/
 /app/build_v3/
 /build/

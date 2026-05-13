@@ -1,24 +1,23 @@
 package com.aicompanion.ui
 
-import android.app.Activity
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
-import android.view.ViewGroup
+import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Button
 import android.widget.RadioGroup
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import com.aicompanion.R
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.settings.LanguageStyle
@@ -31,21 +30,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
 
-class SettingsActivity : Activity() {
+class SettingsActivity : AppCompatActivity() {
 
     private var settingsManager: SettingsManager? = null
     private var memoryManager: MemoryManager? = null
 
     // UI components
-    private var btnPersonaEditor: Button? = null
-    private var btnModelManager: Button? = null
-    private var btnModelAdjust: Button? = null
-    private var btnViewMemories: Button? = null
-    private var btnDeleteAllMemories: Button? = null
-    private var btnChangeTheme: Button? = null
-    private var btnViewLog: Button? = null
-    private var btnStartOverlay: Button? = null
-    private var btnTestChatApi: Button? = null
+    private var btnPersonaEditor: com.google.android.material.button.MaterialButton? = null
+    private var btnModelManager: com.google.android.material.button.MaterialButton? = null
+    private var btnModelAdjust: com.google.android.material.button.MaterialButton? = null
+    private var btnViewMemories: com.google.android.material.button.MaterialButton? = null
+    private var btnDeleteAllMemories: com.google.android.material.button.MaterialButton? = null
+    private var btnChangeTheme: com.google.android.material.button.MaterialButton? = null
+    private var btnViewLog: com.google.android.material.button.MaterialButton? = null
+    private var btnStartOverlay: com.google.android.material.button.MaterialButton? = null
+    private var btnTestChatApi: com.google.android.material.button.MaterialButton? = null
     private var seekOverlaySize: SeekBar? = null
     private var tvOverlaySizeValue: TextView? = null
     private var radioNagFrequency: RadioGroup? = null
@@ -73,8 +72,8 @@ class SettingsActivity : Activity() {
 
     // Wake up settings
     private var switchWakeEnabled: Switch? = null
-    private var btnSetWakeTime: Button? = null
-    private var btnSetWakeMessage: Button? = null
+    private var btnSetWakeTime: com.google.android.material.button.MaterialButton? = null
+    private var btnSetWakeMessage: com.google.android.material.button.MaterialButton? = null
     private var tvWakeInfo: TextView? = null
 
     // Spinner auto-fill guard
@@ -118,6 +117,7 @@ class SettingsActivity : Activity() {
             val outlineColorMap = mapOf(
                 R.id.btn_change_theme to primaryColor,
                 R.id.btn_view_log to accentColor,
+                R.id.btn_model_adjust to primaryColor,
                 R.id.btn_set_wake_time to primaryColor,
                 R.id.btn_set_wake_message to accentColor,
                 R.id.btn_view_memories to primaryColor,
@@ -125,14 +125,27 @@ class SettingsActivity : Activity() {
             )
 
             fun applyBtnColor(id: Int, tintColor: Int, textColor: Int, outline: Boolean) {
-                val btn = findViewById<com.google.android.material.button.MaterialButton>(id) ?: return
-                if (outline) {
-                    btn.strokeColor = android.content.res.ColorStateList.valueOf(tintColor)
-                    btn.setTextColor(textColor)
-                    btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
-                } else {
-                    btn.backgroundTintList = android.content.res.ColorStateList.valueOf(tintColor)
-                    btn.setTextColor(android.graphics.Color.WHITE)
+                val btn = findViewById<View?>(id) ?: return
+                try {
+                    if (btn is com.google.android.material.button.MaterialButton) {
+                        if (outline) {
+                            btn.strokeColor = android.content.res.ColorStateList.valueOf(tintColor)
+                            btn.setTextColor(textColor)
+                            btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
+                        } else {
+                            btn.backgroundTintList = android.content.res.ColorStateList.valueOf(tintColor)
+                            btn.setTextColor(android.graphics.Color.WHITE)
+                        }
+                    } else if (btn is android.widget.Button) {
+                        if (outline) {
+                            (btn as android.widget.Button).setTextColor(textColor)
+                        } else {
+                            (btn as android.widget.Button).setBackgroundColor(tintColor)
+                            (btn as android.widget.Button).setTextColor(android.graphics.Color.WHITE)
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("SettingsActivity", "applyBtnColor error for id=$id: ${e.message}")
                 }
             }
 
@@ -150,15 +163,15 @@ class SettingsActivity : Activity() {
         toolbar.setNavigationOnClickListener { finish() }
 
         // Buttons
-        btnPersonaEditor = findViewById(R.id.btn_persona_editor)
-        btnModelManager = findViewById(R.id.btn_model_manager)
-        btnModelAdjust = findViewById(R.id.btn_model_adjust)
-        btnViewMemories = findViewById(R.id.btn_view_memories)
-        btnDeleteAllMemories = findViewById(R.id.btn_delete_all_memories)
-        btnChangeTheme = findViewById(R.id.btn_change_theme)
-        btnViewLog = findViewById(R.id.btn_view_log)
-        btnStartOverlay = findViewById(R.id.btn_start_overlay)
-        btnTestChatApi = findViewById(R.id.btn_test_chat_api)
+        btnPersonaEditor = findViewById<View?>(R.id.btn_persona_editor) as? com.google.android.material.button.MaterialButton
+        btnModelManager = findViewById<View?>(R.id.btn_model_manager) as? com.google.android.material.button.MaterialButton
+        btnModelAdjust = findViewById<View?>(R.id.btn_model_adjust) as? com.google.android.material.button.MaterialButton
+        btnViewMemories = findViewById<View?>(R.id.btn_view_memories) as? com.google.android.material.button.MaterialButton
+        btnDeleteAllMemories = findViewById<View?>(R.id.btn_delete_all_memories) as? com.google.android.material.button.MaterialButton
+        btnChangeTheme = findViewById<View?>(R.id.btn_change_theme) as? com.google.android.material.button.MaterialButton
+        btnViewLog = findViewById<View?>(R.id.btn_view_log) as? com.google.android.material.button.MaterialButton
+        btnStartOverlay = findViewById<View?>(R.id.btn_start_overlay) as? com.google.android.material.button.MaterialButton
+        btnTestChatApi = findViewById<View?>(R.id.btn_test_chat_api) as? com.google.android.material.button.MaterialButton
 
         // SeekBar
         seekOverlaySize = findViewById(R.id.seek_overlay_size)
@@ -190,8 +203,8 @@ class SettingsActivity : Activity() {
 
         // Wake up settings
         switchWakeEnabled = findViewById(R.id.switch_wake_enabled)
-        btnSetWakeTime = findViewById(R.id.btn_set_wake_time)
-        btnSetWakeMessage = findViewById(R.id.btn_set_wake_message)
+        btnSetWakeTime = findViewById<View?>(R.id.btn_set_wake_time) as? com.google.android.material.button.MaterialButton
+        btnSetWakeMessage = findViewById<View?>(R.id.btn_set_wake_message) as? com.google.android.material.button.MaterialButton
         tvWakeInfo = findViewById(R.id.tv_wake_info)
 
         setupOverlaySize()
@@ -251,6 +264,10 @@ class SettingsActivity : Activity() {
     }
 
     private fun setupClickListeners() {
+        (findViewById<View?>(R.id.donateBtn))?.setOnClickListener {
+            showDonateDialog()
+        }
+
         btnPersonaEditor?.setOnClickListener {
             try {
                 startActivity(Intent(this, PersonaEditorActivity::class.java))
@@ -399,6 +416,22 @@ class SettingsActivity : Activity() {
                 }
                 .setNegativeButton("取消", null)
                 .show()
+        }
+
+        findViewById<View?>(R.id.tvBilibiliLink)?.setOnClickListener {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://space.bilibili.com/1523985433"))
+                startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(this, "无法打开链接，请手动搜索B站UID: 1523985433", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        findViewById<View?>(R.id.tvDouyinLink)?.setOnClickListener {
+            val clip = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clipData = android.content.ClipData.newPlainText("抖音ID", "31991565756")
+            clip.setPrimaryClip(clipData)
+            Toast.makeText(this, "抖音ID已复制到剪贴板：31991565756", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -610,6 +643,27 @@ class SettingsActivity : Activity() {
         }
 
         Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showDonateDialog() {
+        try {
+            val imageView = android.widget.ImageView(this)
+            val inputStream = assets.open("donate_qrcode.png")
+            val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            imageView.setImageBitmap(bitmap)
+            imageView.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            imageView.setPadding(padding, padding, padding, padding)
+
+            android.app.AlertDialog.Builder(this)
+                .setTitle("感谢你的支持 💛")
+                .setView(imageView)
+                .setPositiveButton("已扫码，感谢!", null)
+                .show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "加载二维码失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun safeParseColor(colorStr: String?, default: Int): Int {

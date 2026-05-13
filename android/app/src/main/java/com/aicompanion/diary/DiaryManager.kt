@@ -1,61 +1,22 @@
 package com.aicompanion.diary
 
 import android.content.Context
-import com.aicompanion.settings.SettingsManager
+import android.content.Intent
+import androidx.core.content.FileProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
-data class DiaryEntry(
-    val date: String,
-    val title: String,
-    val content: String,
-    val mood: String = "normal",
-    val moodEmoji: String = "😊",
-    val affectionLevel: Int = 0,
-    val messageCount: Int = 0,
-    val keyMemories: List<String> = emptyList(),
-    val createdAt: Long = System.currentTimeMillis()
-) {
-    fun toJson(): JSONObject = JSONObject().apply {
-        put("date", date)
-        put("title", title)
-        put("content", content)
-        put("mood", mood)
-        put("mood_emoji", moodEmoji)
-        put("affection_level", affectionLevel)
-        put("message_count", messageCount)
-        put("created_at", createdAt)
-        val memArray = JSONArray()
-        keyMemories.forEach { memArray.put(it) }
-        put("key_memories", memArray)
-    }
+class DiaryManager(private val context: Context) {
 
     companion object {
-        fun fromJson(json: JSONObject): DiaryEntry {
-            val mems = mutableListOf<String>()
-            val memsArr = json.optJSONArray("key_memories")
-            if (memsArr != null) {
-                for (i in 0 until memsArr.length()) mems.add(memsArr.optString(i, ""))
-            }
-            return DiaryEntry(
-                date = json.optString("date", ""),
-                title = json.optString("title", ""),
-                content = json.optString("content", ""),
-                mood = json.optString("mood", "normal"),
-                moodEmoji = json.optString("mood_emoji", "😊"),
-                affectionLevel = json.optInt("affection_level", 0),
-                messageCount = json.optInt("message_count", 0),
-                keyMemories = mems,
-                createdAt = json.optLong("created_at", System.currentTimeMillis())
-            )
-        }
+        const val CURRENT_VERSION = 2
+        val APP_VERSION = "1.0.0"
+        private const val INDEX_FILE = "diary_index.json"
+        private const val TAG = "DiaryManager"
     }
-}
-
-class DiaryManager(private val context: Context) {
 
     private val diaryDir = File(context.filesDir, "diaries")
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -73,9 +34,41 @@ class DiaryManager(private val context: Context) {
         if (!diaryDir.exists()) diaryDir.mkdirs()
     }
 
+    private fun getIndexFile(): File = File(diaryDir, INDEX_FILE)
+
+    private fun readIndex(): JSONObject {
+        val idxFile = getIndexFile()
+        return if (idxFile.exists()) {
+            try { JSONObject(idxFile.readText()) } catch (_: Exception) { JSONObject() }
+        } else {
+            JSONObject()
+        }
+    }
+
+    private fun writeIndex(index: JSONObject) {
+        try {
+            getIndexFile().writeText(index.toString(2))
+        } catch (_: Exception) {}
+    }
+
+    private fun updateIndex(entry: DiaryEntry) {
+        val index = readIndex()
+        val idxObj = JSONObject().apply {
+            put("title", entry.title)
+            put("mood", entry.mood)
+            put("mood_emoji", entry.moodEmoji)
+            put("affection_level", entry.affectionLevel)
+            put("message_count", entry.messageCount)
+            put("created_at", entry.createdAt)
+            put("version", entry.version)
+        }
+        index.put(entry.date, idxObj)
+        writeIndex(index)
+    }
+
     fun getAllDiaries(): List<DiaryEntry> {
         val diaries = mutableListOf<DiaryEntry>()
-        diaryDir.listFiles()?.filter { it.extension == "json" }?.forEach { file ->
+        diaryDir.listFiles()?.filter { it.isFile && it.extension == "json" && it.name != INDEX_FILE }?.forEach { file ->
             try {
                 val json = JSONObject(file.readText())
                 diaries.add(DiaryEntry.fromJson(json))
@@ -136,6 +129,18 @@ class DiaryManager(private val context: Context) {
             else -> "平凡而美好"
         }
 
+        val tagSuggestions = mutableListOf("daily")
+        when (mood) {
+            "happy" -> tagSuggestions.add("happy")
+            "sad" -> tagSuggestions.add("sad")
+            "excited" -> tagSuggestions.add("excited")
+            "calm" -> tagSuggestions.add("calm")
+        }
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        if (hour < 12) tagSuggestions.add("morning")
+        else if (hour < 18) tagSuggestions.add("afternoon")
+        else tagSuggestions.add("evening")
+
         val entry = DiaryEntry(
             date = today,
             title = title,
@@ -143,11 +148,15 @@ class DiaryManager(private val context: Context) {
             mood = mood,
             moodEmoji = moodEmoji,
             affectionLevel = affectionLevel,
-            messageCount = chatTexts.size
+            messageCount = chatTexts.size,
+            tags = tagSuggestions,
+            pluginMeta = JSONObject(),
+            customFields = JSONObject()
         )
 
         val file = File(diaryDir, "$today.json")
         file.writeText(entry.toJson().toString(2))
+        updateIndex(entry)
     }
 
     private fun analyzeMood(text: String): String {
@@ -172,8 +181,173 @@ class DiaryManager(private val context: Context) {
 
     fun deleteDiary(date: String): Boolean {
         val file = File(diaryDir, "$date.json")
-        return file.delete()
+        val deleted = file.delete()
+        if (deleted) {
+            val index = readIndex()
+            index.remove(date)
+            writeIndex(index)
+        }
+        return deleted
     }
 
-    fun getDiaryCount(): Int = diaryDir.listFiles()?.size ?: 0
+    fun getDiaryCount(): Int = diaryDir.listFiles()?.count { it.isFile && it.extension == "json" && it.name != INDEX_FILE } ?: 0
+
+    fun exportToMarkdown(entries: List<DiaryEntry>): String {
+        val sb = StringBuilder()
+        sb.appendLine("# 星尘日记")
+        sb.appendLine()
+        sb.appendLine("> 导出时间：${fullDateFormat.format(Date())}")
+        sb.appendLine("> 应用版本：$APP_VERSION")
+        sb.appendLine("> 日记格式：v$CURRENT_VERSION")
+        sb.appendLine()
+        sb.appendLine("---")
+        sb.appendLine()
+
+        entries.sortedBy { it.date }.forEach { diary ->
+            sb.appendLine("## ${diary.date} ${diary.title} ${diary.moodEmoji}")
+            sb.appendLine()
+            sb.appendLine("- 情绪：${diary.mood} ${diary.moodEmoji}")
+            sb.appendLine("- 好感度：${diary.affectionLevel}")
+            sb.appendLine("- 消息数：${diary.messageCount}")
+            if (diary.tags.isNotEmpty()) sb.appendLine("- 标签：${diary.tags.joinToString("、")}")
+            if (diary.keyMemories.isNotEmpty()) {
+                sb.appendLine("- 记忆片段：")
+                diary.keyMemories.forEach { sb.appendLine("  - $it") }
+            }
+            sb.appendLine()
+            sb.appendLine(diary.content)
+            sb.appendLine()
+            sb.appendLine("---")
+            sb.appendLine()
+        }
+        return sb.toString()
+    }
+
+    fun exportToJson(entries: List<DiaryEntry>): String {
+        val root = JSONObject().apply {
+            put("export_version", CURRENT_VERSION)
+            put("app_version", APP_VERSION)
+            put("export_time", System.currentTimeMillis())
+            put("export_date", dateFormat.format(Date()))
+            put("total_count", entries.size)
+
+            val entriesArray = JSONArray()
+            entries.sortedBy { it.date }.forEach { diary ->
+                entriesArray.put(diary.toJson())
+            }
+            put("diaries", entriesArray)
+        }
+        return root.toString(2)
+    }
+
+    fun shareExport(content: String, filename: String, mimeType: String = "text/markdown") {
+        try {
+            val exportDir = File(context.cacheDir, "exports")
+            if (!exportDir.exists()) exportDir.mkdirs()
+            val exportFile = File(exportDir, filename)
+            exportFile.writeText(content)
+
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                exportFile
+            )
+
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            context.startActivity(Intent.createChooser(intent, "分享日记").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "shareExport failed: ${e.message}", e)
+        }
+    }
+
+    data class ImportResult(
+        val imported: Int,
+        val skipped: Int,
+        val errors: List<String>
+    )
+
+    fun importFromJson(jsonContent: String): ImportResult {
+        val imported = mutableListOf<String>()
+        val errors = mutableListOf<String>()
+
+        try {
+            val root = JSONObject(jsonContent)
+            val diariesArray = root.optJSONArray("diaries")
+
+            if (diariesArray != null) {
+                for (i in 0 until diariesArray.length()) {
+                    try {
+                        val entryJson = diariesArray.getJSONObject(i)
+                        val entry = DiaryEntry.fromJson(entryJson)
+                        if (entry.date.isNotBlank()) {
+                            if (importDiary(entry)) {
+                                imported.add(entry.date)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        errors.add("第${i + 1}条解析失败: ${e.message}")
+                    }
+                }
+            } else {
+                val entry = DiaryEntry.fromJson(root)
+                if (entry.date.isNotBlank()) {
+                    if (importDiary(entry)) {
+                        imported.add(entry.date)
+                    }
+                } else {
+                    errors.add("无法识别日记格式")
+                }
+            }
+
+            rebuildIndex()
+        } catch (e: Exception) {
+            errors.add("JSON解析失败: ${e.message}")
+        }
+
+        return ImportResult(
+            imported = imported.size,
+            skipped = (imported.size + errors.size) - imported.size,
+            errors = errors
+        )
+    }
+
+    fun importDiary(entry: DiaryEntry): Boolean {
+        val file = File(diaryDir, "${entry.date}.json")
+        if (file.exists()) return false
+        return try {
+            file.writeText(entry.toJson().toString(2))
+            true
+        } catch (_: Exception) { false }
+    }
+
+    private fun rebuildIndex() {
+        val index = JSONObject()
+        diaryDir.listFiles()?.filter { it.isFile && it.extension == "json" && it.name != INDEX_FILE }?.forEach { file ->
+            try {
+                val json = JSONObject(file.readText())
+                val date = json.optString("date", "")
+                if (date.isNotBlank()) {
+                    val idxObj = JSONObject().apply {
+                        put("title", json.optString("title", ""))
+                        put("mood", json.optString("mood", "normal"))
+                        put("mood_emoji", json.optString("mood_emoji", "😊"))
+                        put("affection_level", json.optInt("affection_level", 0))
+                        put("message_count", json.optInt("message_count", 0))
+                        put("created_at", json.optLong("created_at", 0))
+                        put("version", json.optInt("version", 1))
+                    }
+                    index.put(date, idxObj)
+                }
+            } catch (_: Exception) {}
+        }
+        writeIndex(index)
+    }
 }

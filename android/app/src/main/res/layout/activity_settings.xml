@@ -69,7 +69,7 @@
                         app:strokeWidth="1dp"
                         android:textColor="#aabbdd"
                         app:backgroundTint="@android:color/transparent"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_view_log"
@@ -84,7 +84,7 @@
                         app:strokeWidth="1dp"
                         android:textColor="#aabbdd"
                         app:backgroundTint="@android:color/transparent"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
                 </LinearLayout>
 
                 <View
@@ -101,7 +101,7 @@
                     android:textSize="14sp"
                     app:cornerRadius="22dp"
                     app:backgroundTint="#667eea"
-                    style="@style/Widget.MaterialComponents.Button" />
+                    style="@style/Widget.Material3.Button" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_model_adjust"
@@ -115,7 +115,7 @@
                     app:strokeWidth="1dp"
                     android:textColor="#8899cc"
                     app:backgroundTint="@android:color/transparent"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_start_overlay"
@@ -126,7 +126,7 @@
                     android:layout_marginTop="8dp"
                     app:cornerRadius="22dp"
                     app:backgroundTint="#ff6b9d"
-                    style="@style/Widget.MaterialComponents.Button" />
+                    style="@style/Widget.Material3.Button" />
 
                 <View
                     android:layout_width="match_parent"
@@ -242,7 +242,7 @@
                     app:boxBackgroundColor="#151525"
                     app:boxStrokeColor="#2a2a4a"
                     app:hintTextColor="#556677"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_marginTop="12dp">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -261,7 +261,7 @@
                     app:boxBackgroundColor="#151525"
                     app:boxStrokeColor="#2a2a4a"
                     app:hintTextColor="#556677"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_marginTop="8dp">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -280,7 +280,7 @@
                     app:boxBackgroundColor="#151525"
                     app:boxStrokeColor="#2a2a4a"
                     app:hintTextColor="#556677"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_marginTop="8dp">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -305,7 +305,7 @@
                     app:strokeWidth="1dp"
                     android:textColor="#8899cc"
                     app:backgroundTint="@android:color/transparent"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -350,7 +350,7 @@
                     app:boxBackgroundColor="#151525"
                     app:boxStrokeColor="#2a2a4a"
                     app:hintTextColor="#556677"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_marginTop="8dp">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -369,7 +369,7 @@
                     app:boxBackgroundColor="#151525"
                     app:boxStrokeColor="#2a2a4a"
                     app:hintTextColor="#556677"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_marginTop="8dp">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -434,7 +434,7 @@
                     app:boxBackgroundColor="#151525"
                     app:boxStrokeColor="#2a2a4a"
                     app:hintTextColor="#556677"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_marginTop="8dp">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -489,7 +489,7 @@
                     app:boxBackgroundColor="#151525"
                     app:boxStrokeColor="#2a2a4a"
                     app:hintTextColor="#556677"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_marginTop="8dp">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -508,7 +508,7 @@
                     app:boxBackgroundColor="#151525"
                     app:boxStrokeColor="#2a2a4a"
                     app:hintTextColor="#556677"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_marginTop="8dp">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -556,7 +556,7 @@
                     app:boxBackgroundColor="#151525"
                     app:boxStrokeColor="#2a2a4a"
                     app:hintTextColor="#556677"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/et_user_id"
@@ -624,7 +624,7 @@
                     app:strokeWidth="1dp"
                     android:textColor="#aabbdd"
                     app:backgroundTint="@android:color/transparent"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_set_wake_message"
@@ -638,7 +638,7 @@
                     app:strokeWidth="1dp"
                     android:textColor="#aabbdd"
                     app:backgroundTint="@android:color/transparent"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
 
                 <TextView
                     android:id="@+id/tv_wake_info"
@@ -685,7 +685,7 @@
                     android:textSize="14sp"
                     app:cornerRadius="22dp"
                     app:backgroundTint="#667eea"
-                    style="@style/Widget.MaterialComponents.Button" />
+                    style="@style/Widget.Material3.Button" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_view_memories"
@@ -699,7 +699,7 @@
                     app:strokeWidth="1dp"
                     android:textColor="#8899cc"
                     app:backgroundTint="@android:color/transparent"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_delete_all_memories"
@@ -710,7 +710,7 @@
                     android:layout_marginTop="8dp"
                     app:cornerRadius="22dp"
                     app:backgroundTint="#cc3344"
-                    style="@style/Widget.MaterialComponents.Button" />
+                    style="@style/Widget.Material3.Button" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -880,6 +880,173 @@
                     android:textColor="#667788"
                     android:layout_marginTop="6dp"
                     android:gravity="center" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="#1a1a30"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#3360A5FA"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gravity="center">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🐛"
+                    android:textSize="28sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Bug 反馈"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#60A5FA"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="如果使用过程中有遇到什么问题，或者哪里不足的可以给作者发私信反馈"
+                    android:textSize="14sp"
+                    android:textColor="#AAAAAA"
+                    android:lineSpacingExtra="4dp"
+                    android:gravity="center"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:id="@+id/tvBilibiliLink"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📺 B站：搜索 UID 1523985433"
+                    android:textSize="13sp"
+                    android:textColor="#60A5FA"
+                    android:layout_marginTop="10dp"
+                    android:padding="6dp" />
+
+                <TextView
+                    android:id="@+id/tvDouyinLink"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎵 抖音ID：31991565756"
+                    android:textSize="13sp"
+                    android:textColor="#60A5FA"
+                    android:layout_marginTop="4dp"
+                    android:padding="6dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="#1a1a30"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#33667FE0"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gravity="center">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📢"
+                    android:textSize="28sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="公告"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#c4b5fd"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="此项目纯心血来潮的vibe coding，没有添加任何非法收集个人信息的功能，项目在GitHub上有源码，不放心的可以审计源码或是逆向app，都可以哦~"
+                    android:textSize="14sp"
+                    android:textColor="#AAAAAA"
+                    android:lineSpacingExtra="4dp"
+                    android:gravity="center"
+                    android:layout_marginTop="8dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="32dp"
+            app:cardBackgroundColor="#1a1a30"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#33FFB6C1"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gravity="center">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💛"
+                    android:textSize="32sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="此软件纯vibecoding开源免费，献给热爱自己热爱生活的所有人。不过作者家道中落，快要没米吃饭了，如果愿意资助作者开发，就请点击下面的按钮，你们的支持是我更新下去的动力 ✨"
+                    android:textSize="14sp"
+                    android:textColor="#CCCCCC"
+                    android:lineSpacingExtra="4dp"
+                    android:gravity="center"
+                    android:layout_marginTop="12dp" />
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:src="@drawable/donate_image"
+                    android:scaleType="fitCenter"
+                    android:adjustViewBounds="true"
+                    android:layout_marginTop="12dp"
+                    android:contentDescription="赞助二维码" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/donateBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:text="帮助落难作者"
+                    android:textSize="15sp"
+                    android:textColor="#FFFFFF"
+                    app:backgroundTint="#FF6B9D"
+                    app:cornerRadius="22dp"
+                    android:paddingStart="32dp"
+                    android:paddingEnd="32dp"
+                    android:layout_marginTop="16dp"
+                    style="@style/Widget.Material3.Button" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

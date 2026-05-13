@@ -6,20 +6,25 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.aicompanion.R
+import com.aicompanion.network.ApiClient
 import com.aicompanion.ui.MainActivity
+import com.aicompanion.models.ChatResponse
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.*
 
 class WakeUpReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == ACTION_WAKE_UP) {
-            showWakeUpNotification(context)
+            showWakeUpNotification(context, true)
         }
     }
 
-    private fun showWakeUpNotification(context: Context) {
+    private fun showWakeUpNotification(context: Context, tryAI: Boolean = true) {
         val channelId = "ai_wakeup_channel"
         val notificationManager = NotificationManagerCompat.from(context)
         
@@ -46,8 +51,11 @@ class WakeUpReceiver : BroadcastReceiver() {
 
         val prefs = context.getSharedPreferences("wakeup_settings", Context.MODE_PRIVATE)
         val customMessage = prefs.getString("wake_message", null)
-        
-        val greeting = customMessage ?: run {
+
+        val personaPrefs = context.getSharedPreferences("persona_data", Context.MODE_PRIVATE)
+        val aiName = personaPrefs.getString("persona_name", null) ?: "星尘"
+
+        val baseGreeting = customMessage ?: run {
             val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
             when {
                 hour < 6 -> "夜深了，星尘还在等你..."
@@ -57,10 +65,60 @@ class WakeUpReceiver : BroadcastReceiver() {
             }
         }
 
+        var notificationText = baseGreeting
+
+        if (tryAI) {
+            val settingsPrefs = context.getSharedPreferences("companion_settings", Context.MODE_PRIVATE)
+            val apiUrl = settingsPrefs.getString("chat_api_url", "") ?: ""
+            val apiKey = settingsPrefs.getString("chat_api_key", "") ?: ""
+            val apiModel = settingsPrefs.getString("chat_model", "gpt-4o-mini") ?: "gpt-4o-mini"
+
+            if (apiUrl.isNotBlank()) {
+                Thread {
+                    try {
+                        val aiClient = ApiClient(apiUrl, apiKey, apiModel)
+                        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                        val timeHint = when {
+                            hour < 6 -> "凌晨"
+                            hour < 12 -> "早上"
+                            hour < 18 -> "下午"
+                            else -> "晚上"
+                        }
+                        val result = aiClient.sendProactiveChat(
+                            "星尘",
+                            "你是一个可爱的AI桌宠",
+                            "现在是$timeHint，你想主动找用户打个招呼。回复1-2句话，自然可爱，语气像认识很久的朋友。不需要自我介绍。直接说想说的话就好。",
+                            "（用户现在没在看手机，你想主动找ta说话）"
+                        )
+                        if (result != null && result.text.isNotBlank()) {
+                            val aiText = result.text
+                            if (aiText.length <= 60) {
+                                notificationText = aiText
+                                val notification = NotificationCompat.Builder(context, channelId)
+                                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                                    .setContentTitle("$aiName 唤醒")
+                                    .setContentText(notificationText)
+                                    .setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
+                                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                                    .setContentIntent(pendingIntent)
+                                    .setAutoCancel(true)
+                                    .build()
+                                notificationManager.notify(NOTIFICATION_ID_WAKEUP, notification)
+                                return@Thread
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.d("WakeUp", "AI wakeup failed: ${e.message}")
+                    }
+                }.apply { start() }
+            }
+        }
+
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("星尘唤醒")
-            .setContentText(greeting)
+            .setContentTitle("$aiName 唤醒")
+            .setContentText(notificationText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)

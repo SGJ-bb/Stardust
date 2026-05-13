@@ -60,7 +60,7 @@
                         android:id="@+id/tv_pet_name"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="✨ 星尘"
+                        android:text=""
                         android:textColor="@android:color/white"
                         android:textSize="15sp"
                         android:textStyle="bold" />

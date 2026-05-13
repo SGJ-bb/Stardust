@@ -1,5 +1,6 @@
 package com.aicompanion.models
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 enum class Emotion { HAPPY, ANGRY, SAD, SURPRISED, TSUNDERE, NEUTRAL }
@@ -8,11 +9,186 @@ enum class Action { TAIL_FLICK, EAR_TWITCH, BLUSH, STRETCH, YAWN, IDLE, TAP }
 
 enum class TextureQuality { LOW, MEDIUM, HIGH }
 
+data class CharacterCard(
+    val id: String,
+    val name: String,
+    val description: String = "",
+    val personality: String = "",
+    val scenario: String = "",
+    val firstMes: String = "",
+    val mesExample: String = "",
+    val creatorNotes: String = "",
+    val systemPrompt: String = "",
+    val postHistoryInstructions: String = "",
+    val alternateGreetings: List<String> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val creator: String = "",
+    val characterVersion: String = "1.0",
+    val avatarPath: String = "",
+    val isActive: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+    val worldInfoId: String = ""
+) {
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("id", id)
+        put("name", name)
+        put("description", description)
+        put("personality", personality)
+        put("scenario", scenario)
+        put("first_mes", firstMes)
+        put("mes_example", mesExample)
+        put("creator_notes", creatorNotes)
+        put("system_prompt", systemPrompt)
+        put("post_history_instructions", postHistoryInstructions)
+        put("alternate_greetings", JSONArray(alternateGreetings))
+        put("tags", JSONArray(tags))
+        put("creator", creator)
+        put("character_version", characterVersion)
+        put("avatar_path", avatarPath)
+        put("is_active", isActive)
+        put("created_at", createdAt)
+        put("world_info_id", worldInfoId)
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): CharacterCard = CharacterCard(
+            id = json.optString("id", ""),
+            name = json.optString("name", ""),
+            description = json.optString("description", ""),
+            personality = json.optString("personality", ""),
+            scenario = json.optString("scenario", ""),
+            firstMes = json.optString("first_mes", ""),
+            mesExample = json.optString("mes_example", ""),
+            creatorNotes = json.optString("creator_notes", ""),
+            systemPrompt = json.optString("system_prompt", ""),
+            postHistoryInstructions = json.optString("post_history_instructions", ""),
+            alternateGreetings = json.optJSONArray("alternate_greetings")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
+            tags = json.optJSONArray("tags")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
+            creator = json.optString("creator", ""),
+            characterVersion = json.optString("character_version", "1.0"),
+            avatarPath = json.optString("avatar_path", ""),
+            isActive = json.optBoolean("is_active", false),
+            createdAt = json.optLong("created_at", System.currentTimeMillis()),
+            worldInfoId = json.optString("world_info_id", "")
+        )
+
+        fun defaultCard(): CharacterCard = CharacterCard(
+            id = "default_stardust",
+            name = "星尘",
+            description = "一只异色瞳黑猫，傲娇毒舌但内心关心主人",
+            personality = "傲娇、毒舌、但内心温柔关心主人、偶尔会害羞、喜欢被夸奖",
+            scenario = "你是主人的AI桌宠，住在主人的手机里",
+            firstMes = "哼，你终于来了？我才没有在等你呢...",
+            systemPrompt = "你是「星尘」，一只异色瞳黑猫AI桌宠。性格傲娇毒舌但内心关心主人。说话风格简短自然，偶尔带点小傲娇。用中文回复。",
+            tags = listOf("猫", "傲娇", "默认"),
+            creator = "AI Companion",
+            isActive = true
+        )
+    }
+}
+
+data class WorldInfoEntry(
+    val id: String,
+    val key: String,
+    val keySecondary: String = "",
+    val content: String,
+    val comment: String = "",
+    val constant: Boolean = false,
+    val selective: Boolean = false,
+    val insertionOrder: Int = 100,
+    val enabled: Boolean = true,
+    val position: String = "before_char",
+    val extensions: JSONObject = JSONObject()
+) {
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("id", id)
+        put("key", key)
+        put("keysecondary", keySecondary)
+        put("content", content)
+        put("comment", comment)
+        put("constant", constant)
+        put("selective", selective)
+        put("insertionorder", insertionOrder)
+        put("enabled", enabled)
+        put("position", position)
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): WorldInfoEntry = WorldInfoEntry(
+            id = json.optString("id", ""),
+            key = json.optString("key", ""),
+            keySecondary = json.optString("keysecondary", ""),
+            content = json.optString("content", ""),
+            comment = json.optString("comment", ""),
+            constant = json.optBoolean("constant", false),
+            selective = json.optBoolean("selective", false),
+            insertionOrder = json.optInt("insertionorder", 100),
+            enabled = json.optBoolean("enabled", true),
+            position = json.optString("position", "before_char")
+        )
+    }
+}
+
+data class WorldInfo(
+    val id: String,
+    val name: String,
+    val entries: List<WorldInfoEntry> = emptyList(),
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("id", id)
+        put("name", name)
+        put("entries", JSONArray(entries.map { it.toJson() }))
+        put("created_at", createdAt)
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): WorldInfo = WorldInfo(
+            id = json.optString("id", ""),
+            name = json.optString("name", ""),
+            entries = json.optJSONArray("entries")?.let { arr ->
+                (0 until arr.length()).map { WorldInfoEntry.fromJson(arr.getJSONObject(it)) }
+            } ?: emptyList(),
+            createdAt = json.optLong("created_at", System.currentTimeMillis())
+        )
+    }
+}
+
+data class UserPersona(
+    val id: String = "default",
+    val name: String = "",
+    val description: String = "",
+    val personality: String = "",
+    val appearance: String = "",
+    val isActive: Boolean = true
+) {
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("id", id)
+        put("name", name)
+        put("description", description)
+        put("personality", personality)
+        put("appearance", appearance)
+        put("is_active", isActive)
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): UserPersona = UserPersona(
+            id = json.optString("id", "default"),
+            name = json.optString("name", ""),
+            description = json.optString("description", ""),
+            personality = json.optString("personality", ""),
+            appearance = json.optString("appearance", ""),
+            isActive = json.optBoolean("is_active", true)
+        )
+    }
+}
+
 data class ChatResponse(
     val text: String,
     val emotion: Emotion,
     val action: Action,
-    val audioUrl: String? = null
+    val audioUrl: String? = null,
+    val errorMessage: String? = null
 )
 
 data class MemoryFact(

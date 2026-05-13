@@ -143,6 +143,17 @@ class ModelManager(context: Context) {
     private fun getDefaultModels(): List<Live2DModel> {
         return listOf(
             Live2DModel(
+                id = "purple_bird",
+                name = "PurpleBird",
+                description = "紫鸟，默认模型",
+                modelPath = "file:///android_asset/vtuber/PurpleBird/PurpleBird.model3.json",
+                texturePath = "",
+                physicsPath = "",
+                motionPath = "",
+                version = "Cubism 4",
+                isActive = true
+            ),
+            Live2DModel(
                 id = "xiaodemao",
                 name = "小恶魔",
                 description = "小恶魔风格，活泼可爱",
@@ -151,7 +162,7 @@ class ModelManager(context: Context) {
                 physicsPath = "",
                 motionPath = "",
                 version = "Cubism 4",
-                isActive = true
+                isActive = false
             ),
             Live2DModel(
                 id = "default_stardust",
