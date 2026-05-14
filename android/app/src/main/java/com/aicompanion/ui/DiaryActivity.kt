@@ -1,3 +1,4 @@
+/** 日记页: 按日期展示AI自动生成的每日日记 */
 package com.aicompanion.ui
 
 import android.net.Uri
@@ -254,7 +255,26 @@ class DiaryActivity : AppCompatActivity() {
                 true
             }
 
+            view.setOnClickListener {
+                showDiaryDetail(diary)
+            }
+
             return view
         }
+    }
+
+    private fun showDiaryDetail(diary: com.aicompanion.diary.DiaryEntry) {
+        val contentView = layoutInflater.inflate(R.layout.dialog_diary_detail, null)
+        contentView.findViewById<TextView>(R.id.tv_detail_mood)?.text = "${diary.moodEmoji} ${diary.mood}"
+        contentView.findViewById<TextView>(R.id.tv_detail_date)?.text = diary.date
+        contentView.findViewById<TextView>(R.id.tv_detail_stats)?.text = "[${diary.messageCount}条消息] 好感度${diary.affectionLevel}"
+        contentView.findViewById<TextView>(R.id.tv_detail_tags)?.text = if (diary.tags.isNotEmpty()) "标签: ${diary.tags.joinToString(", ")}" else ""
+        contentView.findViewById<TextView>(R.id.tv_detail_content)?.text = diary.content
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle(diary.title)
+            .setView(contentView)
+            .setPositiveButton("关闭", null)
+            .show()
     }
 }

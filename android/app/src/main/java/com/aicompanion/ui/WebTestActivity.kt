@@ -1,3 +1,4 @@
+/** WebView测试页: 用于调试Live2D WebView功能 */
 package com.aicompanion.ui
 
 import android.app.Activity

@@ -1,3 +1,4 @@
+/** 记忆管理页: 查看/添加/删除AI的长期记忆条目 */
 package com.aicompanion.ui
 
 import android.os.Bundle

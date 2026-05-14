@@ -1,3 +1,4 @@
+/** 主动交互引擎: 根据时间/用户活跃度/好感度决定何时主动搭话, 支持不同频率策略 */
 package com.aicompanion.interaction
 
 import com.aicompanion.models.Emotion

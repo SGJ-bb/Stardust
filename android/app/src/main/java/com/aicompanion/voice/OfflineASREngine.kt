@@ -1,3 +1,4 @@
+/** 离线语音识别引擎: 语音转文字输入(离线模式) */
 package com.aicompanion.voice
 
 import android.content.Context

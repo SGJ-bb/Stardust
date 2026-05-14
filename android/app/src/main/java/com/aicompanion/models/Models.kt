@@ -1,5 +1,7 @@
 package com.aicompanion.models
 
+/** 数据模型定义: 包含所有核心数据类(角色/消息/好感度/成就/日记等)和枚举(Emotion/Action/TextureQuality/DayCountLevel/DiaryTriggerMode) */
+
 import org.json.JSONArray
 import org.json.JSONObject
 

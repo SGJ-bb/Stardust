@@ -1,3 +1,4 @@
+/** 模型实时调整页: 拖动调整模型位置/大小/缩放 */
 package com.aicompanion.ui
 
 import android.app.Activity

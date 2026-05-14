@@ -1,3 +1,4 @@
+/** 主题管理器: 深色/浅色/跟随系统主题切换, 自定义配色方案 */
 package com.aicompanion.theme
 
 import android.app.Activity

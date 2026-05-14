@@ -1,3 +1,4 @@
+/** 启动页: 显示Logo后自动跳转至MainActivity */
 package com.aicompanion.ui
 
 import android.content.Intent

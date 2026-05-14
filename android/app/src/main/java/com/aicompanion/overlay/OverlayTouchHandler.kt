@@ -1,3 +1,4 @@
+/** 悬浮窗手势处理: 处理拖拽/点击/双击/长按等手势事件 */
 package com.aicompanion.overlay
 
 import android.content.Context

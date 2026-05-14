@@ -1,3 +1,4 @@
+/** 应用入口: Application生命周期管理, 全局异常捕获和Toast提示 */
 package com.aicompanion
 
 import android.app.Application

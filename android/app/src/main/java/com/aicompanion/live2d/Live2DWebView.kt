@@ -1,3 +1,4 @@
+/** Live2D WebView核心容器: 基于WebView的Live2D渲染容器, 加载Cubism SDK for Web, 提供JS接口控制表情/动作/日志, 支持模型下载/解压/缓存/截图 */
 package com.aicompanion.live2d
 
 import android.content.Context

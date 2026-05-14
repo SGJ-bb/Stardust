@@ -7,4 +7,29 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <color name="bg_start">#0f0c29</color>
+    <color name="bg_center">#1a1a3e</color>
+    <color name="bg_end">#24243e</color>
+
+    <color name="surface_dark">#1a1a30</color>
+    <color name="surface_card">#1e1e3a</color>
+    <color name="surface_input">#252550</color>
+
+    <color name="accent_purple">#c4b5fd</color>
+    <color name="accent_pink">#ff6b9d</color>
+    <color name="accent_blue">#667eea</color>
+    <color name="accent_cyan">#64ffda</color>
+
+    <color name="text_primary">#e8e8f0</color>
+    <color name="text_secondary">#8899bb</color>
+    <color name="text_muted">#556677</color>
+
+    <color name="bubble_user_start">#667eea</color>
+    <color name="bubble_user_end">#764ba2</color>
+    <color name="bubble_pet_start">#1e1e3a</color>
+    <color name="bubble_pet_end">#2a2a5a</color>
+
+    <color name="divider">#1a2030</color>
+    <color name="stroke">#2a2a4a</color>
 </resources>

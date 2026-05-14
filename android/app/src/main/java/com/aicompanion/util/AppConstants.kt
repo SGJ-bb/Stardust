@@ -1,3 +1,4 @@
+/** 应用全局常量: API默认值/阈值/配置键名/常量定义 */
 package com.aicompanion.util
 
 object AppConstants {

@@ -1,3 +1,4 @@
+/** 成长值管理器: 成长值计算/等级系统/经验值进度 */
 package com.aicompanion.gamify
 
 import android.content.Context

@@ -1,3 +1,4 @@
+/** 日记数据类: 定义日记条目结构(日期/内容/心情/触发模式) */
 package com.aicompanion.diary
 
 import android.content.Context

@@ -1,3 +1,4 @@
+/** 离线自然语言处理: 离线意图识别和简单对话回复, 无网络时兜底使用 */
 package com.aicompanion.nlp
 
 import com.aicompanion.models.Emotion

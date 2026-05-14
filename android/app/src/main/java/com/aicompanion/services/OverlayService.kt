@@ -1,3 +1,4 @@
+/** 悬浮窗前台服务: 管理悬浮窗的创建/销毁/保活, 防止被系统杀死 */
 package com.aicompanion.services
 
 import android.app.Notification

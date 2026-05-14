@@ -1,3 +1,4 @@
+/** 长期记忆管理器: 从对话中自动提取事实, 支持手动添加/删除/检索记忆条目 */
 package com.aicompanion.memory
 
 import android.content.Context

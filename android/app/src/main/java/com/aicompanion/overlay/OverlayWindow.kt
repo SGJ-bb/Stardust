@@ -1,3 +1,4 @@
+/** 悬浮窗窗口: 创建系统级悬浮窗(TYPE_APPLICATION_OVERLAY), 包含Live2D渲染区/迷你聊天输入/展开折叠按钮/状态指示器 */
 package com.aicompanion.overlay
 
 import android.annotation.SuppressLint
