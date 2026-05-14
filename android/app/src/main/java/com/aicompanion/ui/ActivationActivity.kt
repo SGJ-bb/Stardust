@@ -1,3 +1,4 @@
+/** 激活页: 应用激活/验证页面 */
 package com.aicompanion.ui
 
 import android.content.Intent

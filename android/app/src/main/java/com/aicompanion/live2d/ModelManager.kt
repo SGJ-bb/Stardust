@@ -1,3 +1,4 @@
+/** 模型管理器: Live2D模型下载/切换/删除/列表管理 */
 package com.aicompanion.live2d
 
 import android.content.Context

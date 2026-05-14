@@ -1,3 +1,4 @@
+/** 角色卡片管理器: 角色卡的创建/加载/保存/序列化/反序列化 */
 package com.aicompanion.character
 
 import android.content.Context

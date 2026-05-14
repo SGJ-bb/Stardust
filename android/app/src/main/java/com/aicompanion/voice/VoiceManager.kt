@@ -1,3 +1,4 @@
+/** 语音管理器: TTS语音合成播放, 支持根据AI情绪调整语调和语速 */
 package com.aicompanion.voice
 
 import android.content.Context

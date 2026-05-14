@@ -1,0 +1,285 @@
+/** 角色信息页: 查看/编辑角色信息, 好感度展示, 角色卡导入导出 */
+package com.aicompanion.ui
+
+import android.app.Activity
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.aicompanion.R
+import com.aicompanion.affection.AffectionManager
+import com.aicompanion.diary.DiaryManager
+import com.aicompanion.gamify.AchievementManager
+import com.aicompanion.memory.MemorableMomentsManager
+import com.aicompanion.memory.ScoredMemory
+import java.io.File
+
+class ProfileActivity : AppCompatActivity() {
+
+    companion object {
+        private const val REQUEST_AI_AVATAR = 200
+        private const val REQUEST_USER_AVATAR = 201
+    }
+
+    private lateinit var affectionManager: AffectionManager
+    private lateinit var achievementManager: AchievementManager
+    private lateinit var momentsManager: MemorableMomentsManager
+    private lateinit var diaryManager: DiaryManager
+
+    private lateinit var ivAiAvatar: ImageView
+    private lateinit var ivUserAvatar: ImageView
+    private lateinit var tvAffectionTitle: TextView
+    private lateinit var progressAffection: ProgressBar
+    private lateinit var tvAffectionValue: TextView
+    private lateinit var tvDaysCount: TextView
+    private lateinit var tvAchCount: TextView
+    private lateinit var tvDiaryCount: TextView
+    private lateinit var recyclerAchievements: RecyclerView
+    private lateinit var containerMoments: LinearLayout
+    private lateinit var tvMomentsEmpty: TextView
+    private lateinit var tvAiName: TextView
+    private lateinit var tvUserName: TextView
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_profile)
+
+        affectionManager = AffectionManager(this)
+        achievementManager = AchievementManager(this)
+        momentsManager = MemorableMomentsManager(this)
+        diaryManager = DiaryManager(this)
+
+        initViews()
+        loadData()
+    }
+
+    private fun initViews() {
+        findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)
+            .setNavigationOnClickListener { finish() }
+
+        ivAiAvatar = findViewById(R.id.iv_ai_avatar)
+        ivUserAvatar = findViewById(R.id.iv_user_avatar)
+        tvAffectionTitle = findViewById(R.id.tv_affection_title)
+        progressAffection = findViewById(R.id.progress_affection_profile)
+        tvAffectionValue = findViewById(R.id.tv_affection_value)
+        tvDaysCount = findViewById(R.id.tv_days_count)
+        tvAchCount = findViewById(R.id.tv_ach_count)
+        tvDiaryCount = findViewById(R.id.tv_diary_count)
+        recyclerAchievements = findViewById(R.id.recycler_achievements)
+        containerMoments = findViewById(R.id.container_moments)
+        tvMomentsEmpty = findViewById(R.id.tv_moments_empty)
+        tvAiName = findViewById(R.id.tv_ai_name_profile)
+        tvUserName = findViewById(R.id.tv_user_name_profile)
+
+        recyclerAchievements.layoutManager = LinearLayoutManager(this)
+
+        ivAiAvatar.setOnClickListener { pickAvatar(REQUEST_AI_AVATAR) }
+        ivUserAvatar.setOnClickListener { pickAvatar(REQUEST_USER_AVATAR) }
+    }
+
+    private fun loadData() {
+        val am = affectionManager
+        val affection = am.affectionLevel
+        progressAffection.progress = affection
+        tvAffectionValue.text = "$affection / 100"
+        tvAffectionTitle.text = am.getAffectionTitle()
+        tvDaysCount.text = "相伴 ${am.getDaysSinceFirstUse()} 天"
+
+        val personaName = getSharedPreferences("persona_data", MODE_PRIVATE)
+            .getString("persona_name", null)
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
+                .getString("ai_name", "星尘") ?: "星尘"
+        tvAiName.text = personaName
+
+        val userCall = getSharedPreferences("persona_data", MODE_PRIVATE)
+            .getString("user_nickname", null)
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
+                .getString("user_call_name", "") ?: ""
+        tvUserName.text = userCall.ifEmpty { "主人" }
+
+        val unlocked = achievementManager.getUnlocked()
+        tvAchCount.text = "${unlocked.size} 成就"
+        recyclerAchievements.adapter = AchievementAdapter(unlocked)
+
+        val diaryCount = diaryManager.getDiaryCount()
+        tvDiaryCount.text = "$diaryCount 日记"
+
+        loadAvatars()
+        loadMoments()
+    }
+
+    private fun loadAvatars() {
+        val prefs = getSharedPreferences("avatar_data", MODE_PRIVATE)
+        val aiPath = prefs.getString("ai_avatar", "")
+        val userPath = prefs.getString("user_avatar", "")
+
+        if (aiPath?.isNotEmpty() == true) {
+            val file = File(aiPath)
+            if (file.exists()) {
+                ivAiAvatar.setImageBitmap(BitmapFactory.decodeFile(aiPath))
+            }
+        }
+        if (userPath?.isNotEmpty() == true) {
+            val file = File(userPath)
+            if (file.exists()) {
+                ivUserAvatar.setImageBitmap(BitmapFactory.decodeFile(userPath))
+            }
+        }
+    }
+
+    private fun pickAvatar(requestCode: Int) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+        }
+        try { startActivityForResult(intent, requestCode) } catch (_: Exception) {}
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != Activity.RESULT_OK || data?.data == null) return
+
+        val uri = data.data!!
+        try {
+            val prefix = if (requestCode == REQUEST_AI_AVATAR) "ai" else "user"
+            val file = File(filesDir, "${prefix}_avatar_${System.currentTimeMillis()}.jpg")
+            contentResolver.openInputStream(uri)?.use { input ->
+                file.outputStream().use { output -> input.copyTo(output) }
+            }
+
+            getSharedPreferences("avatar_data", MODE_PRIVATE).edit()
+                .putString("${prefix}_avatar", file.absolutePath).apply()
+
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+            if (requestCode == REQUEST_AI_AVATAR) {
+                ivAiAvatar.setImageBitmap(bitmap)
+            } else {
+                ivUserAvatar.setImageBitmap(bitmap)
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "设置头像失败", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun loadMoments() {
+        val moments = momentsManager.getAll()
+        if (moments.isEmpty()) {
+            tvMomentsEmpty.visibility = View.VISIBLE
+            return
+        }
+        tvMomentsEmpty.visibility = View.GONE
+
+        containerMoments.removeAllViews()
+        moments.forEach { moment ->
+            val card = com.google.android.material.card.MaterialCardView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 0, 0, 12) }
+                setCardBackgroundColor(0xFF1a1a3e.toInt())
+                radius = 24f
+                strokeWidth = 1
+                strokeColor = 0xFF2a2a5a.toInt()
+                cardElevation = 1f
+            }
+
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(20, 16, 20, 16)
+            }
+
+            val header = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
+
+            TextView(this).apply {
+                text = when (moment.category) {
+                    "habit" -> "🕐 习惯"
+                    "preference" -> "💗 喜好"
+                    "impression" -> "🌟 印象"
+                    "detail" -> "📌 细节"
+                    else -> "💫 记忆"
+                }
+                textSize = 12f
+                setTextColor(0xFFc4b5fd.toInt())
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }.let { header.addView(it) }
+
+            View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
+            }.let { header.addView(it) }
+
+            val scoreLabel = "★★★★★★★★★★".take(moment.score) + "☆☆☆☆☆☆☆☆☆☆".drop(moment.score)
+            TextView(this).apply {
+                text = scoreLabel
+                textSize = 10f
+                setTextColor(0xFFff6b9d.toInt())
+            }.let { header.addView(it) }
+
+            content.addView(header)
+
+            val tvContent = TextView(this)
+            tvContent.text = moment.content
+            tvContent.textSize = 14f
+            tvContent.setTextColor(0xFFe8e8f0.toInt())
+            tvContent.setLineSpacing(4f, 1f)
+            tvContent.setPadding(0, 10, 0, 0)
+            content.addView(tvContent)
+
+            card.setOnLongClickListener {
+                android.app.AlertDialog.Builder(this@ProfileActivity)
+                    .setTitle("删除该记忆")
+                    .setMessage("确定要删除这条记忆吗？")
+                    .setPositiveButton("删除") { _, _ ->
+                        momentsManager.deleteMoment(moment.id)
+                        loadMoments()
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+                true
+            }
+
+            card.addView(content)
+            containerMoments.addView(card)
+        }
+    }
+
+    private inner class AchievementAdapter(private val achievements: List<com.aicompanion.models.Achievement>) :
+        RecyclerView.Adapter<AchievementAdapter.ViewHolder>() {
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(android.R.layout.simple_list_item_1, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val ach = achievements[position]
+            holder.bind(ach)
+        }
+
+        override fun getItemCount(): Int = achievements.size
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            private val tv: TextView = view.findViewById(android.R.id.text1)
+
+            fun bind(ach: com.aicompanion.models.Achievement) {
+                tv.text = "${ach.icon}  ${ach.title}"
+                tv.setTextColor(0xFFe8e8f0.toInt())
+                tv.textSize = 14f
+                tv.setPadding(8, 8, 8, 8)
+            }
+        }
+    }
+}

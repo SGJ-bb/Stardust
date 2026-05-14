@@ -1,3 +1,4 @@
+/** API预设配置: 预配置各厂商AI API地址/模型, 支持一键切换提供商 */
 package com.aicompanion.api
 
 object ApiProviderPreset {

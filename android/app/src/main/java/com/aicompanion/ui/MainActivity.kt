@@ -1,5 +1,11 @@
 package com.aicompanion.ui
 
+/**
+ * 主界面Activity: 整个App最核心的文件, 负责所有业务逻辑调度
+ * 包括: 聊天消息收发/系统感知(时间/电量)/上下文记忆/闹钟日程设置/搜索功能/
+ *       好感度计算/日记定时触发/主动搭话/电量提醒/签到成就/难忘时刻评分/
+ *       Live2D初始化/用户心情选择/新手引导等
+ */
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
@@ -52,7 +58,9 @@ data class ChatMessage(
     val time: String,
     val isUser: Boolean,
     val userMood: String = "",
-    var feedback: Int = 0
+    var feedback: Int = 0,
+    val emotion: Emotion = Emotion.NEUTRAL,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 class MainActivity : AppCompatActivity() {
@@ -77,6 +85,7 @@ class MainActivity : AppCompatActivity() {
     private var tvStatus: TextView? = null
     private var chipEmotion: com.google.android.material.chip.Chip? = null
     private var chipAction: com.google.android.material.chip.Chip? = null
+    private var ivAiAvatarSmall: ImageView? = null
 
     private var settingsManager: SettingsManager? = null
     private var affectionManager: AffectionManager? = null
@@ -86,11 +95,15 @@ class MainActivity : AppCompatActivity() {
     private var voiceManager: VoiceManager? = null
     private var proactiveEngine: ProactiveInteractionEngine? = null
     private var memoryManager: MemoryManager? = null
+    private var momentsManager: com.aicompanion.memory.MemorableMomentsManager? = null
+    private var systemMonitor: com.aicompanion.services.SystemMonitor? = null
     private var searchEngine: WebSearchEngine? = null
+    private var aiActionManager: com.aicompanion.action.AIActionManager? = null
 
     private val messages = mutableListOf<ChatMessage>()
     private val messageScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val handler = Handler(Looper.getMainLooper())
+    private var isInForeground = false
 
     private var offsetX = 0f
     private var offsetY = 0f
@@ -131,11 +144,25 @@ class MainActivity : AppCompatActivity() {
             initStep("AffectionManager") { affectionManager = AffectionManager(this) }
             initStep("AchievementManager") { achievementManager = AchievementManager(this) }
             initStep("MemoryManager") { memoryManager = MemoryManager(this) }
+            initStep("MomentsManager") { momentsManager = com.aicompanion.memory.MemorableMomentsManager(this) }
+            initStep("SystemMonitor") {
+                val monitor = com.aicompanion.services.SystemMonitor(this)
+                monitor.startMonitoring()
+                monitor.onBatteryLow = { percentage ->
+                    if (!isFinishing && !isDestroyed) {
+                        isInForeground = false
+                        triggerBatteryAlert(percentage)
+                    }
+                }
+                systemMonitor = monitor
+            }
             initStep("SearchEngine") { searchEngine = WebSearchEngine() }
+            initStep("AIActionManager") { aiActionManager = com.aicompanion.action.AIActionManager(this) }
             initStep("VoiceManager") { voiceManager = VoiceManager(this) }
             initStep("ProactiveEngine") { proactiveEngine = ProactiveInteractionEngine(settingsManager!!) }
             initStep("ApiClient") { rebuildApiClient() }
             initStep("ChatAdapter") { initChatAdapter() }
+            initStep("LoadAvatar") { loadAiAvatar() }
             initStep("Live2DSettings") { loadLive2DSettings() }
             initStep("Live2DModel") { loadLive2DModel() }
             initStep("ClickListeners") { setupClickListeners() }
@@ -145,6 +172,7 @@ class MainActivity : AppCompatActivity() {
             initStep("LoadMessages") { loadChatHistory() }
             initStep("Welcome") { loadWelcomeMessage() }
             initStep("Proactive") { scheduleProactiveChat() }
+            initStep("DiaryTimer") { scheduleDiaryTimer() }
         } catch (e: Exception) {
             fatal("onCreate", e)
         }
@@ -178,6 +206,7 @@ class MainActivity : AppCompatActivity() {
         tvStatus = findViewById(R.id.tv_status)
         chipEmotion = findViewById(R.id.chip_emotion)
         chipAction = findViewById(R.id.chip_action)
+        ivAiAvatarSmall = findViewById(R.id.iv_ai_avatar_small)
     }
 
     private fun ensureAppDirs() {
@@ -204,6 +233,34 @@ class MainActivity : AppCompatActivity() {
         recyclerChat?.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = chatAdapter
+        }
+
+        chatAdapter?.onFeedback = { position, isLike ->
+            if (position < messages.size) {
+                val msg = messages[position]
+                if (!msg.isUser) {
+                    msg.feedback = if (isLike) 1 else -1
+                    saveMessageFeedback(position, if (isLike) 1 else -1)
+                    val ach = achievementManager?.updateProgress("feedback", getTotalPositiveFeedback())
+                    if (ach != null) showAchievementUnlock(ach)
+                    if (isLike) { affectionManager?.addAffection(1); updateAffectionDisplay() }
+                }
+            }
+        }
+
+        chatAdapter?.onDeleteMessage = { position ->
+            if (position >= 0 && position < messages.size) {
+                android.app.AlertDialog.Builder(this@MainActivity)
+                    .setTitle("删除消息")
+                    .setMessage("确定删除这条消息吗？")
+                    .setPositiveButton("删除") { _, _ ->
+                        messages.removeAt(position)
+                        chatAdapter?.notifyDataSetChanged()
+                        saveChatHistory()
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+            }
         }
     }
 
@@ -394,6 +451,9 @@ class MainActivity : AppCompatActivity() {
 
         btnMood?.setOnClickListener { showMoodSelector() }
         btnMore?.setOnClickListener { showFeaturePanel() }
+        ivAiAvatarSmall?.setOnClickListener {
+            try { startActivity(Intent(this, ProfileActivity::class.java)) } catch (_: Exception) {}
+        }
 
         chatAdapter?.onFeedback = { position, isLike ->
             if (position < messages.size) {
@@ -410,13 +470,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showFeaturePanel() {
+        data class FeatureItem(val iconRes: Int, val label: String, val index: Int)
+
         val bottomSheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
-        val contentView = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
+        val contentView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(24, 16, 24, 32)
 
-            android.widget.TextView(this@MainActivity).apply {
-                text = "✨ 功能面板"
+            TextView(this@MainActivity).apply {
+                text = "功能面板"
                 textSize = 18f
                 setTextColor(android.graphics.Color.WHITE)
                 setTypeface(null, android.graphics.Typeface.BOLD)
@@ -425,18 +487,23 @@ class MainActivity : AppCompatActivity() {
             }
 
             android.view.View(this@MainActivity).apply {
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 1
                 ).apply { setMargins(0, 0, 0, 16) }
                 setBackgroundColor(0x22ffffff)
                 addView(this)
             }
 
             val features = listOf(
-                Triple("📅", "每日签到", 0), Triple("🏆", "成就殿堂", 1),
-                Triple("📔", "心情日记", 2), Triple("🍅", "专注计时", 3),
-                Triple("🎭", "切换皮套", 4), Triple("🖼", "更换背景", 5),
-                Triple("📋", "运行日志", 6), Triple("📖", "操作教程", 7)
+                FeatureItem(R.drawable.ic_checkin, "每日签到", 0),
+                FeatureItem(R.drawable.ic_trophy, "成就殿堂", 1),
+                FeatureItem(R.drawable.ic_diary, "心情日记", 2),
+                FeatureItem(R.drawable.ic_focus, "专注计时", 3),
+                FeatureItem(R.drawable.ic_model, "切换皮套", 4),
+                FeatureItem(R.drawable.ic_background, "更换背景", 5),
+                FeatureItem(R.drawable.ic_log, "运行日志", 6),
+                FeatureItem(R.drawable.ic_help, "操作教程", 7),
+                FeatureItem(R.drawable.ic_robot, "手机自动化", 8)
             )
 
             val gridLayout = android.widget.GridLayout(this@MainActivity).apply {
@@ -444,28 +511,29 @@ class MainActivity : AppCompatActivity() {
                 alignmentMode = android.widget.GridLayout.ALIGN_BOUNDS
             }
 
-            features.forEach { (emoji, label, index) ->
-                val itemLayout = android.widget.LinearLayout(this@MainActivity).apply {
-                    orientation = android.widget.LinearLayout.VERTICAL
+            features.forEach { feature ->
+                val itemLayout = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
                     gravity = android.view.Gravity.CENTER
                     setPadding(8, 12, 8, 12)
 
                     val iconSize = (40 * resources.displayMetrics.density).toInt()
-                    android.widget.TextView(this@MainActivity).apply {
-                        text = emoji; textSize = 24f; gravity = android.view.Gravity.CENTER
-                        layoutParams = android.widget.LinearLayout.LayoutParams(iconSize, iconSize).apply { gravity = android.view.Gravity.CENTER }
+                    ImageView(this@MainActivity).apply {
+                        setImageResource(feature.iconRes)
+                        setColorFilter(0xFFc4b5fd.toInt())
+                        layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply { gravity = android.view.Gravity.CENTER }
                         addView(this)
                     }
 
-                    android.widget.TextView(this@MainActivity).apply {
-                        text = label; textSize = 11f; setTextColor(0xFFaabbdd.toInt())
+                    TextView(this@MainActivity).apply {
+                        text = feature.label; textSize = 11f; setTextColor(0xFFaabbdd.toInt())
                         gravity = android.view.Gravity.CENTER; setPadding(0, 4, 0, 0)
                         addView(this)
                     }
 
                     setOnClickListener {
                         bottomSheet.dismiss()
-                        when (index) {
+                        when (feature.index) {
                             0 -> performCheckIn()
                             1 -> try { startActivity(Intent(this@MainActivity, AchievementActivity::class.java)) } catch (_: Exception) {}
                             2 -> try { startActivity(Intent(this@MainActivity, DiaryActivity::class.java)) } catch (_: Exception) {}
@@ -474,6 +542,7 @@ class MainActivity : AppCompatActivity() {
                             5 -> pickBackgroundImage()
                             6 -> showLogViewer()
                             7 -> showTutorial()
+                            8 -> showAutoOperationDialog()
                         }
                     }
                 }
@@ -509,7 +578,108 @@ class MainActivity : AppCompatActivity() {
         val chatAch = achievementManager?.updateProgress("chat", messages.count { it.isUser })
         if (chatAch != null) showAchievementUnlock(chatAch)
 
+        triggerMomentsScoringIfNeeded()
+
+        val actionMgr = aiActionManager
+        if (actionMgr != null) {
+            if (actionMgr.isSearchRequest(text)) {
+                handleSearchRequest(text, actionMgr)
+                return
+            }
+        }
+
         sendToLLM(text)
+    }
+
+    private fun handleSearchRequest(text: String, actionMgr: com.aicompanion.action.AIActionManager) {
+        setLoading(true)
+        addPetMessage("🔍 正在搜索...", Emotion.NEUTRAL, Action.IDLE)
+
+        messageScope.launch {
+            try {
+                val keywords = withContext(Dispatchers.IO) { actionMgr.extractSearchKeywords(text) }
+                val result = withContext(Dispatchers.IO) { actionMgr.searchAndSummarize(keywords) }
+                addPetMessage(result, Emotion.HAPPY, Action.EAR_TWITCH)
+            } catch (e: Exception) {
+                addPetMessage("搜索出错了：${e.message}", Emotion.SAD, Action.IDLE)
+            } finally {
+                setLoading(false)
+            }
+        }
+    }
+
+    private fun handleAlarmRequest(text: String, actionMgr: com.aicompanion.action.AIActionManager) {
+        val info = actionMgr.parseAlarmInfo(text)
+        if (info != null) {
+            val result = actionMgr.setAlarm(info)
+            addPetMessage(result, Emotion.HAPPY, Action.TAIL_FLICK)
+        } else {
+            addPetMessage("没听懂要定几点的闹钟呢😅 试试说「定个10点的闹钟」", Emotion.SAD, Action.IDLE)
+        }
+    }
+
+    private fun handleScheduleRequest(text: String, actionMgr: com.aicompanion.action.AIActionManager) {
+        val info = actionMgr.parseScheduleInfo(text)
+        if (info != null) {
+            val result = actionMgr.addSchedule(info)
+            addPetMessage(result, Emotion.HAPPY, Action.TAIL_FLICK)
+        } else {
+            addPetMessage("没听懂要安排什么日程呢😅 试试说「明天下午3点开会」", Emotion.SAD, Action.IDLE)
+        }
+    }
+
+    private fun trySetAlarmFromMessage(text: String, actionMgr: com.aicompanion.action.AIActionManager) {
+        val info = actionMgr.parseAlarmInfo(text)
+        if (info != null) {
+            actionMgr.setAlarm(info)
+        }
+    }
+
+    private fun trySetScheduleFromMessage(text: String, actionMgr: com.aicompanion.action.AIActionManager) {
+        val info = actionMgr.parseScheduleInfo(text)
+        if (info != null) {
+            actionMgr.addSchedule(info)
+        }
+    }
+
+    private var momentsScoreCounter = 0
+    private fun triggerMomentsScoringIfNeeded() {
+        momentsScoreCounter++
+        if (momentsScoreCounter % 20 == 0) {
+            triggerMomentsScoring()
+        }
+    }
+
+    private fun triggerMomentsScoring() {
+        val client = apiClient ?: return
+        val sm = settingsManager ?: return
+        if (sm.chatApiUrl.isBlank()) return
+
+        messageScope.launch {
+            try {
+                val persona = getPersonaInfo()
+                val texts = messages.map { it.text }
+                val scored = withContext(Dispatchers.IO) {
+                    client.scoreMemorableMoments(texts, persona.first, persona.second)
+                }
+                if (scored.isNotEmpty()) {
+                    momentsManager?.addMoments(scored)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Moments scoring failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun loadAiAvatar() {
+        val prefs = getSharedPreferences("avatar_data", MODE_PRIVATE)
+        val aiPath = prefs.getString("ai_avatar", "")
+        if (aiPath?.isNotEmpty() == true) {
+            val file = File(aiPath)
+            if (file.exists()) {
+                ivAiAvatarSmall?.setImageBitmap(android.graphics.BitmapFactory.decodeFile(aiPath))
+            }
+        }
     }
 
     private fun sendToLLM(message: String) {
@@ -524,14 +694,17 @@ class MainActivity : AppCompatActivity() {
         chatAdapter?.setTypingIndicator(true)
         recyclerChat?.scrollToPosition(messages.size - 1)
 
+        val systemContext = buildSystemContext(message)
+
         messageScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
                     val persona = getPersonaInfo()
                     val memories = memoryManager?.getLocalMemories()?.map { it.fact } ?: emptyList()
+                    val history = messages.takeLast(10).filter { it.text.length < 500 }.map { it.isUser to it.text }
                     client.sendChat(
                         sm.userId, message, persona.first, persona.second,
-                        currentUserMoodName, "idle", memories, "", sm.offlineMode
+                        currentUserMoodName, "idle", memories, "", sm.offlineMode, systemContext, history
                     )
                 }
 
@@ -549,6 +722,14 @@ class MainActivity : AppCompatActivity() {
                             voiceManager?.speak(response.text, response.emotion)
                         }
                         updatePetDisplay(response)
+
+                        val actionMgr = aiActionManager
+                        if (actionMgr != null && actionMgr.isAlarmRequest(message)) {
+                            trySetAlarmFromMessage(message, actionMgr)
+                        }
+                        if (actionMgr != null && actionMgr.isScheduleRequest(message)) {
+                            trySetScheduleFromMessage(message, actionMgr)
+                        }
                     }
                 } else {
                     addPetMessage("呜...连接不上AI，请检查API设置", Emotion.SAD, Action.IDLE)
@@ -567,13 +748,19 @@ class MainActivity : AppCompatActivity() {
     private fun addPetMessage(text: String, emotion: Emotion, action: Action) {
         val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val cleanText = text.replace(Regex("\\[\\[emotion:\\w+\\]\\]", RegexOption.IGNORE_CASE), "").trim()
-        messages.add(ChatMessage(cleanText, time, false))
+        messages.add(ChatMessage(cleanText, time, false, emotion = emotion, timestamp = System.currentTimeMillis()))
         chatAdapter?.notifyItemInserted(messages.size - 1)
         recyclerChat?.scrollToPosition(messages.size - 1)
         saveChatHistory()
 
         live2dView?.setEmotion(emotion)
         live2dView?.setAction(action)
+
+        if (!isInForeground) {
+            val aiName = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                .getString("ai_name", "星尘") ?: "星尘"
+            systemMonitor?.showAiMessageNotification(aiName, cleanText)
+        }
     }
 
     private fun getPersonaInfo(): Pair<String, String> {
@@ -738,6 +925,75 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "🏆 成就解锁: ${achievement.title}", Toast.LENGTH_LONG).show()
     }
 
+    private fun buildSystemContext(message: String): String {
+        val lower = message.lowercase()
+        val sb = StringBuilder()
+
+        val needTime = listOf("几点", "什么时间", "时间", "日期", "今天几号", "星期", "几点钟", "now time", "what time").any { lower.contains(it) }
+        val needBattery = listOf(
+            "电量", "电池", "电量百分比", "还有多少电", "还剩多少电", "电量剩余",
+            "手机电量", "电池电量", "充", "充电", "power", "battery"
+        ).any { lower.contains(it) } || lower.matches(Regex(".*\\b电.*\\b.*"))
+
+        val isAlarmRequest = listOf(
+            "闹钟", "定闹", "设闹", "订闹", "提醒我",
+            "分钟后提醒", "小时后提醒",
+            "set alarm", "alarm"
+        ).any { lower.contains(it) }
+
+        val isScheduleRequest = listOf(
+            "安排", "日程", "记一下", "记着", "记住", "提醒我",
+            "明天", "后天", "下周", "下个月", "周一", "周二", "周三",
+            "周四", "周五", "周六", "周日", "星期",
+            "上午", "下午", "晚上"
+        ).count { lower.contains(it) } >= 2
+
+        val now = java.util.Calendar.getInstance()
+        val currentTimeStr = java.text.SimpleDateFormat("yyyy年M月d日 EEEE HH:mm", java.util.Locale.getDefault()).format(now.time)
+
+        if (needTime) {
+            sb.append("[系统信息] 当前时间：$currentTimeStr")
+        }
+
+        if (needBattery) {
+            try {
+                val percentage = getBatteryPercentage()
+                if (percentage >= 0) {
+                    val batteryManager = getSystemService(android.content.Context.BATTERY_SERVICE) as? android.os.BatteryManager
+                    val isCharging = batteryManager?.isCharging == true
+                    if (sb.isNotEmpty()) sb.append("\n")
+                    sb.append("[系统信息] 当前手机电量：${percentage}%${if (isCharging) "（充电中）" else ""}")
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (isAlarmRequest) {
+            if (sb.isNotEmpty()) sb.append("\n")
+            sb.append("[系统信息] 当前时间：$currentTimeStr。用户想要设置闹钟，请用轻松自然的语气回复，我会帮你设置好闹钟。")
+        }
+
+        if (isScheduleRequest) {
+            if (sb.isNotEmpty()) sb.append("\n")
+            sb.append("[系统信息] 当前时间：$currentTimeStr。用户想要安排日程，请用轻松自然的语气回复，我会帮你记下来。")
+        }
+
+        return sb.toString()
+    }
+
+    private fun getBatteryPercentage(): Int {
+        try {
+            val batteryIntent = applicationContext.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            if (batteryIntent != null) {
+                val level = batteryIntent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                val scale = batteryIntent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                if (level >= 0 && scale > 0) {
+                    return (level * 100) / scale
+                }
+            }
+        } catch (_: Exception) {}
+        return -1
+    }
+
     private fun showLogViewer() {
         val currentLog = live2dView?.getLog() ?: "无日志"
         val historyLog = logHistory.joinToString("\n").takeLast(2000)
@@ -799,6 +1055,130 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showAutoOperationDialog() {
+        if (isFinishing || isDestroyed) return
+
+        val sm = settingsManager ?: return
+        if (sm.chatApiUrl.isBlank()) {
+            Toast.makeText(this, "请先在设置中配置API", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!com.aicompanion.screen.AutoOperator.isServiceReady()) {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("需要无障碍权限")
+                .setMessage("手机自动化需要开启「星尘AI」的无障碍服务才能操作手机。\n\n请前往：系统设置 → 无障碍 → 已安装应用 → 星尘AI → 开启服务\n\n开启后重新进入此功能即可使用。")
+                .setPositiveButton("去开启") { _, _ ->
+                    try { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) } catch (_: Exception) {}
+                }
+                .setNegativeButton("取消", null)
+                .show()
+            return
+        }
+
+        val input = android.widget.EditText(this).apply {
+            hint = "例：帮我把音量调到最大 / 打开微信找张三"
+            setTextColor(0xFFe8e8f0.toInt())
+            setHintTextColor(0xFF667788.toInt())
+            setBackgroundResource(android.R.color.transparent)
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 24, 32, 24)
+            setBackgroundColor(0xFF0f0c29.toInt())
+            addView(input)
+        }
+
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setTitle("🤖 手机自动化")
+            .setView(container)
+            .setPositiveButton("开始执行", null)
+            .setNegativeButton("取消", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val request = input.text.toString().trim()
+                if (request.isEmpty()) return@setOnClickListener
+                dialog.dismiss()
+                executeAutoOperation(request)
+            }
+        }
+
+        dialog.show()
+    }
+
+    private fun executeAutoOperation(userRequest: String) {
+        if (isFinishing || isDestroyed) return
+
+        Toast.makeText(this, "🤖 正在分析指令...", Toast.LENGTH_LONG).show()
+        addPetMessage("主人让我帮你操作手机：$userRequest", com.aicompanion.models.Emotion.HAPPY, com.aicompanion.models.Action.IDLE)
+
+        messageScope.launch {
+            try {
+                val screenInfo = withContext(Dispatchers.IO) {
+                    com.aicompanion.screen.AutoOperator.formatScreenForLLM()
+                }
+
+                val llmResult = withContext(Dispatchers.IO) {
+                    apiClient?.analyzeAutoOperation(userRequest, screenInfo)
+                }
+
+                if (llmResult.isNullOrBlank() || llmResult == "[]") {
+                    addPetMessage("抱歉，我没法理解这个操作该怎么办😅", com.aicompanion.models.Emotion.SAD, com.aicompanion.models.Action.IDLE)
+                    return@launch
+                }
+
+                val actions = com.aicompanion.screen.AutoOperator.parseActionsFromLLM(llmResult)
+                if (actions.isEmpty()) {
+                    addPetMessage("抱歉，我没法理解这个操作该怎么办😅", com.aicompanion.models.Emotion.SAD, com.aicompanion.models.Action.IDLE)
+                    return@launch
+                }
+
+                addPetMessage("明白了！正在执行${actions.size}个步骤...", com.aicompanion.models.Emotion.TSUNDERE, com.aicompanion.models.Action.EAR_TWITCH)
+
+                var successCount = 0
+                for ((i, action) in actions.withIndex()) {
+                    if (isFinishing || isDestroyed) return@launch
+
+                    val stepDesc = when (action.type) {
+                        "click" -> "点击「${action.text}」"
+                        "back" -> "返回"
+                        "home" -> "回到桌面"
+                        "scroll" -> "滚动"
+                        "wait" -> "等待${action.durationMs}ms"
+                        "notifications" -> "打开通知栏"
+                        "recents" -> "打开最近任务"
+                        else -> action.type
+                    }
+
+                    val stepResult = withContext(Dispatchers.IO) {
+                        com.aicompanion.screen.AutoOperator.executeAction(action)
+                    }
+
+                    if (stepResult) successCount++
+
+                    withContext(Dispatchers.IO) { Thread.sleep(800) }
+                }
+
+                val reportStr = buildString {
+                    append("完成！${successCount}/${actions.size}个步骤执行成功")
+                    if (successCount == actions.size) {
+                        append("，搞定啦~")
+                    } else {
+                        append("，有几个步骤没成功，可能界面不太一样")
+                    }
+                }
+                addPetMessage(reportStr, com.aicompanion.models.Emotion.HAPPY, com.aicompanion.models.Action.IDLE)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "AutoOperation failed: ${e.message}")
+                addPetMessage("操作失败了：${e.message}", com.aicompanion.models.Emotion.SAD, com.aicompanion.models.Action.IDLE)
+            }
+        }
+    }
+
     private fun pickBackgroundImage() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -845,6 +1225,130 @@ class MainActivity : AppCompatActivity() {
         addPetMessage("专注取消了，没关系，下次继续~", Emotion.NEUTRAL, Action.IDLE)
     }
 
+    private fun scheduleDiaryTimer() {
+        val sm = settingsManager ?: return
+        val mode = sm.diaryTriggerMode
+        if (mode == com.aicompanion.settings.DiaryTriggerMode.MANUAL) return
+
+        val intervalMs = when (mode) {
+            com.aicompanion.settings.DiaryTriggerMode.HOURLY -> 60 * 60 * 1000L
+            com.aicompanion.settings.DiaryTriggerMode.TWO_HOURS -> 2 * 60 * 60 * 1000L
+            com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50 -> 30 * 1000L
+            com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM -> {
+                val cal = java.util.Calendar.getInstance()
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 22)
+                cal.set(java.util.Calendar.MINUTE, 0)
+                cal.set(java.util.Calendar.SECOND, 0)
+                if (cal.timeInMillis <= System.currentTimeMillis()) cal.add(java.util.Calendar.DAY_OF_YEAR, 1)
+                cal.timeInMillis - System.currentTimeMillis()
+            }
+            else -> return
+        }
+
+        handler.postDelayed({
+            if (isFinishing || isDestroyed) return@postDelayed
+            checkDiaryTimerTrigger()
+            if (mode != com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM) {
+                scheduleDiaryTimer()
+            }
+        }, intervalMs)
+    }
+
+    private fun checkDiaryTimerTrigger() {
+        val sm = settingsManager ?: return
+        val mm = memoryManager ?: return
+        val dm = com.aicompanion.diary.DiaryManager(this)
+        val am = affectionManager ?: return
+
+        when (sm.diaryTriggerMode) {
+            com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50 -> {
+                if (messages.count { it.isUser } % 50 == 0 && messages.count { it.isUser } > 0) {
+                    autoTriggerDiary(dm, am)
+                }
+            }
+            com.aicompanion.settings.DiaryTriggerMode.HOURLY,
+            com.aicompanion.settings.DiaryTriggerMode.TWO_HOURS -> {
+                autoTriggerDiary(dm, am)
+            }
+            com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM -> {
+                autoTriggerDiary(dm, am)
+            }
+            else -> {}
+        }
+    }
+
+    private fun autoTriggerDiary(dm: com.aicompanion.diary.DiaryManager, am: AffectionManager) {
+        val client = apiClient ?: return
+        val sm = settingsManager ?: return
+        if (sm.chatApiUrl.isBlank()) return
+
+        messageScope.launch {
+            try {
+                val persona = getPersonaInfo()
+                val chatTexts = messages.map { it.text }
+                val combined = chatTexts.joinToString(" | ")
+                val localMood = analyzeLocalMood(combined)
+
+                val llmContent = withContext(Dispatchers.IO) {
+                    val existing = dm.getDiaryByDate(
+                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                    )
+                    client.generateDiaryContent(
+                        chatTexts, persona.first, persona.second, localMood,
+                        when (localMood) {
+                            "happy" -> "🥰"
+                            "sad" -> "😢"
+                            "excited" -> "🤩"
+                            "calm" -> "😌"
+                            "sentimental" -> "🌙"
+                            else -> "😊"
+                        },
+                        am.affectionLevel,
+                        isUpdate = existing != null
+                    )
+                }
+
+                if (llmContent != null && llmContent.isNotBlank()) {
+                    val existing = dm.getDiaryByDate(
+                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                    )
+                    if (existing != null) {
+                        dm.appendLlmDiaryUpdate(llmContent, chatTexts, am.affectionLevel)
+                    } else {
+                        dm.saveLlmDiary(llmContent, chatTexts, am.affectionLevel)
+                    }
+                    Toast.makeText(this@MainActivity, "📔 日记已更新", Toast.LENGTH_SHORT).show()
+                } else {
+                    dm.updateOrGenerateDailyDiary(chatTexts, am.affectionLevel)
+                    Toast.makeText(this@MainActivity, "📔 日记已生成（本地模式）", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "LLM diary failed, falling back: ${e.message}")
+                val chatTexts = messages.map { it.text }
+                dm.updateOrGenerateDailyDiary(chatTexts, am.affectionLevel)
+                Toast.makeText(this@MainActivity, "📔 日记已生成（本地模式）", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun analyzeLocalMood(text: String): String {
+        val lower = text.lowercase()
+        val happyWords = listOf("哈哈", "开心", "喜欢", "太好了", "棒", "nice", "love", "good", "可爱")
+        val sadWords = listOf("难过", "伤心", "哭", "不好", "烦", "生气", "sad", "bad", "讨厌")
+        val excitedWords = listOf("厉害", "冲", "加油", "go", "yes", "完美", "了不起", "冲啊")
+        val calmWords = listOf("安静", "舒服", "平静", "放松", "休息", "calm", "peace", "冥想")
+        val sentimentalWords = listOf("回忆", "想念", "记得", "曾经", "星空", "月光", "诗", "夜晚")
+        val scores = mapOf(
+            "happy" to happyWords.count { lower.contains(it) },
+            "sad" to sadWords.count { lower.contains(it) },
+            "excited" to excitedWords.count { lower.contains(it) },
+            "calm" to calmWords.count { lower.contains(it) },
+            "sentimental" to sentimentalWords.count { lower.contains(it) }
+        )
+        val max = scores.maxByOrNull { it.value }
+        return if (max != null && max.value > 0) max.key else "normal"
+    }
+
     private fun updateFocusDisplay() {
         if (!focusActive) return
         val min = focusSecondsLeft / 60
@@ -860,10 +1364,8 @@ class MainActivity : AppCompatActivity() {
         messageScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
-                    val persona = getPersonaInfo()
-                    val customPrompt = "现在用户没有主动找你聊天，但你想主动找用户搭话。\n规则：像朋友一样自然地搭话，不要用问句结尾，保持1-2句话。语气要可爱自然，不要重复之前说过的话。"
                     if (sm.chatApiUrl.isNotBlank()) {
-                        client.sendProactiveChat(persona.first, persona.second, customPrompt, "（用户正在忙自己的事情，你突然想找ta搭话）")
+                        client.generateNagContent(getPersonaInfo().first, getPersonaInfo().second)
                     } else null
                 }
                 if (response != null && response.text.isNotBlank() && response.errorMessage == null) {
@@ -876,7 +1378,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             } catch (e: Exception) {
-                Log.d(TAG, "Proactive chat failed: ${e.message}")
+                Log.d(TAG, "LLM proactive chat failed: ${e.message}")
                 val fallback = proactiveEngine?.getIdlePhrase()
                 if (fallback != null && !isDestroyed) {
                     addPetMessage(fallback.first, fallback.second, fallback.third)
@@ -896,6 +1398,29 @@ class MainActivity : AppCompatActivity() {
             scheduleProactiveChat()
         }
         handler.postDelayed(proactiveRunnable!!, 120000L)
+    }
+
+    private fun triggerBatteryAlert(percentage: Int) {
+        val client = apiClient ?: return
+        val sm = settingsManager ?: return
+        if (sm.chatApiUrl.isBlank()) return
+
+        messageScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    client.generateNagContent(
+                        getPersonaInfo().first, getPersonaInfo().second,
+                        systemAlert = "主人的手机电量只剩 $percentage% 了！请提醒主人及时充电，语气要关心和温柔。"
+                    )
+                }
+                if (response != null && response.text.isNotBlank() && response.errorMessage == null) {
+                    addPetMessage(response.text, response.emotion, response.action)
+                    updatePetDisplay(response)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Battery alert failed: ${e.message}")
+            }
+        }
     }
 
     private fun loadWelcomeMessage() {
@@ -980,6 +1505,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        isInForeground = true
         if (isFinishing || isDestroyed) return
 
         loadLive2DSettings()
@@ -1002,11 +1528,17 @@ class MainActivity : AppCompatActivity() {
         updateAffectionDisplay()
     }
 
+    override fun onPause() {
+        super.onPause()
+        isInForeground = false
+    }
+
     override fun onDestroy() {
         focusRunnable?.let { handler.removeCallbacks(it) }
         proactiveRunnable?.let { handler.removeCallbacks(it) }
         longPressRunnable?.let { handler.removeCallbacks(it) }
         messageScope.cancel()
+        systemMonitor?.stopMonitoring()
         voiceManager?.cleanup()
         live2dView?.cleanup()
         super.onDestroy()

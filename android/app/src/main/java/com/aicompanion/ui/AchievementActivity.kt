@@ -1,3 +1,4 @@
+/** 成就页: 展示已解锁和未解锁的成就列表及进度 */
 package com.aicompanion.ui
 
 import android.app.Activity

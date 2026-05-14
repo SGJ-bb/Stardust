@@ -1,3 +1,4 @@
+/** 设置页面: API配置/功能开关/偏好设置/模型管理入口 */
 package com.aicompanion.ui
 
 import android.app.TimePickerDialog
@@ -251,6 +252,20 @@ class SettingsActivity : AppCompatActivity() {
         // Load wake up settings
         switchWakeEnabled?.isChecked = WakeUpScheduler.isWakeupEnabled(this)
         updateWakeInfoDisplay()
+
+        // Diary + background settings
+        findViewById<Switch>(R.id.switch_auto_start)?.isChecked = sm.autoStart
+        findViewById<Switch>(R.id.switch_background_running)?.isChecked = sm.backgroundRunning
+
+        findViewById<RadioGroup>(R.id.radio_diary_trigger)?.check(
+            when (sm.diaryTriggerMode) {
+                com.aicompanion.settings.DiaryTriggerMode.MANUAL -> R.id.radio_diary_manual
+                com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50 -> R.id.radio_diary_50msg
+                com.aicompanion.settings.DiaryTriggerMode.HOURLY -> R.id.radio_diary_hourly
+                com.aicompanion.settings.DiaryTriggerMode.TWO_HOURS -> R.id.radio_diary_2h
+                com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM -> R.id.radio_diary_10pm
+            }
+        )
     }
 
     private fun updateWakeInfoDisplay() {
@@ -432,6 +447,14 @@ class SettingsActivity : AppCompatActivity() {
             val clipData = android.content.ClipData.newPlainText("抖音ID", "31991565756")
             clip.setPrimaryClip(clipData)
             Toast.makeText(this, "抖音ID已复制到剪贴板：31991565756", Toast.LENGTH_LONG).show()
+        }
+
+        findViewById<Switch>(R.id.switch_auto_start)?.setOnCheckedChangeListener { _, isChecked ->
+            settingsManager?.autoStart = isChecked
+        }
+
+        findViewById<Switch>(R.id.switch_background_running)?.setOnCheckedChangeListener { _, isChecked ->
+            settingsManager?.backgroundRunning = isChecked
         }
     }
 
@@ -640,6 +663,17 @@ class SettingsActivity : AppCompatActivity() {
             R.id.radio_tsundere -> LanguageStyle.TSUNDERE
             R.id.radio_cute -> LanguageStyle.CUTE
             else -> LanguageStyle.NORMAL
+        }
+
+        sm.autoStart = findViewById<Switch>(R.id.switch_auto_start)?.isChecked ?: true
+        sm.backgroundRunning = findViewById<Switch>(R.id.switch_background_running)?.isChecked ?: true
+
+        sm.diaryTriggerMode = when (findViewById<RadioGroup>(R.id.radio_diary_trigger)?.checkedRadioButtonId) {
+            R.id.radio_diary_manual -> com.aicompanion.settings.DiaryTriggerMode.MANUAL
+            R.id.radio_diary_hourly -> com.aicompanion.settings.DiaryTriggerMode.HOURLY
+            R.id.radio_diary_2h -> com.aicompanion.settings.DiaryTriggerMode.TWO_HOURS
+            R.id.radio_diary_10pm -> com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM
+            else -> com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50
         }
 
         Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show()

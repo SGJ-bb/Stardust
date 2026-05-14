@@ -1,3 +1,4 @@
+/** 签到管理器: 每日签到打卡, 连续签到额外奖励, 防作弊检测 */
 package com.aicompanion.gamify
 
 import android.content.Context

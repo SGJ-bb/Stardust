@@ -1,3 +1,4 @@
+/** 应用分类器: 根据应用包名自动分类(社交/游戏/学习/购物等), 辅助AI理解当前场景 */
 package com.aicompanion.screen
 
 object AppCategoryClassifier {

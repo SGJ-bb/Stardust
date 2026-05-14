@@ -1,3 +1,4 @@
+/** 设置管理器: SharedPreferences统一封装, API配置/功能开关/偏好设置读写 */
 package com.aicompanion.settings
 
 import android.content.Context
@@ -80,6 +81,30 @@ class SettingsManager(context: Context) {
     var ttsModel: String
         get() = prefs.getString("tts_model", "tts-1") ?: "tts-1"
         set(value) { prefs.edit().putString("tts_model", value).apply() }
+
+    // 开机自启动（默认开启）
+    var autoStart: Boolean
+        get() = prefs.getBoolean("auto_start", true)
+        set(value) { prefs.edit().putBoolean("auto_start", value).apply() }
+
+    // 后台运行（默认开启）
+    var backgroundRunning: Boolean
+        get() = prefs.getBoolean("background_running", true)
+        set(value) { prefs.edit().putBoolean("background_running", value).apply() }
+
+    // 日记触发模式
+    var diaryTriggerMode: DiaryTriggerMode
+        get() {
+            val value = prefs.getString("diary_trigger_mode", "messages_50") ?: "messages_50"
+            return try {
+                DiaryTriggerMode.valueOf(value.uppercase())
+            } catch (e: Exception) {
+                DiaryTriggerMode.MESSAGES_50
+            }
+        }
+        set(value) {
+            prefs.edit().putString("diary_trigger_mode", value.name.lowercase()).apply()
+        }
 
     var simpleScreenMode: Boolean
         get() = prefs.getBoolean("simple_screen_mode", false)
@@ -222,6 +247,14 @@ enum class NagFrequency {
 
 enum class LanguageStyle {
     NORMAL, TSUNDERE, CUTE
+}
+
+enum class DiaryTriggerMode {
+    MANUAL,       // 仅手动
+    MESSAGES_50,  // 每50条消息
+    HOURLY,       // 每小时
+    TWO_HOURS,    // 每2小时
+    DAILY_10PM    // 每晚10点
 }
 
 data class ScheduledWake(

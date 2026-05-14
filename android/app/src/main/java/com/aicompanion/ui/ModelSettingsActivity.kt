@@ -1,3 +1,4 @@
+/** 模型设置页: 调整Live2D模型显示大小/位置参数 */
 package com.aicompanion.ui
 
 import android.app.Activity

@@ -75,6 +75,11 @@
             android:parentActivityName=".ui.MainActivity" />
 
         <activity
+            android:name=".ui.ProfileActivity"
+            android:label="AI 档案"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
             android:name=".ui.AchievementActivity"
             android:label="成就殿堂"
             android:parentActivityName=".ui.MainActivity" />
@@ -94,6 +99,11 @@
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
+        <service
+            android:name=".services.BackgroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
         <receiver
             android:name=".wakeup.WakeUpReceiver"
             android:enabled="true"
@@ -108,6 +118,11 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".action.AIActionManager$ReminderReceiver"
+            android:enabled="true"
+            android:exported="false" />
 
         <service
             android:name=".screen.ScreenRecognitionService"

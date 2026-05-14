@@ -581,6 +581,113 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="  日记与后台"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#8899dd"
+            android:letterSpacing="0.05"
+            android:layout_marginBottom="10dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            app:cardBackgroundColor="#1a1a30"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="#2a2a4a">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <Switch
+                    android:id="@+id/switch_auto_start"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="开机自启动"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0" />
+
+                <Switch
+                    android:id="@+id/switch_background_running"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="后台运行"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:layout_marginTop="4dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#2a2a4a"
+                    android:layout_marginVertical="12dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="日记触发模式"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#c4b5fd" />
+
+                <RadioGroup
+                    android:id="@+id/radio_diary_trigger"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp">
+
+                    <RadioButton
+                        android:id="@+id/radio_diary_manual"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="仅手动"
+                        android:textColor="#8899aa"
+                        android:buttonTint="#667eea" />
+
+                    <RadioButton
+                        android:id="@+id/radio_diary_50msg"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="每50条消息"
+                        android:checked="true"
+                        android:textColor="#d0d0e0"
+                        android:buttonTint="#667eea" />
+
+                    <RadioButton
+                        android:id="@+id/radio_diary_hourly"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="每小时"
+                        android:textColor="#8899aa"
+                        android:buttonTint="#667eea" />
+
+                    <RadioButton
+                        android:id="@+id/radio_diary_2h"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="每2小时"
+                        android:textColor="#8899aa"
+                        android:buttonTint="#667eea" />
+
+                    <RadioButton
+                        android:id="@+id/radio_diary_10pm"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="每晚10点"
+                        android:textColor="#8899aa"
+                        android:buttonTint="#667eea" />
+                </RadioGroup>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="  AI 功能页面"
             android:textSize="14sp"
             android:textStyle="bold"

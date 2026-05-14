@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="400dp"
+    android:background="#1C2128"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:id="@+id/tv_detail_mood"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="😊 开心"
+                android:textSize="20sp"
+                android:textColor="#C9D1D9"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_detail_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2024年1月1日"
+                android:textSize="13sp"
+                android:textColor="#8899CC" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_detail_stats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💬 12条消息 · ❤️ 好感度50"
+            android:textSize="12sp"
+            android:textColor="#667788"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tv_detail_tags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🏷️ 标签1 · 标签2"
+            android:textSize="12sp"
+            android:textColor="#66BB6A"
+            android:layout_marginBottom="12dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#2A3040"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:id="@+id/tv_detail_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="日记内容"
+            android:textSize="14sp"
+            android:textColor="#C9D1D9"
+            android:lineSpacingExtra="4dp" />
+    </LinearLayout>
+
+</ScrollView>

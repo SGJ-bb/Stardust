@@ -1,15 +1,19 @@
+/** 聊天消息适配器: 用户/AI消息不同布局, 支持心情头像/时间戳/打字指示器 */
 package com.aicompanion.ui
 
 import android.graphics.Color
+import android.graphics.BitmapFactory
 import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.aicompanion.R
+import java.io.File
 
 class ChatAdapter(private val messages: List<ChatMessage>) :
     RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -65,6 +69,7 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
     private val cornerRadius: Float
 
     var onFeedback: ((Int, Boolean) -> Unit)? = null
+    var onDeleteMessage: ((Int) -> Unit)? = null
     private var showTyping = false
 
     init {
@@ -143,17 +148,23 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
 
     override fun getItemCount(): Int = messages.size + if (showTyping) 1 else 0
 
-    class UserViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+    inner class UserViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val bubble: View = view.findViewById(R.id.bubble_user)
         private val tvMessage: TextView = view.findViewById(R.id.tv_message_text)
         private val tvTime: TextView = view.findViewById(R.id.tv_message_time)
         private val tvMoodLabel: TextView = view.findViewById(R.id.tv_mood_label)
+        private val ivAvatar: ImageView = view.findViewById(R.id.iv_user_avatar_img)
 
         fun bind(message: ChatMessage, color: Int, radius: Float) {
             tvMessage.text = message.text
             tvTime.text = message.time
             bindMood(message.userMood)
             applyBubbleColor(bubble, color, radius)
+            loadUserAvatar()
+            bubble.setOnLongClickListener {
+                onDeleteMessage?.invoke(adapterPosition)
+                true
+            }
         }
 
         fun bindGradient(message: ChatMessage, colors: List<Int>, radius: Float) {
@@ -161,6 +172,24 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
             tvTime.text = message.time
             bindMood(message.userMood)
             bubble.background = createGradientBubbleDrawable(colors, radius)
+            loadUserAvatar()
+            bubble.setOnLongClickListener {
+                onDeleteMessage?.invoke(adapterPosition)
+                true
+            }
+        }
+
+        private fun loadUserAvatar() {
+            try {
+                val prefs = itemView.context.getSharedPreferences("avatar_data", 0)
+                val path = prefs.getString("user_avatar", "")
+                if (!path.isNullOrEmpty()) {
+                    val file = File(path)
+                    if (file.exists()) {
+                        ivAvatar.setImageBitmap(BitmapFactory.decodeFile(path))
+                    }
+                }
+            } catch (_: Exception) {}
         }
 
         private fun bindMood(mood: String) {
@@ -186,6 +215,7 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
         private val btnLike: TextView = view.findViewById(R.id.btn_feedback_like)
         private val btnDislike: TextView = view.findViewById(R.id.btn_feedback_dislike)
         private var currentPosition = -1
+        private val ivAvatar: ImageView = view.findViewById(R.id.iv_ai_avatar_img)
 
         fun bind(message: ChatMessage, color: Int, radius: Float, position: Int) {
             tvMessage.text = message.text
@@ -193,6 +223,7 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
             tvEmotion.visibility = View.GONE
             currentPosition = position
             applyBubbleColor(bubble, color, radius)
+            loadAiAvatar()
 
             btnLike.alpha = 0f
             btnDislike.alpha = 0f
@@ -206,12 +237,7 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
             }
 
             bubble.setOnLongClickListener {
-                btnLike.animate().alpha(1f).setDuration(200).start()
-                btnDislike.animate().alpha(1f).setDuration(200).start()
-                btnLike.postDelayed({
-                    btnLike.animate().alpha(0f).setDuration(500).start()
-                    btnDislike.animate().alpha(0f).setDuration(500).start()
-                }, 3000)
+                onDeleteMessage?.invoke(currentPosition)
                 true
             }
 
@@ -224,6 +250,19 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
                 btnLike.alpha = 0f
                 btnDislike.setTextColor(0xFFE53935.toInt())
             }
+        }
+
+        private fun loadAiAvatar() {
+            try {
+                val prefs = itemView.context.getSharedPreferences("avatar_data", 0)
+                val path = prefs.getString("ai_avatar", "")
+                if (!path.isNullOrEmpty()) {
+                    val file = File(path)
+                    if (file.exists()) {
+                        ivAvatar.setImageBitmap(BitmapFactory.decodeFile(path))
+                    }
+                }
+            } catch (_: Exception) {}
         }
 
         private fun animateFeedback(active: TextView, inactive: TextView, isLike: Boolean) {

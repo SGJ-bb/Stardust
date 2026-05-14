@@ -1,3 +1,4 @@
+/** 唤醒调度器: 使用WorkManager定时唤醒后台服务, 确保AI桌宠保持活跃 */
 package com.aicompanion.wakeup
 
 import android.app.AlarmManager

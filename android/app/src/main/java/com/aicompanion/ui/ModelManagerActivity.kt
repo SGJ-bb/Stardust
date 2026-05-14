@@ -1,3 +1,4 @@
+/** 模型管理页: Live2D模型下载/切换/删除/列表展示 */
 package com.aicompanion.ui
 
 import android.app.Activity

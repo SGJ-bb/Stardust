@@ -11,7 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
-        android:src="#16162a" />
+        android:src="@drawable/bg_gradient" />
 
     <FrameLayout
         android:id="@+id/ui_layer"
@@ -37,6 +37,29 @@
                 android:orientation="horizontal"
                 android:clickable="true"
                 android:focusable="true">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/iv_ai_avatar_small_card"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="8dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="#1a1a3e"
+                    app:strokeWidth="1.5dp"
+                    app:strokeColor="#667eea">
+
+                    <ImageView
+                        android:id="@+id/iv_ai_avatar_small"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/ic_avatar_default_ai"
+                        android:contentDescription="AI头像"
+                        android:clickable="true"
+                        android:focusable="true" />
+                </com.google.android.material.card.MaterialCardView>
 
                 <ImageButton
                     android:id="@+id/btn_more"
@@ -215,7 +238,7 @@
             android:orientation="horizontal"
             android:paddingHorizontal="8dp"
             android:paddingVertical="6dp"
-            android:background="#cc16162a"
+            android:background="#cc1a1a3e"
             android:clickable="true"
             android:focusable="true"
             android:elevation="12dp"

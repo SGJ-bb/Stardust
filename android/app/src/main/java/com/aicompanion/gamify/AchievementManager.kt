@@ -1,3 +1,4 @@
+/** 成就管理器: 成就进度追踪/解锁判定/成就列表管理 */
 package com.aicompanion.gamify
 
 import android.content.Context

@@ -1,5 +1,7 @@
 package com.aicompanion.models
 
+/** 情绪/动作映射器: 将LLM返回的emotion/action文本标签转换为对应的枚举值 */
+
 object EmotionActionMapper {
 
     fun getDefaultAction(emotion: Emotion): Action {

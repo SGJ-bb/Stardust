@@ -1,3 +1,4 @@
+/** OpenGL ES渲染器: 基于OpenGL ES 2.0的Live2D备用渲染方案 */
 package com.aicompanion.live2d
 
 import android.content.Context

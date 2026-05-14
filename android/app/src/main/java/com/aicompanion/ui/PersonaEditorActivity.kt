@@ -1,3 +1,4 @@
+/** 人设编辑器: 自定义AI角色Prompt/性格/对话示例 */
 package com.aicompanion.ui
 
 import android.app.Activity

@@ -1,3 +1,4 @@
+/** 好感度管理器: 根据用户消息数量/心情/互动频率计算好感度, 行为评估影响好感度变化 */
 package com.aicompanion.affection
 
 import android.content.Context
@@ -29,7 +30,7 @@ class AffectionManager(context: Context) {
         }
 
     var firstUseDate: Long
-        get() = prefs.getLong("first_use_date", System.currentTimeMillis())
+        get() = prefs.getLong("first_use_date", 0L)
         private set(value) {
             prefs.edit().putLong("first_use_date", value).apply()
         }

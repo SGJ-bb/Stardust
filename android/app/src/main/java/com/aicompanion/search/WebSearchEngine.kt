@@ -1,5 +1,7 @@
 package com.aicompanion.search
 
+/** 网页搜索引擎: 支持百度搜索/Google搜索/百度百科查询, 返回搜索结果摘要 */
+
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
