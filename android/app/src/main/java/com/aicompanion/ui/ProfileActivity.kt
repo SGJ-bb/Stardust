@@ -36,6 +36,7 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var achievementManager: AchievementManager
     private lateinit var momentsManager: MemorableMomentsManager
     private lateinit var diaryManager: DiaryManager
+    private lateinit var favoriteManager: FavoriteManager
 
     private lateinit var ivAiAvatar: ImageView
     private lateinit var ivUserAvatar: ImageView
@@ -50,6 +51,8 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var tvMomentsEmpty: TextView
     private lateinit var tvAiName: TextView
     private lateinit var tvUserName: TextView
+    private lateinit var containerFavorites: LinearLayout
+    private lateinit var tvFavoritesEmpty: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,6 +62,7 @@ class ProfileActivity : AppCompatActivity() {
         achievementManager = AchievementManager(this)
         momentsManager = MemorableMomentsManager(this)
         diaryManager = DiaryManager(this)
+        favoriteManager = FavoriteManager(this)
 
         initViews()
         loadData()
@@ -81,6 +85,8 @@ class ProfileActivity : AppCompatActivity() {
         tvMomentsEmpty = findViewById(R.id.tv_moments_empty)
         tvAiName = findViewById(R.id.tv_ai_name_profile)
         tvUserName = findViewById(R.id.tv_user_name_profile)
+        containerFavorites = findViewById(R.id.container_favorites)
+        tvFavoritesEmpty = findViewById(R.id.tv_favorites_empty)
 
         recyclerAchievements.layoutManager = LinearLayoutManager(this)
 
@@ -117,6 +123,7 @@ class ProfileActivity : AppCompatActivity() {
 
         loadAvatars()
         loadMoments()
+        loadFavorites()
     }
 
     private fun loadAvatars() {
@@ -252,6 +259,53 @@ class ProfileActivity : AppCompatActivity() {
 
             card.addView(content)
             containerMoments.addView(card)
+        }
+    }
+
+    private fun loadFavorites() {
+        val favorites = favoriteManager.getAll()
+        if (favorites.isEmpty()) {
+            tvFavoritesEmpty.visibility = View.VISIBLE
+            containerFavorites.visibility = View.GONE
+            return
+        }
+        tvFavoritesEmpty.visibility = View.GONE
+        containerFavorites.visibility = View.VISIBLE
+        containerFavorites.removeAllViews()
+
+        favorites.forEach { msg ->
+            val cardView = LayoutInflater.from(this)
+                .inflate(R.layout.item_favorite_message, containerFavorites, false)
+            val card = cardView as com.google.android.material.card.MaterialCardView
+
+            val tvRole = card.findViewById<TextView>(R.id.tv_fav_role_label)
+            val tvTime = card.findViewById<TextView>(R.id.tv_fav_time)
+            val tvContent = card.findViewById<TextView>(R.id.tv_fav_content)
+            val tvReaction = card.findViewById<TextView>(R.id.tv_fav_reaction)
+
+            tvRole.text = if (msg.isUser) "我" else "AI"
+            tvRole.setTextColor(if (msg.isUser) 0xFFff6b9d.toInt() else 0xFFc4b5fd.toInt())
+            tvTime.text = msg.time
+            tvContent.text = msg.text
+            if (msg.reactionEmoji.isNotEmpty()) {
+                tvReaction.text = msg.reactionEmoji
+                tvReaction.visibility = View.VISIBLE
+            }
+
+            card.setOnLongClickListener {
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("取消收藏")
+                    .setMessage("确定要取消收藏这条消息吗？")
+                    .setPositiveButton("确定") { _, _ ->
+                        favoriteManager.removeFavorite(msg.id)
+                        loadFavorites()
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+                true
+            }
+
+            containerFavorites.addView(cardView)
         }
     }
 

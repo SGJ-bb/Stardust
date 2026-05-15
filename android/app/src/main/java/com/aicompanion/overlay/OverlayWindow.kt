@@ -14,6 +14,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.Toast
 import com.aicompanion.live2d.Live2DWebView
+import com.aicompanion.settings.SettingsManager
 import com.aicompanion.ui.MainActivity
 
 class OverlayWindow(context: Context) {
@@ -65,6 +66,9 @@ class OverlayWindow(context: Context) {
 
         if (overlayRoot != null || windowManager == null) return
         try {
+            val sm = SettingsManager(context)
+            val live2dEnabled = sm.live2dEnabled
+
             val wm = windowManager ?: return
             val density = context.resources.displayMetrics.density
             val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
@@ -78,12 +82,14 @@ class OverlayWindow(context: Context) {
                 )
                 setBackgroundColor(0x00000000)
 
-                val modelPath = getModelPath()
-                if (modelPath.startsWith("file:///android_asset/")) {
-                    val assetPath = modelPath.removePrefix("file:///android_asset/")
-                    loadLive2DModelFromAssets(assetPath)
-                } else {
-                    loadLive2DModelFromPath(modelPath)
+                if (live2dEnabled) {
+                    val modelPath = getModelPath()
+                    if (modelPath.startsWith("file:///android_asset/")) {
+                        val assetPath = modelPath.removePrefix("file:///android_asset/")
+                        loadLive2DModelFromAssets(assetPath)
+                    } else {
+                        loadLive2DModelFromPath(modelPath)
+                    }
                 }
 
                 touchHandler = { event ->
@@ -160,6 +166,10 @@ class OverlayWindow(context: Context) {
 
             wm.addView(overlayRoot, layoutParams)
             Log.d(TAG, "Overlay window added successfully, size=$containerSize")
+
+            if (!live2dEnabled) {
+                Toast.makeText(context, "Live2D 已关闭，请在设置中开启", Toast.LENGTH_SHORT).show()
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "show() error: ${e.message}", e)

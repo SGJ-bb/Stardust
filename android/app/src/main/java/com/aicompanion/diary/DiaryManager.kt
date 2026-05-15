@@ -4,6 +4,7 @@ package com.aicompanion.diary
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
+import com.aicompanion.rag.RagConfig
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -89,6 +90,35 @@ class DiaryManager(private val context: Context) {
         return getAllDiaries().filter {
             it.title.lowercase().contains(lower) || it.content.lowercase().contains(lower)
         }
+    }
+
+    fun searchDiariesRag(query: String, topK: Int = 5): List<DiaryEntry> {
+        val all = getAllDiaries()
+        if (all.isEmpty() || query.isBlank()) return emptyList()
+
+        val docs = all.map { it.title + " " + it.content }
+        val embedder = com.aicompanion.rag.TfidfEmbedder()
+        embedder.buildVocabulary(docs)
+        val docVectors = embedder.embedSync(docs)
+        val queryVec = embedder.embedSingleSync(query)
+
+        val scored = docVectors.mapIndexed { i, vec -> i to cosineSimilarity(queryVec, vec) }
+            .sortedByDescending { it.second }
+
+        return scored.take(topK).filter { it.second > RagConfig.minSimilarity }.map { all[it.first] }
+    }
+
+    private fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
+        var dot = 0f
+        var normA = 0f
+        var normB = 0f
+        for (i in a.indices) {
+            dot += a[i] * b[i]
+            normA += a[i] * a[i]
+            normB += b[i] * b[i]
+        }
+        val denom = kotlin.math.sqrt(normA) * kotlin.math.sqrt(normB)
+        return if (denom > 0f) dot / denom else 0f
     }
 
     fun getDiariesByMood(mood: String): List<DiaryEntry> {
