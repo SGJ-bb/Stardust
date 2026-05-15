@@ -117,6 +117,26 @@
                     app:backgroundTint="@android:color/transparent"
                     style="@style/Widget.Material3.Button.OutlinedButton" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#2a2a4a"
+                    android:layout_marginVertical="12dp" />
+
+                <Switch
+                    android:id="@+id/switch_live2d"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="启用 Live2D 动态皮套"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#2a2a4a"
+                    android:layout_marginVertical="12dp" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_start_overlay"
                     android:layout_width="match_parent"
@@ -184,6 +204,116 @@
                     android:textColor="#7c5cfc"
                     android:gravity="center"
                     android:layout_marginTop="4dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="  联网搜索配置"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#8899dd"
+            android:letterSpacing="0.05"
+            android:layout_marginBottom="10dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            app:cardBackgroundColor="#1a1a30"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="#2a2a4a">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <Switch
+                    android:id="@+id/switch_search_enabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="启用联网搜索工具"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="选择搜索引擎"
+                    android:textSize="14sp"
+                    android:textColor="#c4b5fd"
+                    android:layout_marginTop="8dp" />
+
+                <Spinner
+                    android:id="@+id/spinner_search_provider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_search_api_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="搜索API地址 (可选，DuckDuckGo免费)"
+                    app:boxBackgroundColor="#151525"
+                    app:boxStrokeColor="#2a2a4a"
+                    app:hintTextColor="#556677"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_search_api_url"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textUri"
+                        android:textColor="#d0d0e0"
+                        android:textColorHint="#556677" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_search_api_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="搜索API密钥 (SerpAPI/Google等)"
+                    app:boxBackgroundColor="#151525"
+                    app:boxStrokeColor="#2a2a4a"
+                    app:hintTextColor="#556677"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_search_api_key"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:textColor="#d0d0e0"
+                        android:textColorHint="#556677" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_search_engine_id"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="搜索引擎ID (Google CSE需填写)"
+                    app:boxBackgroundColor="#151525"
+                    app:boxStrokeColor="#2a2a4a"
+                    app:hintTextColor="#556677"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_search_engine_id"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:textColor="#d0d0e0"
+                        android:textColorHint="#556677" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

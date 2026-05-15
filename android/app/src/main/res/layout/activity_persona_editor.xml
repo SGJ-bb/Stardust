@@ -124,6 +124,25 @@
                     android:textSize="12sp"
                     android:lineSpacingExtra="4dp"
                     android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="AI发现的称呼"
+                    android:textColor="#c4b5fd"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone"
+                    android:id="@+id/tv_discovered_label" />
+
+                <LinearLayout
+                    android:id="@+id/container_discovered_nicknames"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginTop="8dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

@@ -23,7 +23,8 @@ import com.aicompanion.R
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.settings.LanguageStyle
 import com.aicompanion.settings.NagFrequency
-import com.aicompanion.memory.MemoryManager
+import com.aicompanion.diary.DiaryManager
+import com.aicompanion.models.Emotion
 import com.aicompanion.theme.ThemeManager
 import com.aicompanion.wakeup.WakeUpScheduler
 import kotlinx.coroutines.Dispatchers
@@ -34,14 +35,11 @@ import java.util.*
 class SettingsActivity : AppCompatActivity() {
 
     private var settingsManager: SettingsManager? = null
-    private var memoryManager: MemoryManager? = null
 
     // UI components
     private var btnPersonaEditor: com.google.android.material.button.MaterialButton? = null
     private var btnModelManager: com.google.android.material.button.MaterialButton? = null
     private var btnModelAdjust: com.google.android.material.button.MaterialButton? = null
-    private var btnViewMemories: com.google.android.material.button.MaterialButton? = null
-    private var btnDeleteAllMemories: com.google.android.material.button.MaterialButton? = null
     private var btnChangeTheme: com.google.android.material.button.MaterialButton? = null
     private var btnViewLog: com.google.android.material.button.MaterialButton? = null
     private var btnStartOverlay: com.google.android.material.button.MaterialButton? = null
@@ -70,12 +68,23 @@ class SettingsActivity : AppCompatActivity() {
     private var switchVoiceRecognition: Switch? = null
     private var switchTts: Switch? = null
     private var switchOfflineMode: Switch? = null
+    private var switchSearchEnabled: Switch? = null
+    private var switchLive2d: Switch? = null
 
     // Wake up settings
     private var switchWakeEnabled: Switch? = null
     private var btnSetWakeTime: com.google.android.material.button.MaterialButton? = null
     private var btnSetWakeMessage: com.google.android.material.button.MaterialButton? = null
     private var tvWakeInfo: TextView? = null
+
+    // Search config
+    private var spinnerSearchProvider: Spinner? = null
+    private var etSearchApiUrl: TextView? = null
+    private var etSearchApiKey: TextView? = null
+    private var etSearchEngineId: TextView? = null
+    private var tilSearchApiUrl: View? = null
+    private var tilSearchApiKey: View? = null
+    private var tilSearchEngineId: View? = null
 
     // Spinner auto-fill guard
     private var isSpinnerInitialized = false
@@ -86,7 +95,6 @@ class SettingsActivity : AppCompatActivity() {
 
         try {
             settingsManager = SettingsManager(this)
-            memoryManager = MemoryManager(this)
 
             initViews()
             setupSpinner()
@@ -167,8 +175,6 @@ class SettingsActivity : AppCompatActivity() {
         btnPersonaEditor = findViewById<View?>(R.id.btn_persona_editor) as? com.google.android.material.button.MaterialButton
         btnModelManager = findViewById<View?>(R.id.btn_model_manager) as? com.google.android.material.button.MaterialButton
         btnModelAdjust = findViewById<View?>(R.id.btn_model_adjust) as? com.google.android.material.button.MaterialButton
-        btnViewMemories = findViewById<View?>(R.id.btn_view_memories) as? com.google.android.material.button.MaterialButton
-        btnDeleteAllMemories = findViewById<View?>(R.id.btn_delete_all_memories) as? com.google.android.material.button.MaterialButton
         btnChangeTheme = findViewById<View?>(R.id.btn_change_theme) as? com.google.android.material.button.MaterialButton
         btnViewLog = findViewById<View?>(R.id.btn_view_log) as? com.google.android.material.button.MaterialButton
         btnStartOverlay = findViewById<View?>(R.id.btn_start_overlay) as? com.google.android.material.button.MaterialButton
@@ -201,6 +207,7 @@ class SettingsActivity : AppCompatActivity() {
         switchVoiceRecognition = findViewById(R.id.switch_voice_recognition)
         switchTts = findViewById(R.id.switch_tts)
         switchOfflineMode = findViewById(R.id.switch_offline_mode)
+        switchLive2d = findViewById(R.id.switch_live2d)
 
         // Wake up settings
         switchWakeEnabled = findViewById(R.id.switch_wake_enabled)
@@ -208,7 +215,18 @@ class SettingsActivity : AppCompatActivity() {
         btnSetWakeMessage = findViewById<View?>(R.id.btn_set_wake_message) as? com.google.android.material.button.MaterialButton
         tvWakeInfo = findViewById(R.id.tv_wake_info)
 
+        // Search config
+        switchSearchEnabled = findViewById(R.id.switch_search_enabled)
+        spinnerSearchProvider = findViewById(R.id.spinner_search_provider)
+        etSearchApiUrl = findViewById(R.id.et_search_api_url)
+        etSearchApiKey = findViewById(R.id.et_search_api_key)
+        etSearchEngineId = findViewById(R.id.et_search_engine_id)
+        tilSearchApiUrl = findViewById(R.id.til_search_api_url)
+        tilSearchApiKey = findViewById(R.id.til_search_api_key)
+        tilSearchEngineId = findViewById(R.id.til_search_engine_id)
+
         setupOverlaySize()
+        setupEndpointAutoComplete()
     }
 
     private fun loadSettings() {
@@ -230,6 +248,7 @@ class SettingsActivity : AppCompatActivity() {
         switchVoiceRecognition?.isChecked = sm.voiceRecognitionEnabled
         switchTts?.isChecked = sm.ttsEnabled
         switchOfflineMode?.isChecked = sm.offlineMode
+        switchLive2d?.isChecked = sm.live2dEnabled
 
         // Radio groups
         radioNagFrequency?.check(
@@ -266,6 +285,14 @@ class SettingsActivity : AppCompatActivity() {
                 com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM -> R.id.radio_diary_10pm
             }
         )
+
+        // Load search settings
+        switchSearchEnabled?.isChecked = sm.searchEnabled
+        setupSearchSpinner()
+        etSearchApiUrl?.text = sm.searchApiUrl
+        etSearchApiKey?.text = sm.searchApiKey
+        etSearchEngineId?.text = sm.searchEngineId
+        updateSearchFieldsVisibility()
     }
 
     private fun updateWakeInfoDisplay() {
@@ -308,39 +335,6 @@ class SettingsActivity : AppCompatActivity() {
                 e.printStackTrace()
                 Toast.makeText(this, "无法打开模型调整: ${e.message}", Toast.LENGTH_SHORT).show()
             }
-        }
-
-        btnViewMemories?.setOnClickListener {
-            try {
-                startActivity(Intent(this, MemoryActivity::class.java))
-            } catch (e: Exception) {
-                Log.e("SettingsActivity", "Failed to open MemoryActivity: ${e.message}", e)
-                Toast.makeText(this, "无法打开记忆页面: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        btnDeleteAllMemories?.setOnClickListener {
-            android.app.AlertDialog.Builder(this)
-                .setTitle("确认清空记忆")
-                .setMessage("清空所有记忆数据？此操作不可撤销。")
-                .setPositiveButton("清空") { _, _ ->
-                    val sm = settingsManager
-                    val mm = memoryManager
-                    if (sm != null && mm != null) {
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                            val success = mm.deleteAllMemories(sm.userId)
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(
-                                    this@SettingsActivity,
-                                    if (success) "记忆已清空" else "清空失败",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    }
-                }
-                .setNegativeButton("取消", null)
-                .show()
         }
 
         btnChangeTheme?.setOnClickListener {
@@ -505,7 +499,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupSpinner() {
-        val providers = arrayOf("自定义", "OpenAI", "阿里云百炼", "智谱AI", "MiniMax", "月之暗面", "DeepSeek", "硅基流动", "OpenRouter", "通义千问")
+        val providers = arrayOf("自定义", "OpenAI", "阿里云百炼", "智谱AI", "MiniMax", "月之暗面", "n1n", "DeepSeek", "硅基流动", "OpenRouter", "通义千问")
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, providers)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerApiProvider?.adapter = adapter
@@ -513,8 +507,8 @@ class SettingsActivity : AppCompatActivity() {
         val savedProvider = settingsManager?.apiProvider ?: "custom"
         val savedIndex = when (savedProvider) {
             "openai" -> 1; "aliyun" -> 2; "zhipu" -> 3; "minimax" -> 4
-            "moonshot" -> 5; "deepseek" -> 6; "siliconflow" -> 7; "openrouter" -> 8
-            "qwen" -> 9
+            "moonshot" -> 5; "n1n" -> 6; "deepseek" -> 7; "siliconflow" -> 8; "openrouter" -> 9
+            "qwen" -> 10
             else -> 0
         }
         spinnerApiProvider?.setSelection(savedIndex)
@@ -527,10 +521,11 @@ class SettingsActivity : AppCompatActivity() {
                     3 -> Triple("zhipu", "https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4-flash")
                     4 -> Triple("minimax", "https://api.minimax.chat/v1/text/chatcompletion_v2", "MiniMax-Text-01")
                     5 -> Triple("moonshot", "https://api.moonshot.cn/v1/chat/completions", "moonshot-v1-8k")
-                    6 -> Triple("deepseek", "https://api.deepseek.com/v1/chat/completions", "deepseek-chat")
-                    7 -> Triple("siliconflow", "https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen2.5-7B-Instruct")
-                    8 -> Triple("openrouter", "https://openrouter.ai/api/v1/chat/completions", "google/gemini-2.0-flash-001")
-                    9 -> Triple("qwen", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-max")
+                    6 -> Triple("n1n", "https://api.n1n.ai/v1/chat/completions", "gpt-4o-mini")
+                    7 -> Triple("deepseek", "https://api.deepseek.com/v1/chat/completions", "deepseek-v4-flash")
+                    8 -> Triple("siliconflow", "https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen2.5-7B-Instruct")
+                    9 -> Triple("openrouter", "https://openrouter.ai/api/v1/chat/completions", "google/gemini-2.0-flash-001")
+                    10 -> Triple("qwen", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-max")
                     else -> Triple("custom", "", "")
                 }
                 if (isSpinnerInitialized && url.isNotEmpty()) {
@@ -540,7 +535,7 @@ class SettingsActivity : AppCompatActivity() {
                     val currentModel = etChatModel?.text?.toString()?.trim() ?: ""
                     val knownDefaults = setOf(
                         "gpt-4o-mini", "qwen-plus", "qwen-max", "glm-4-flash",
-                        "MiniMax-Text-01", "moonshot-v1-8k", "deepseek-chat",
+                        "MiniMax-Text-01", "moonshot-v1-8k", "deepseek-chat", "deepseek-v4-flash",
                         "Qwen/Qwen2.5-7B-Instruct", "google/gemini-2.0-flash-001"
                     )
                     if (currentModel.isEmpty() || currentModel in knownDefaults) {
@@ -558,6 +553,41 @@ class SettingsActivity : AppCompatActivity() {
         // This prevents the spinner from overwriting saved model/URL on initial setup.
         spinnerApiProvider?.post {
             isSpinnerInitialized = true
+        }
+    }
+
+    private fun setupEndpointAutoComplete() {
+        etChatApiUrl?.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                autoCompleteEndpoint()
+            }
+        }
+    }
+
+    private fun autoCompleteEndpoint() {
+        val url = etChatApiUrl?.text?.toString()?.trim() ?: return
+        if (url.isEmpty()) return
+
+        if (url.contains("/chat/completions")) return
+        if (url.contains("/text/chatcompletion_v2")) return
+
+        val completions = mapOf(
+            "/v1" to "/chat/completions",
+            "/v1/" to "chat/completions",
+            "/v4" to "/chat/completions",
+            "/v4/" to "chat/completions",
+            "/compatible-mode/v1" to "/chat/completions",
+            "/compatible-mode/v1/" to "chat/completions",
+        )
+
+        for ((base, suffix) in completions) {
+            if (url.endsWith(base)) {
+                val completed = url.removeSuffix(base) + base.trimEnd('/') + "/" + suffix.trimStart('/')
+                etChatApiUrl?.setText(completed)
+                (etChatApiUrl as? android.widget.EditText)?.setSelection(completed.length)
+                Toast.makeText(this, "已自动补全端点: $suffix", Toast.LENGTH_SHORT).show()
+                return
+            }
         }
     }
 
@@ -651,6 +681,7 @@ class SettingsActivity : AppCompatActivity() {
         sm.voiceRecognitionEnabled = switchVoiceRecognition?.isChecked ?: false
         sm.ttsEnabled = switchTts?.isChecked ?: false
         sm.offlineMode = switchOfflineMode?.isChecked ?: false
+        sm.live2dEnabled = switchLive2d?.isChecked ?: true
 
         sm.nagFrequency = when (radioNagFrequency?.checkedRadioButtonId) {
             R.id.radio_low -> NagFrequency.LOW
@@ -676,7 +707,52 @@ class SettingsActivity : AppCompatActivity() {
             else -> com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50
         }
 
+        sm.searchEnabled = switchSearchEnabled?.isChecked ?: true
+        sm.searchApiUrl = etSearchApiUrl?.text?.toString() ?: ""
+        sm.searchApiKey = etSearchApiKey?.text?.toString() ?: ""
+        sm.searchEngineId = etSearchEngineId?.text?.toString() ?: ""
+
         Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun setupSearchSpinner() {
+        val providers = arrayOf("DuckDuckGo (免费)", "必应搜索 API", "百度搜索")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, providers)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerSearchProvider?.adapter = adapter
+
+        val savedProvider = settingsManager?.searchProvider ?: "duckduckgo"
+        val savedIndex = when (savedProvider) {
+            "bing" -> 1
+            "baidu" -> 2
+            else -> 0
+        }
+        spinnerSearchProvider?.setSelection(savedIndex)
+
+        spinnerSearchProvider?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val providerId = when (position) {
+                    1 -> "bing"
+                    2 -> "baidu"
+                    else -> "duckduckgo"
+                }
+                settingsManager?.searchProvider = providerId
+                updateSearchFieldsVisibility()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        switchSearchEnabled?.setOnCheckedChangeListener { _, _ -> updateSearchFieldsVisibility() }
+    }
+
+    private fun updateSearchFieldsVisibility() {
+        val enabled = switchSearchEnabled?.isChecked ?: true
+        val provider = settingsManager?.searchProvider ?: "duckduckgo"
+
+        spinnerSearchProvider?.visibility = if (enabled) View.VISIBLE else View.GONE
+        tilSearchApiUrl?.visibility = if (enabled && provider == "bing") View.VISIBLE else View.GONE
+        tilSearchApiKey?.visibility = if (enabled && provider == "bing") View.VISIBLE else View.GONE
+        tilSearchEngineId?.visibility = View.GONE
     }
 
     private fun showDonateDialog() {

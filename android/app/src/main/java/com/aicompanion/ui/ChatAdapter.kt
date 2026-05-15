@@ -1,21 +1,23 @@
-/** 聊天消息适配器: 用户/AI消息不同布局, 支持心情头像/时间戳/打字指示器 */
 package com.aicompanion.ui
 
 import android.graphics.Color
 import android.graphics.BitmapFactory
 import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.aicompanion.R
 import java.io.File
 
-class ChatAdapter(private val messages: List<ChatMessage>) :
+class ChatAdapter(private val messages: MutableList<ChatMessage>) :
     RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
@@ -70,6 +72,10 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
 
     var onFeedback: ((Int, Boolean) -> Unit)? = null
     var onDeleteMessage: ((Int) -> Unit)? = null
+    var onQuoteMessage: ((Int) -> Unit)? = null
+    var onFavoriteMessage: ((Int) -> Unit)? = null
+    var onReactionMessage: ((Int, String) -> Unit)? = null
+
     private var showTyping = false
 
     init {
@@ -87,6 +93,14 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
                 showTyping = false
                 notifyItemRemoved(removePos)
             }
+        }
+    }
+
+    fun updateLastPetMessage(text: String, isPartial: Boolean = false) {
+        val lastPetIndex = messages.indexOfLast { !it.isUser }
+        if (lastPetIndex >= 0) {
+            messages[lastPetIndex] = messages[lastPetIndex].copy(text = text, isPartial = isPartial)
+            notifyItemChanged(lastPetIndex)
         }
     }
 
@@ -133,9 +147,9 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
             is UserViewHolder -> {
                 val message = messages[position]
                 if (userGradientColors.size >= 2) {
-                    holder.bindGradient(message, userGradientColors, cornerRadius)
+                    holder.bindGradient(message, userGradientColors, cornerRadius, position)
                 } else {
-                    holder.bind(message, bubbleUserColor, cornerRadius)
+                    holder.bind(message, bubbleUserColor, cornerRadius, position)
                 }
             }
             is PetViewHolder -> {
@@ -148,34 +162,179 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
 
     override fun getItemCount(): Int = messages.size + if (showTyping) 1 else 0
 
+    private fun showPopupMenu(anchorView: View, position: Int, message: ChatMessage) {
+        val context = anchorView.context
+        val popupView = LayoutInflater.from(context).inflate(R.layout.popup_chat_action, null)
+
+        val popup = PopupWindow(
+            popupView,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            elevation = 12f
+            isOutsideTouchable = true
+            isFocusable = true
+        }
+
+        val favIcon = popupView.findViewById<TextView>(R.id.tv_favorite_icon)
+        val favLabel = popupView.findViewById<TextView>(R.id.tv_favorite_label)
+        if (message.isFavorited) {
+            favIcon.text = "⭐"
+            favLabel.text = "取消收藏"
+            favLabel.setTextColor(0xFFFFB347.toInt())
+        } else {
+            favIcon.text = "☆"
+            favLabel.text = "收藏"
+            favLabel.setTextColor(0xFFe0e0f0.toInt())
+        }
+
+        popupView.findViewById<View>(R.id.action_favorite).setOnClickListener {
+            onFavoriteMessage?.invoke(position)
+            popup.dismiss()
+        }
+
+        popupView.findViewById<View>(R.id.action_reaction).setOnClickListener {
+            popup.dismiss()
+            postShowEmojiPicker(anchorView, position, message)
+        }
+
+        popupView.findViewById<View>(R.id.action_delete).setOnClickListener {
+            popup.dismiss()
+            android.app.AlertDialog.Builder(context)
+                .setTitle("删除消息")
+                .setMessage("确定删除这条消息吗？")
+                .setPositiveButton("删除") { _, _ ->
+                    onDeleteMessage?.invoke(position)
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+
+        popupView.findViewById<View>(R.id.action_quote).setOnClickListener {
+            onQuoteMessage?.invoke(position)
+            popup.dismiss()
+        }
+
+        popupView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+
+        val anchorLoc = IntArray(2)
+        anchorView.getLocationOnScreen(anchorLoc)
+        val anchorCenterX = anchorLoc[0] + anchorView.width / 2
+        val anchorTop = anchorLoc[1]
+
+        val popupW = popupView.measuredWidth
+        val popupH = popupView.measuredHeight
+
+        val screenW = context.resources.displayMetrics.widthPixels
+        val x = (anchorCenterX - popupW / 2).coerceIn(8, screenW - popupW - 8)
+        val y = anchorTop - popupH - 8
+
+        popup.showAtLocation(anchorView, Gravity.TOP or Gravity.START, x, y)
+    }
+
+    private fun postShowEmojiPicker(anchorView: View, position: Int, message: ChatMessage) {
+        anchorView.postDelayed({
+            showEmojiPicker(anchorView, position, message)
+        }, 150)
+    }
+
+    private fun showEmojiPicker(anchorView: View, position: Int, message: ChatMessage) {
+        val context = anchorView.context
+        val pickerView = LayoutInflater.from(context).inflate(R.layout.popup_emoji_reaction, null)
+
+        val popup = PopupWindow(
+            pickerView,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            elevation = 12f
+            isOutsideTouchable = true
+            isFocusable = true
+        }
+
+        val emojiMap = mapOf(
+            R.id.emoji_love to "❤️",
+            R.id.emoji_laugh to "😂",
+            R.id.emoji_wow to "😮",
+            R.id.emoji_cry to "😢",
+            R.id.emoji_angry to "😡",
+            R.id.emoji_thumbsup to "👍",
+            R.id.emoji_clap to "👏",
+            R.id.emoji_party to "🎉",
+            R.id.emoji_remove to ""
+        )
+
+        emojiMap.forEach { (viewId, emoji) ->
+            pickerView.findViewById<View>(viewId).setOnClickListener {
+                onReactionMessage?.invoke(position, emoji)
+                popup.dismiss()
+            }
+        }
+
+        pickerView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+
+        val anchorLoc = IntArray(2)
+        anchorView.getLocationOnScreen(anchorLoc)
+        val anchorCenterX = anchorLoc[0] + anchorView.width / 2
+        val anchorTop = anchorLoc[1]
+
+        val popupW = pickerView.measuredWidth
+        val popupH = pickerView.measuredHeight
+
+        val screenW = context.resources.displayMetrics.widthPixels
+        val x = (anchorCenterX - popupW / 2).coerceIn(8, screenW - popupW - 8)
+        val y = anchorTop - popupH - 8
+
+        popup.showAtLocation(anchorView, Gravity.TOP or Gravity.START, x, y)
+    }
+
     inner class UserViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val bubble: View = view.findViewById(R.id.bubble_user)
         private val tvMessage: TextView = view.findViewById(R.id.tv_message_text)
         private val tvTime: TextView = view.findViewById(R.id.tv_message_time)
         private val tvMoodLabel: TextView = view.findViewById(R.id.tv_mood_label)
         private val ivAvatar: ImageView = view.findViewById(R.id.iv_user_avatar_img)
+        private val tvReaction: TextView = view.findViewById(R.id.tv_reaction_badge)
+        private var currentPosition = -1
 
-        fun bind(message: ChatMessage, color: Int, radius: Float) {
+        fun bind(message: ChatMessage, color: Int, radius: Float, position: Int) {
+            currentPosition = position
             tvMessage.text = message.text
             tvTime.text = message.time
             bindMood(message.userMood)
+            bindReaction(message)
             applyBubbleColor(bubble, color, radius)
             loadUserAvatar()
             bubble.setOnLongClickListener {
-                onDeleteMessage?.invoke(adapterPosition)
+                showPopupMenu(bubble, currentPosition, message)
                 true
             }
         }
 
-        fun bindGradient(message: ChatMessage, colors: List<Int>, radius: Float) {
+        fun bindGradient(message: ChatMessage, colors: List<Int>, radius: Float, position: Int) {
+            currentPosition = position
             tvMessage.text = message.text
             tvTime.text = message.time
             bindMood(message.userMood)
+            bindReaction(message)
             bubble.background = createGradientBubbleDrawable(colors, radius)
             loadUserAvatar()
             bubble.setOnLongClickListener {
-                onDeleteMessage?.invoke(adapterPosition)
+                showPopupMenu(bubble, currentPosition, message)
                 true
+            }
+        }
+
+        private fun bindReaction(message: ChatMessage) {
+            if (message.reactionEmoji.isNotEmpty()) {
+                tvReaction.text = message.reactionEmoji
+                tvReaction.visibility = View.VISIBLE
+            } else {
+                tvReaction.visibility = View.GONE
             }
         }
 
@@ -216,12 +375,14 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
         private val btnDislike: TextView = view.findViewById(R.id.btn_feedback_dislike)
         private var currentPosition = -1
         private val ivAvatar: ImageView = view.findViewById(R.id.iv_ai_avatar_img)
+        private val tvReaction: TextView = view.findViewById(R.id.tv_reaction_badge)
 
         fun bind(message: ChatMessage, color: Int, radius: Float, position: Int) {
-            tvMessage.text = message.text
+            tvMessage.text = if (message.isPartial) "${message.text}…" else message.text
             tvTime.text = message.time
             tvEmotion.visibility = View.GONE
             currentPosition = position
+            bindReaction(message)
             applyBubbleColor(bubble, color, radius)
             loadAiAvatar()
 
@@ -237,7 +398,7 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
             }
 
             bubble.setOnLongClickListener {
-                onDeleteMessage?.invoke(currentPosition)
+                showPopupMenu(bubble, currentPosition, message)
                 true
             }
 
@@ -249,6 +410,15 @@ class ChatAdapter(private val messages: List<ChatMessage>) :
                 btnDislike.alpha = 1.0f
                 btnLike.alpha = 0f
                 btnDislike.setTextColor(0xFFE53935.toInt())
+            }
+        }
+
+        private fun bindReaction(message: ChatMessage) {
+            if (message.reactionEmoji.isNotEmpty()) {
+                tvReaction.text = message.reactionEmoji
+                tvReaction.visibility = View.VISIBLE
+            } else {
+                tvReaction.visibility = View.GONE
             }
         }
 

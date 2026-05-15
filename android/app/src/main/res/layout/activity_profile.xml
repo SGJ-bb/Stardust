@@ -298,5 +298,37 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="32dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="  ⭐ 收藏的消息"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#ffb347"
+            android:letterSpacing="0.05"
+            android:layout_marginBottom="10dp" />
+
+        <TextView
+            android:id="@+id/tv_favorites_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="还没有收藏任何消息\n长按聊天气泡可以收藏哦~"
+            android:textSize="13sp"
+            android:textColor="#667788"
+            android:gravity="center"
+            android:padding="24dp"
+            android:visibility="visible" />
+
+        <LinearLayout
+            android:id="@+id/container_favorites"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="32dp" />
     </LinearLayout>
 </ScrollView>

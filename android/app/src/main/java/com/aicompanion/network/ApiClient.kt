@@ -1,9 +1,10 @@
 package com.aicompanion.network
 
-/** AI后端API客户端: 聊天请求(sendChat)支持persona/记忆/历史消息/系统上下文注入, 以及天气查询/角色生成/图片生成/TTS语音 */
+/** AI后端API客户端: 聊天请求(sendChat)支持工具调用/解析tool_calls, 以及persona/记忆/历史消息注入, 天气查询/角色生成/图片生成/TTS语音/日记生成 */
 
 import android.util.Log
 import com.aicompanion.models.*
+import com.aicompanion.util.AppLogger
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -39,7 +40,9 @@ class ApiClient(
         appCategory: String,
         isOfflineMode: Boolean,
         systemContext: String = "",
-        chatHistory: List<Pair<Boolean, String>> = emptyList()
+        chatHistory: List<Pair<Boolean, String>> = emptyList(),
+        tools: List<ToolDefinition> = emptyList(),
+        extraMessages: List<Pair<String, String>> = emptyList()
     ): ChatResponse? {
         val useModel = modelName ?: "gpt-4o-mini"
 
@@ -99,16 +102,41 @@ class ApiClient(
             put("content", userContent)
         })
 
+        for ((role, content) in extraMessages) {
+            val msgObj = if (content.startsWith("{") && (role == "assistant" || role == "tool")) {
+                try {
+                    JSONObject(content)
+                } catch (_: Exception) {
+                    JSONObject().apply {
+                        put("role", role)
+                        put("content", content)
+                    }
+                }
+            } else {
+                JSONObject().apply {
+                    put("role", role)
+                    put("content", content)
+                }
+            }
+            messagesArray.put(msgObj)
+        }
+
         val requestBody = JSONObject().apply {
             put("model", useModel)
             put("messages", messagesArray)
-            put("temperature", 0.85)
-            put("max_tokens", 300)
+            put("temperature", 1.05)
+            put("max_tokens", 500)
+            put("top_p", 0.92)
+            put("frequency_penalty", 0.35)
+            put("presence_penalty", 0.5)
+            if (tools.isNotEmpty()) {
+                put("tools", buildToolsJson(tools))
+            }
         }
 
         return try {
             if (chatApiUrl.isBlank()) {
-                Log.e(TAG, "sendChat: API URL is empty!")
+                AppLogger.e(TAG, "sendChat: API URL is empty!")
                 return ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = "API地址为空，请在设置中配置API地址")
             }
             val body = requestBody.toString().toRequestBody(jsonMediaType)
@@ -121,11 +149,32 @@ class ApiClient(
                 requestBuilder.header("Authorization", "Bearer $apiKey")
             }
 
-            Log.d(TAG, "sendChat: POST $chatApiUrl model=$useModel")
+            AppLogger.d(TAG, "sendChat: POST $chatApiUrl model=$useModel tools=${tools.size}")
             client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
-                    val errBody = response.body?.string()?.take(200) ?: ""
-                    Log.e(TAG, "Chat failed: HTTP ${response.code} ${response.message} body=$errBody")
+                    val errBody = response.body?.string()?.take(500) ?: ""
+                    AppLogger.e(TAG, "Chat failed: HTTP ${response.code} body=$errBody")
+
+                    if (response.code == 400 && tools.isNotEmpty()) {
+                        AppLogger.w(TAG, "HTTP 400 with tools, retrying without tools (model may not support function calling)")
+                        val retryBody = JSONObject(requestBody.toString()).apply {
+                            remove("tools")
+                        }
+                        val retryReq = Request.Builder()
+                            .url(chatApiUrl)
+                            .post(retryBody.toString().toRequestBody(jsonMediaType))
+                            .header("Content-Type", "application/json")
+                        if (!apiKey.isNullOrEmpty()) {
+                            retryReq.header("Authorization", "Bearer $apiKey")
+                        }
+                        val retryResp = client.newCall(retryReq.build()).execute()
+                        val retryStr = retryResp.body?.string() ?: "{}"
+                        AppLogger.d(TAG, "Retry without tools: HTTP ${retryResp.code}")
+                        if (retryResp.isSuccessful) {
+                            return@use parseOpenAIResponse(retryStr)
+                        }
+                    }
+
                     val errMsg = when (response.code) {
                         401 -> "API密钥无效，请检查设置中的API Key"
                         403 -> "无权限访问，请检查API密钥权限"
@@ -138,11 +187,11 @@ class ApiClient(
                     return ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = errMsg)
                 }
                 val bodyStr = response.body?.string() ?: "{}"
-                Log.d(TAG, "sendChat: response ${bodyStr.length} chars")
+                AppLogger.d(TAG, "sendChat: response ${bodyStr.length} chars")
                 parseOpenAIResponse(bodyStr)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "sendChat error: ${e.javaClass.simpleName}: ${e.message}", e)
+            AppLogger.e(TAG, "sendChat error: ${e.javaClass.simpleName}: ${e.message}", e)
             val errMsg = when {
                 e.message?.contains("Unable to resolve host") == true -> "无法解析域名，请检查网络和API地址"
                 e.message?.contains("timeout") == true -> "连接超时，请检查网络和API地址"
@@ -153,6 +202,86 @@ class ApiClient(
         }
     }
 
+    fun sendChatWithToolLoop(
+        userId: String,
+        message: String,
+        personaName: String,
+        personaPrompt: String,
+        emotion: String,
+        action: String,
+        memories: List<String>,
+        chatHistory: List<Pair<Boolean, String>> = emptyList(),
+        systemContext: String = "",
+        tools: List<ToolDefinition> = emptyList(),
+        toolExecutor: (String, String) -> String
+    ): ChatResponse? {
+        val maxIterations = 3
+        var currentHistory = chatHistory.toMutableList()
+        val allExtraMessages = mutableListOf<Pair<String, String>>()
+
+        var response = sendChat(
+            userId, message, personaName, personaPrompt,
+            emotion, action, memories, "", false,
+            systemContext, currentHistory, tools, allExtraMessages
+        )
+
+        for (iteration in 1..maxIterations) {
+            if (response == null) return null
+
+            val toolCalls = response.toolCalls
+            if (toolCalls.isEmpty()) return response
+
+            val reasoningContent = response.reasoningContent
+
+            val results = toolCalls.map { tc ->
+                try { toolExecutor(tc.name, tc.arguments) }
+                catch (e: Exception) { "工具执行失败: ${e.message}" }
+            }
+
+            val assistantTcArray = JSONArray()
+            for ((i, tc) in toolCalls.withIndex()) {
+                assistantTcArray.put(JSONObject().apply {
+                    put("id", tc.id)
+                    put("type", "function")
+                    put("function", JSONObject().apply {
+                        put("name", tc.name)
+                        put("arguments", tc.arguments)
+                    })
+                })
+            }
+
+            allExtraMessages.add("assistant" to JSONObject().apply {
+                put("role", "assistant")
+                put("content", JSONObject.NULL)
+                put("tool_calls", assistantTcArray)
+                if (reasoningContent != null) {
+                    put("reasoning_content", reasoningContent)
+                }
+            }.toString())
+
+            for ((i, tc) in toolCalls.withIndex()) {
+                allExtraMessages.add("tool" to JSONObject().apply {
+                    put("role", "tool")
+                    put("tool_call_id", tc.id)
+                    put("content", results[i])
+                }.toString())
+            }
+
+            AppLogger.d(TAG, "Tool loop iteration $iteration: ${toolCalls.size} tools executed")
+            response = sendChat(
+                userId, message, personaName, personaPrompt,
+                emotion, action, memories, "", false,
+                systemContext, currentHistory, tools, allExtraMessages
+            )
+
+            if (iteration == maxIterations && response?.toolCalls?.isNotEmpty() == true) {
+                return ChatResponse("嗯...工具调用太多了，让我想想怎么回答你比较好～", Emotion.NEUTRAL, Action.IDLE)
+            }
+        }
+
+        return response
+    }
+
     private fun parseOpenAIResponse(responseJson: String): ChatResponse? {
         val json = JSONObject(responseJson)
         val choices = json.optJSONArray("choices")
@@ -160,16 +289,36 @@ class ApiClient(
             val message = choices.getJSONObject(0).optJSONObject("message")
             val fullText = message?.optString("content", "") ?: ""
 
+            val toolCalls = mutableListOf<ToolCall>()
+            val tcArray = message?.optJSONArray("tool_calls")
+            if (tcArray != null) {
+                for (i in 0 until tcArray.length()) {
+                    val tc = tcArray.getJSONObject(i)
+                    val func = tc.optJSONObject("function")
+                    if (func != null) {
+                        toolCalls.add(ToolCall(
+                            id = tc.optString("id", "call_$i"),
+                            name = func.optString("name", ""),
+                            arguments = func.optString("arguments", "{}")
+                        ))
+                    }
+                }
+            }
+
+            val reasoningContent = message?.optString("reasoning_content", "")?.takeIf { it.isNotBlank() }
+
             val (cleanText, extractedEmotion, extractedAction) = extractEmotionAction(fullText)
 
             return ChatResponse(
                 text = cleanText,
                 emotion = extractedEmotion,
                 action = extractedAction,
-                audioUrl = null
+                audioUrl = null,
+                toolCalls = toolCalls,
+                reasoningContent = reasoningContent
             )
         }
-        Log.e(TAG, "parseOpenAIResponse: no choices in response")
+        AppLogger.e(TAG, "parseOpenAIResponse: no choices in response")
         return null
     }
 
@@ -194,6 +343,63 @@ class ApiClient(
         }
 
         return Triple(cleanText, emotion, action)
+    }
+
+    private fun buildToolsJson(tools: List<ToolDefinition>): JSONArray {
+        val arr = JSONArray()
+        for (tool in tools) {
+            arr.put(JSONObject().apply {
+                put("type", "function")
+                put("function", JSONObject().apply {
+                    put("name", tool.name)
+                    put("description", tool.description)
+                    put("parameters", mapToJson(tool.parameters))
+                })
+            })
+        }
+        return arr
+    }
+
+    private fun mapToJson(map: Map<String, Any>): JSONObject {
+        val obj = JSONObject()
+        for ((key, value) in map) {
+            when (value) {
+                is Map<*, *> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    obj.put(key, mapToJson(value as Map<String, Any>))
+                }
+                is List<*> -> obj.put(key, listToJson(value))
+                is String -> obj.put(key, value)
+                is Int -> obj.put(key, value)
+                is Long -> obj.put(key, value)
+                is Double -> obj.put(key, value)
+                is Float -> obj.put(key, value.toDouble())
+                is Boolean -> obj.put(key, value)
+                else -> obj.put(key, value.toString())
+            }
+        }
+        return obj
+    }
+
+    private fun listToJson(list: List<*>): JSONArray {
+        val arr = JSONArray()
+        for (item in list) {
+            when (item) {
+                is Map<*, *> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    arr.put(mapToJson(item as Map<String, Any>))
+                }
+                is List<*> -> arr.put(listToJson(item))
+                is String -> arr.put(item)
+                is Int -> arr.put(item)
+                is Long -> arr.put(item)
+                is Double -> arr.put(item)
+                is Float -> arr.put(item.toDouble())
+                is Boolean -> arr.put(item)
+                else -> arr.put(item.toString())
+            }
+        }
+        return arr
     }
 
     private fun getFallbackResponse(personaName: String): ChatResponse {
@@ -323,18 +529,18 @@ class ApiClient(
             if (!apiKey.isNullOrEmpty()) {
                 requestBuilder.header("Authorization", "Bearer $apiKey")
             }
-            Log.d(TAG, "sendProactiveChat: POST $chatApiUrl model=$useModel")
+            AppLogger.d(TAG, "sendProactiveChat: POST $chatApiUrl model=$useModel")
             client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errBody = response.body?.string()?.take(200) ?: ""
-                    Log.e(TAG, "sendProactiveChat failed: HTTP ${response.code} body=$errBody")
+                    AppLogger.e(TAG, "sendProactiveChat failed: HTTP ${response.code} body=$errBody")
                     return ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = "AI主动聊天失败(HTTP ${response.code})")
                 }
                 val bodyStr = response.body?.string() ?: "{}"
                 parseOpenAIResponse(bodyStr)
             }
         } catch (e: Exception) {
-            Log.d(TAG, "sendProactiveChat error: ${e.message}")
+            AppLogger.d(TAG, "sendProactiveChat error: ${e.message}")
             null
         }
     }
@@ -398,7 +604,7 @@ class ApiClient(
                 } else emptyList()
             }
         } catch (e: Exception) {
-            android.util.Log.e("ApiClient", "scoreMemorableMoments: ${e.message}")
+            AppLogger.e(TAG, "scoreMemorableMoments: ${e.message}")
             emptyList()
         }
     }
@@ -502,7 +708,7 @@ class ApiClient(
                 } else null
             }
         } catch (e: Exception) {
-            Log.e("ApiClient", "generateDiaryContent failed: ${e.message}")
+            AppLogger.e(TAG, "generateDiaryContent failed: ${e.message}")
             null
         }
     }
@@ -566,7 +772,7 @@ class ApiClient(
                 parseOpenAIResponse(bodyStr)
             }
         } catch (e: Exception) {
-            Log.e("ApiClient", "generateNagContent failed: ${e.message}")
+            AppLogger.e(TAG, "generateNagContent failed: ${e.message}")
             null
         }
     }
@@ -624,7 +830,7 @@ class ApiClient(
             }
             client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.e("ApiClient", "analyzeAutoOperation HTTP ${response.code}")
+                    AppLogger.e(TAG, "analyzeAutoOperation HTTP ${response.code}")
                     return@use "[]"
                 }
                 val bodyStr = response.body?.string() ?: return@use "[]"
@@ -635,8 +841,94 @@ class ApiClient(
                 } else "[]"
             }
         } catch (e: Exception) {
-            Log.e("ApiClient", "analyzeAutoOperation failed: ${e.message}")
+            AppLogger.e(TAG, "analyzeAutoOperation failed: ${e.message}")
             "[]"
+        }
+    }
+
+    fun sendSimplePrompt(systemPrompt: String, userContent: String): ChatResponse? {
+        return try {
+            val messagesArray = JSONArray()
+            messagesArray.put(JSONObject().apply {
+                put("role", "system")
+                put("content", systemPrompt)
+            })
+            messagesArray.put(JSONObject().apply {
+                put("role", "user")
+                put("content", userContent)
+            })
+
+            val requestBody = JSONObject().apply {
+                put("model", modelName)
+                put("messages", messagesArray)
+                put("temperature", 0.3)
+                put("max_tokens", 500)
+                put("top_p", 0.9)
+            }
+            val body = requestBody.toString().toRequestBody(jsonMediaType)
+            val request = Request.Builder().url(chatApiUrl)
+                .header("Authorization", "Bearer $apiKey")
+                .header("Content-Type", "application/json")
+                .post(body)
+                .build()
+
+            val tempClient = OkHttpClient.Builder()
+                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+
+            AppLogger.d(TAG, "sendSimplePrompt: calling API")
+            tempClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val errBody = response.body?.string()?.take(300) ?: ""
+                    AppLogger.e(TAG, "sendSimplePrompt failed: HTTP ${response.code} body=$errBody")
+                    return null
+                }
+                val text = response.body?.string() ?: ""
+                AppLogger.d(TAG, "sendSimplePrompt: response ${text.length} chars")
+                parseOpenAIResponse(text)
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "sendSimplePrompt error: ${e.message}", e)
+            null
+        }
+    }
+
+    fun getEmbedding(text: String, embeddingModel: String = "text-embedding-3-small"): FloatArray? {
+        return try {
+            val baseUrl = chatApiUrl.removeSuffix("/chat/completions").removeSuffix("/")
+            val embeddingUrl = "$baseUrl/embeddings"
+
+            val requestBody = JSONObject().apply {
+                put("model", embeddingModel)
+                put("input", text)
+            }
+            val body = requestBody.toString().toRequestBody(jsonMediaType)
+            val request = Request.Builder().url(embeddingUrl)
+                .header("Authorization", "Bearer $apiKey")
+                .header("Content-Type", "application/json")
+                .post(body)
+                .build()
+
+            val tempClient = OkHttpClient.Builder()
+                .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+
+            tempClient.newCall(request).execute().use { response ->
+                val respText = response.body?.string() ?: return null
+                val obj = JSONObject(respText)
+                val dataArr = obj.optJSONArray("data") ?: return null
+                if (dataArr.length() == 0) return null
+                val embeddingArr = dataArr.getJSONObject(0).optJSONArray("embedding") ?: return null
+                val vec = FloatArray(embeddingArr.length())
+                for (i in 0 until embeddingArr.length()) {
+                    vec[i] = embeddingArr.getDouble(i).toFloat()
+                }
+                vec
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 }

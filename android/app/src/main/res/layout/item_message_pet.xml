@@ -56,6 +56,18 @@
                     android:textSize="14sp"
                     android:lineSpacingExtra="2dp" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_reaction_badge"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="-4dp"
+                android:layout_marginBottom="-10dp"
+                android:gravity="center"
+                android:textSize="12sp"
+                android:background="@drawable/bg_reaction_badge"
+                android:visibility="gone" />
         </FrameLayout>
 
         <LinearLayout

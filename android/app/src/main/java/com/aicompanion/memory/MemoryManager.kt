@@ -56,6 +56,24 @@ class MemoryManager(context: Context) {
 
     fun getLocalMemories(): List<MemoryFact> = localMemories.toList()
 
+    fun addMemoryFact(content: String, category: String = "") {
+        val trimmed = content.trim()
+        if (trimmed.isBlank()) return
+        val exists = localMemories.any { it.fact.equals(trimmed, ignoreCase = true) }
+        if (exists) return
+        localMemories.add(0, MemoryFact(
+            id = "mem_${System.currentTimeMillis()}_${trimmed.hashCode()}",
+            userId = "local",
+            fact = trimmed,
+            timestamp = System.currentTimeMillis(),
+            category = category
+        ))
+        if (localMemories.size > 200) {
+            localMemories = localMemories.take(200).toMutableList()
+        }
+        saveLocalCache()
+    }
+
     fun getLocalMemoriesByCategory(category: String): List<MemoryFact> {
         if (category.isEmpty()) return localMemories.toList()
         return localMemories.filter { it.category.equals(category, ignoreCase = true) }

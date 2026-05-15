@@ -57,6 +57,12 @@ object ApiProviderPreset {
             modelDefault = "moonshot-v1-8k",
         ),
         ApiProvider(
+            name = "n1n",
+            icon = "🟡",
+            chatUrl = "https://api.n1n.ai/v1/chat/completions",
+            modelDefault = "gpt-4o-mini",
+        ),
+        ApiProvider(
             name = "自定义",
             icon = "⚙️",
             chatUrl = "",

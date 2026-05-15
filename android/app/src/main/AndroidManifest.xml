@@ -75,6 +75,13 @@
             android:parentActivityName=".ui.MainActivity" />
 
         <activity
+            android:name=".ui.AlarmActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
+
+        <activity
             android:name=".ui.ProfileActivity"
             android:label="AI 档案"
             android:parentActivityName=".ui.MainActivity" />
@@ -82,6 +89,11 @@
         <activity
             android:name=".ui.AchievementActivity"
             android:label="成就殿堂"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.MemoryPoolActivity"
+            android:label="记忆池"
             android:parentActivityName=".ui.MainActivity" />
 
         <activity

@@ -190,7 +190,21 @@ data class ChatResponse(
     val emotion: Emotion,
     val action: Action,
     val audioUrl: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val toolCalls: List<ToolCall> = emptyList(),
+    val reasoningContent: String? = null
+)
+
+data class ToolDefinition(
+    val name: String,
+    val description: String,
+    val parameters: Map<String, Any>
+)
+
+data class ToolCall(
+    val id: String,
+    val name: String,
+    val arguments: String
 )
 
 data class MemoryFact(

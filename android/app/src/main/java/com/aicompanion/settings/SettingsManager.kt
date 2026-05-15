@@ -82,6 +82,33 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("tts_model", "tts-1") ?: "tts-1"
         set(value) { prefs.edit().putString("tts_model", value).apply() }
 
+    var searchProvider: String
+        get() = prefs.getString("search_provider", "duckduckgo") ?: "duckduckgo"
+        set(value) { prefs.edit().putString("search_provider", value).apply() }
+
+    var searchApiUrl: String
+        get() = prefs.getString("search_api_url", "") ?: ""
+        set(value) { prefs.edit().putString("search_api_url", value).apply() }
+
+    var searchApiKey: String
+        get() = prefs.getString("search_api_key", "") ?: ""
+        set(value) { prefs.edit().putString("search_api_key", value).apply() }
+
+    var searchEngineId: String
+        get() = prefs.getString("search_engine_id", "") ?: ""
+        set(value) { prefs.edit().putString("search_engine_id", value).apply() }
+
+    var searchEnabled: Boolean
+        get() = prefs.getBoolean("search_enabled", true)
+        set(value) { prefs.edit().putBoolean("search_enabled", value).apply() }
+
+    var live2dEnabled: Boolean
+        get() = prefs.getBoolean("live2d_enabled", true)
+        set(value) {
+            prefs.edit().putBoolean("live2d_enabled", value).apply()
+            onLive2DEnabledChanged?.invoke(value)
+        }
+
     // 开机自启动（默认开启）
     var autoStart: Boolean
         get() = prefs.getBoolean("auto_start", true)
@@ -210,6 +237,7 @@ class SettingsManager(context: Context) {
 
     var onScreenRecognitionChanged: ((Boolean) -> Unit)? = null
     var onVoiceRecognitionChanged: ((Boolean) -> Unit)? = null
+    var onLive2DEnabledChanged: ((Boolean) -> Unit)? = null
     var onBatteryLow: (() -> Unit)? = null
 
     fun shouldTriggerNag(): Boolean {

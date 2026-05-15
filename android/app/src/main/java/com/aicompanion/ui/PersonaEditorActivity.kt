@@ -4,6 +4,7 @@ package com.aicompanion.ui
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
+import android.view.View
 import android.widget.*
 import com.aicompanion.R
 import com.aicompanion.settings.SettingsManager
@@ -22,6 +23,9 @@ class PersonaEditorActivity : Activity() {
     private var etWorldRelationship: EditText? = null
     private var etWorldRules: EditText? = null
     private var etUserNickname: EditText? = null
+    private var tvDiscoveredLabel: TextView? = null
+    private var containerDiscovered: LinearLayout? = null
+    private var nicknameManager: NicknameManager? = null
 
     private val defaultPersona = mapOf(
         "persona_name" to "星尘",
@@ -41,8 +45,10 @@ class PersonaEditorActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_persona_editor)
 
+        nicknameManager = NicknameManager(this)
         initViews()
         loadPersona()
+        loadDiscoveredNicknames()
         setupClickListeners()
     }
 
@@ -59,6 +65,8 @@ class PersonaEditorActivity : Activity() {
         etWorldRelationship = findViewById(R.id.et_world_relationship)
         etWorldRules = findViewById(R.id.et_world_rules)
         etUserNickname = findViewById(R.id.et_user_nickname)
+        tvDiscoveredLabel = findViewById(R.id.tv_discovered_label)
+        containerDiscovered = findViewById(R.id.container_discovered_nicknames)
     }
 
     private fun loadPersona() {
@@ -114,10 +122,13 @@ class PersonaEditorActivity : Activity() {
             apply()
         }
 
+        val nickname = etUserNickname?.text?.toString() ?: ""
+        nicknameManager?.setManualNickname(nickname)
+
         val appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         appPrefs.edit().apply {
             putString("ai_name", etPersonaName?.text?.toString() ?: "星尘")
-            putString("user_call_name", etUserNickname?.text?.toString() ?: "")
+            putString("user_call_name", nickname)
             val prompt = buildString {
                 val name = etPersonaName?.text?.toString() ?: "星尘"
                 val desc = etPersonaDesc?.text?.toString() ?: ""
@@ -129,7 +140,6 @@ class PersonaEditorActivity : Activity() {
                 val worldSetting = etWorldSetting?.text?.toString() ?: ""
                 val worldRelationship = etWorldRelationship?.text?.toString() ?: ""
                 val worldRules = etWorldRules?.text?.toString() ?: ""
-                val nickname = etUserNickname?.text?.toString() ?: ""
 
                 append("你是「$name」。")
                 if (desc.isNotBlank()) append("\n简介：$desc")
@@ -145,6 +155,52 @@ class PersonaEditorActivity : Activity() {
             }
             putString("ai_prompt", prompt.toString())
             apply()
+        }
+    }
+
+    private fun loadDiscoveredNicknames() {
+        val nm = nicknameManager ?: return
+        if (nm.isManualSet()) {
+            tvDiscoveredLabel?.visibility = View.GONE
+            containerDiscovered?.visibility = View.GONE
+            return
+        }
+        val entries = nm.getAllDiscovered()
+        if (entries.isEmpty()) {
+            tvDiscoveredLabel?.visibility = View.GONE
+            containerDiscovered?.visibility = View.GONE
+            return
+        }
+        tvDiscoveredLabel?.visibility = View.VISIBLE
+        containerDiscovered?.visibility = View.VISIBLE
+        containerDiscovered?.removeAllViews()
+
+        val seen = mutableSetOf<String>()
+        entries.forEach { entry ->
+            if (entry.nickname in seen) return@forEach
+            seen.add(entry.nickname)
+
+            val chip = com.google.android.material.chip.Chip(this).apply {
+                text = entry.nickname
+                isCloseIconVisible = true
+                closeIconContentDescription = "删除称呼"
+                setTextColor(0xFFe0e0f0.toInt())
+                setChipBackgroundColor(android.content.res.ColorStateList.valueOf(0xFF3a3a5a.toInt()))
+                setChipStrokeColor(android.content.res.ColorStateList.valueOf(0xFFc4b5fd.toInt()))
+                chipStrokeWidth = 1f
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 0, 8, 8) }
+                setOnCloseIconClickListener {
+                    nm.removeDiscovered(entry.nickname)
+                    loadDiscoveredNicknames()
+                }
+                setOnClickListener {
+                    etUserNickname?.setText(entry.nickname)
+                }
+            }
+            containerDiscovered?.addView(chip)
         }
     }
 
