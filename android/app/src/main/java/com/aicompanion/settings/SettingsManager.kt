@@ -3,6 +3,9 @@ package com.aicompanion.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.aicompanion.settings.ScheduledWake
 
 class SettingsManager(context: Context) {
@@ -11,6 +14,24 @@ class SettingsManager(context: Context) {
         "companion_settings",
         Context.MODE_PRIVATE
     )
+
+    private val securePrefs: SharedPreferences by lazy {
+        try {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            EncryptedSharedPreferences.create(
+                context,
+                "companion_secure_prefs",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            Log.w("SettingsManager", "Failed to create EncryptedSharedPreferences, falling back to regular prefs", e)
+            context.getSharedPreferences("companion_secure_prefs", Context.MODE_PRIVATE)
+        }
+    }
 
     var screenRecognitionEnabled: Boolean
         get() = prefs.getBoolean("screen_recognition", false)
@@ -51,8 +72,8 @@ class SettingsManager(context: Context) {
         set(value) { prefs.edit().putString("chat_api_url", value).apply() }
 
     var chatApiKey: String
-        get() = prefs.getString("chat_api_key", "") ?: ""
-        set(value) { prefs.edit().putString("chat_api_key", value).apply() }
+        get() = securePrefs.getString("chat_api_key", "") ?: ""
+        set(value) { securePrefs.edit().putString("chat_api_key", value).apply() }
 
     var chatModel: String
         get() = prefs.getString("chat_model", "gpt-4o-mini") ?: "gpt-4o-mini"
@@ -91,8 +112,8 @@ class SettingsManager(context: Context) {
         set(value) { prefs.edit().putString("search_api_url", value).apply() }
 
     var searchApiKey: String
-        get() = prefs.getString("search_api_key", "") ?: ""
-        set(value) { prefs.edit().putString("search_api_key", value).apply() }
+        get() = securePrefs.getString("search_api_key", "") ?: ""
+        set(value) { securePrefs.edit().putString("search_api_key", value).apply() }
 
     var searchEngineId: String
         get() = prefs.getString("search_engine_id", "") ?: ""

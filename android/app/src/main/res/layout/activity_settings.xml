@@ -137,6 +137,72 @@
                     android:background="#2a2a4a"
                     android:layout_marginVertical="12dp" />
 
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="聊天气泡与头像框"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#c4b5fd"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_bubble_skin"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="💬 气泡皮肤"
+                        android:textSize="12sp"
+                        app:cornerRadius="20dp"
+                        app:strokeColor="#667eea"
+                        app:strokeWidth="1dp"
+                        android:textColor="#aabbdd"
+                        app:backgroundTint="@android:color/transparent"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_ai_frame"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="🤖 AI头像框"
+                        android:textSize="12sp"
+                        app:cornerRadius="20dp"
+                        app:strokeColor="#667eea"
+                        app:strokeWidth="1dp"
+                        android:textColor="#aabbdd"
+                        app:backgroundTint="@android:color/transparent"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_user_frame"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="6dp"
+                    android:text="👤 我的头像框"
+                    android:textSize="12sp"
+                    app:cornerRadius="20dp"
+                    app:strokeColor="#667eea"
+                    app:strokeWidth="1dp"
+                    android:textColor="#aabbdd"
+                    app:backgroundTint="@android:color/transparent"
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#2a2a4a"
+                    android:layout_marginVertical="12dp" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_start_overlay"
                     android:layout_width="match_parent"
@@ -891,6 +957,63 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="  安全与隐私"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#8899dd"
+            android:letterSpacing="0.05"
+            android:layout_marginBottom="10dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            app:cardBackgroundColor="#1a1a30"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="#2a2a4a">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🛡️ 安全模式"
+                        android:textSize="15sp"
+                        android:textColor="#ffffff" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="过滤色情、暴力、非法内容"
+                        android:textSize="12sp"
+                        android:textColor="#557788"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+
+                <Switch
+                    android:id="@+id/switch_safety_mode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="  AI 功能与记忆"
             android:textSize="14sp"
             android:textStyle="bold"
@@ -947,6 +1070,17 @@
                     android:layout_marginTop="8dp"
                     app:cornerRadius="22dp"
                     app:backgroundTint="#cc3344"
+                    style="@style/Widget.Material3.Button" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_clear_chat_history"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:text="💬 清空聊天记录"
+                    android:textSize="14sp"
+                    android:layout_marginTop="8dp"
+                    app:cornerRadius="22dp"
+                    app:backgroundTint="#cc6633"
                     style="@style/Widget.Material3.Button" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

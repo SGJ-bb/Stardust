@@ -131,6 +131,30 @@
                     android:visibility="gone" />
 
                 <ImageButton
+                    android:id="@+id/btn_moments"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/bg_icon_button"
+                    android:src="@drawable/ic_diary"
+                    android:contentDescription="动态"
+                    android:scaleType="centerInside"
+                    android:padding="7dp"
+                    android:layout_marginEnd="4dp"
+                    app:tint="#8899bb" />
+
+                <ImageButton
+                    android:id="@+id/btn_diary"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@drawable/bg_icon_button"
+                    android:src="@drawable/ic_diary"
+                    android:contentDescription="日记"
+                    android:scaleType="centerInside"
+                    android:padding="7dp"
+                    android:layout_marginEnd="4dp"
+                    app:tint="#8899bb" />
+
+                <ImageButton
                     android:id="@+id/btn_settings"
                     android:layout_width="36dp"
                     android:layout_height="36dp"
@@ -270,16 +294,16 @@
             </com.google.android.material.textfield.TextInputLayout>
 
             <ImageButton
-                android:id="@+id/btn_mood"
+                android:id="@+id/btn_sticker_chat"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:src="@drawable/ic_mood"
+                android:src="@drawable/ic_sticker"
                 android:scaleType="centerInside"
                 android:padding="8dp"
-                android:layout_marginStart="6dp"
+                android:layout_marginStart="4dp"
                 android:background="@drawable/bg_icon_button"
                 app:tint="#c4b5fd"
-                android:contentDescription="心情" />
+                android:contentDescription="表情包" />
 
             <ImageButton
                 android:id="@+id/btn_voice"

@@ -1,4 +1,4 @@
-/** 后台服务: 系统监控启动(电量低通知)/每日日记自动生成检查/前台通知保活 */
+/** 后台服务: 每日日记自动生成检查/前台通知保活 */
 package com.aicompanion.services
 
 import android.app.Notification
@@ -18,7 +18,6 @@ class BackgroundService : android.app.Service() {
 
     private var settingsManager: SettingsManager? = null
     private var diaryManager: DiaryManager? = null
-    private var systemMonitor: com.aicompanion.services.SystemMonitor? = null
     private var lastDiaryCheckDay = ""
 
     companion object {
@@ -32,17 +31,7 @@ class BackgroundService : android.app.Service() {
         super.onCreate()
         try {
             settingsManager = SettingsManager(this)
-            diaryManager = DiaryManager(this)
-            systemMonitor = com.aicompanion.services.SystemMonitor(this).apply {
-                startMonitoring()
-                onBatteryLow = { percentage ->
-                    Log.d(TAG, "Battery low in background: $percentage%")
-                    val sm = settingsManager
-                    if (sm?.chatApiUrl?.isNotBlank() == true) {
-                        showBatteryNotification(percentage)
-                    }
-                }
-            }
+            diaryManager = DiaryManager(this, getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default") ?: "default")
             Log.d(TAG, "Background service created")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create background service: ${e.message}", e)
@@ -72,10 +61,8 @@ class BackgroundService : android.app.Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        systemMonitor?.stopMonitoring()
         settingsManager = null
         diaryManager = null
-        systemMonitor = null
         Log.d(TAG, "Background service destroyed")
     }
 
@@ -91,32 +78,6 @@ class BackgroundService : android.app.Service() {
                 dm.updateOrGenerateDailyDiary(emptyList(), 50)
             }
         }
-    }
-
-    private fun showBatteryNotification(percentage: Int) {
-        val openIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, openIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, "system_alert_channel")
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(this)
-        }
-        val notification = builder
-            .setContentTitle("🔋 电量提醒")
-            .setContentText("主人，手机只剩 $percentage% 的电量了，记得充电哦~")
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .setPriority(Notification.PRIORITY_HIGH)
-            .build()
-        val manager = getSystemService(NotificationManager::class.java)
-        manager?.notify(2002, notification)
     }
 
     private fun createNotificationChannel() {

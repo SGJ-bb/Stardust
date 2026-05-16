@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "model": "text-embedding-3-small",
+  "dim": 1536,
+  "count": 14,
+  "stickers": [
+    {"id": "builtin_偷听", "filename": "偷听.jpg", "name": "偷听", "emotion": "好奇", "tags": ["偷听", "八卦", "好奇", "窥探"], "description": "偷偷听别人说话，好奇心满满", "owner": "builtin"},
+    {"id": "builtin_偷瞄", "filename": "偷瞄.jpg", "name": "偷瞄", "emotion": "害羞", "tags": ["偷瞄", "害羞", "偷偷看", "腼腆"], "description": "偷偷瞄一眼，有点害羞", "owner": "builtin"},
+    {"id": "builtin_卖萌揣手手", "filename": "卖萌揣手手.jpg", "name": "卖萌揣手手", "emotion": "可爱", "tags": ["卖萌", "揣手", "可爱", "撒娇", "乖巧"], "description": "揣着小手卖萌，超级可爱", "owner": "builtin"},
+    {"id": "builtin_吐槽", "filename": "吐槽.jpg", "name": "吐槽", "emotion": "无语", "tags": ["吐槽", "无语", "嫌弃", "不满", "抱怨"], "description": "忍不住吐槽，表示不满", "owner": "builtin"},
+    {"id": "builtin_呆滞", "filename": "呆滞.jpg", "name": "呆滞", "emotion": "发呆", "tags": ["呆滞", "发呆", "放空", "宕机", "懵"], "description": "大脑空白，呆呆地发愣", "owner": "builtin"},
+    {"id": "builtin_哭泣", "filename": "哭泣.jpg", "name": "哭泣", "emotion": "难过", "tags": ["哭泣", "难过", "伤心", "委屈", "哭"], "description": "伤心地哭泣，需要安慰", "owner": "builtin"},
+    {"id": "builtin_宕机", "filename": "宕机.jpg", "name": "宕机", "emotion": "崩溃", "tags": ["宕机", "崩溃", "死机", "卡住", "当机"], "description": "大脑宕机了，完全无法思考", "owner": "builtin"},
+    {"id": "builtin_慌张", "filename": "慌张.jpg", "name": "慌张", "emotion": "慌张", "tags": ["慌张", "紧张", "害怕", "慌乱", "着急"], "description": "慌慌张张，不知所措", "owner": "builtin"},
+    {"id": "builtin_捂嘴笑", "filename": "捂嘴笑.png", "name": "捂嘴笑", "emotion": "偷笑", "tags": ["捂嘴笑", "偷笑", "坏笑", "窃喜", "开心"], "description": "捂着嘴偷笑，心里美滋滋", "owner": "builtin"},
+    {"id": "builtin_调侃", "filename": "调侃.jpg", "name": "调侃", "emotion": "调侃", "tags": ["调侃", "戏弄", "打趣", "开玩笑", "逗"], "description": "调侃别人，带着玩味的笑", "owner": "builtin"},
+    {"id": "builtin_邪恶的笑", "filename": "邪恶的笑.jpg", "name": "邪恶的笑", "emotion": "坏笑", "tags": ["邪恶", "坏笑", "阴谋", "不怀好意", "腹黑"], "description": "邪恶地笑，心里打着坏主意", "owner": "builtin"},
+    {"id": "builtin_风趣调侃", "filename": "风趣调侃.jpg", "name": "风趣调侃", "emotion": "幽默", "tags": ["风趣", "幽默", "调侃", "机智", "搞笑"], "description": "风趣地调侃，幽默感十足", "owner": "builtin"},
+    {"id": "builtin_骂别人是猪", "filename": "骂别人是猪.jpg", "name": "骂别人是猪", "emotion": "嫌弃", "tags": ["骂人", "嫌弃", "吐槽", "笨蛋", "猪"], "description": "骂别人是猪，嫌弃的样子", "owner": "builtin"},
+    {"id": "builtin_鬼迷日眼的笑", "filename": "鬼迷日眼的笑.jpg", "name": "鬼迷日眼的笑", "emotion": "狡黠", "tags": ["鬼迷日眼", "狡黠", "贼笑", "诡异", "不怀好意"], "description": "鬼迷日眼地笑，表情诡异又好笑", "owner": "builtin"}
+  ]
+}

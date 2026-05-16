@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    app:cardCornerRadius="18dp"
+    app:cardElevation="0dp"
+    app:cardBackgroundColor="#1a1a38"
+    app:contentPadding="0dp"
+    app:strokeWidth="0.5dp"
+    app:strokeColor="#33c4b5fd">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="6dp">
+
+            <View
+                android:id="@+id/v_author_dot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="@drawable/bg_dot_ai" />
+
+            <TextView
+                android:id="@+id/tv_moment_author"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="15sp"
+                android:textColor="#e0e0f0"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginStart="10dp" />
+
+            <TextView
+                android:id="@+id/tv_moment_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="#667788" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_moment_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14.5sp"
+            android:textColor="#c8c8e0"
+            android:layout_marginTop="6dp"
+            android:lineSpacingExtra="5dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp" />
+
+        <ImageView
+            android:id="@+id/iv_moment_image"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:scaleType="centerCrop"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:contentDescription="图片"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/iv_moment_sticker"
+            android:layout_width="130dp"
+            android:layout_height="130dp"
+            android:scaleType="centerCrop"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="16dp"
+            android:contentDescription="表情包"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/comments_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="10dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/bg_comments"
+            android:padding="10dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:background="#1a2a3a"
+            android:layout_marginTop="10dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:id="@+id/btn_comment"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="💬 评论"
+                android:textSize="13sp"
+                android:textColor="#8899bb"
+                android:gravity="center_vertical" />
+
+            <TextView
+                android:id="@+id/btn_delete"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:text="🗑 删除"
+                android:textSize="13sp"
+                android:textColor="#556677"
+                android:gravity="center_vertical"
+                android:paddingStart="12dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

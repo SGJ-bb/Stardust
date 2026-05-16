@@ -9,10 +9,10 @@ import com.aicompanion.network.ApiClient
 import org.json.JSONArray
 import org.json.JSONObject
 
-class MemoryManager(context: Context) {
+class MemoryManager(private val context: Context, private val personaId: String = "default") {
 
     private val apiClient = ApiClient("")
-    private val localPrefs: SharedPreferences = context.getSharedPreferences("local_memory", Context.MODE_PRIVATE)
+    private val localPrefs: SharedPreferences = context.getSharedPreferences("local_memory_$personaId", Context.MODE_PRIVATE)
     private var localMemories: MutableList<MemoryFact> = mutableListOf()
 
     init {

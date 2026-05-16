@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Bitmap.Config
 import android.graphics.BitmapFactory
-import android.os.Environment
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
@@ -225,8 +224,8 @@ class Live2DWebView @JvmOverloads constructor(
                 domStorageEnabled = true
                 allowFileAccess = true
                 allowContentAccess = true
-                allowUniversalAccessFromFileURLs = true
-                allowFileAccessFromFileURLs = true
+                allowUniversalAccessFromFileURLs = false
+                allowFileAccessFromFileURLs = false
                 mediaPlaybackRequiresUserGesture = false
                 useWideViewPort = true
                 loadWithOverviewMode = true
@@ -806,16 +805,9 @@ class Live2DWebView @JvmOverloads constructor(
                                     fixedRefs.add("$texPath -> $newPath")
                                     textureFixed = true
                                 } else {
-                                    val recovered = recoverTextureFromSystem(texFile.name, modelDir)
-                                    if (recovered != null) {
-                                        validTextures.put(recovered)
-                                        fixedRefs.add("$texPath -> $recovered (recovered from system)")
-                                        textureFixed = true
-                                        addLog("Recovered texture from system: ${texFile.name} -> $recovered")
-                                    } else {
-                                        addLog("Missing texture removed: $texPath")
-                                        removedCount++
-                                    }
+                                    addLog("Missing texture: $texPath")
+                                    missingFiles.add(texPath)
+                                    removedCount++
                                 }
                             }
                         }
@@ -831,35 +823,24 @@ class Live2DWebView @JvmOverloads constructor(
                         }
                     }
                     if (validTextures.length() == 0) {
-                        addLog("ERROR: All textures are missing! Attempting full recovery...")
-                        val recoveredTexs = recoverAllTexturesFromSystem(modelDir)
-                        if (recoveredTexs.isNotEmpty()) {
-                            for (relPath in recoveredTexs) {
-                                validTextures.put(relPath)
+                        addLog("ERROR: All textures are missing! Creating placeholder")
+                        val placeholderFile = File(modelDir, "placeholder.png")
+                        if (!placeholderFile.exists()) {
+                            try {
+                                val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+                                bitmap.setPixel(0, 0, 0xFFFFFFFF.toInt())
+                                placeholderFile.outputStream().use { out ->
+                                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                }
+                                bitmap.recycle()
+                            } catch (e: Exception) {
+                                addLog("Failed to create placeholder: ${e.message}")
                             }
+                        }
+                        if (placeholderFile.exists()) {
+                            validTextures.put("placeholder.png")
                             fileRefs.put(texturesKey, validTextures)
                             needsSave = true
-                            addLog("Full recovery: found ${recoveredTexs.size} texture(s)")
-                        } else {
-                            addLog("ERROR: No textures found anywhere! Creating placeholder")
-                            val placeholderFile = File(modelDir, "placeholder.png")
-                            if (!placeholderFile.exists()) {
-                                try {
-                                    val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-                                    bitmap.setPixel(0, 0, 0xFFFFFFFF.toInt())
-                                    placeholderFile.outputStream().use { out ->
-                                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                                    }
-                                    bitmap.recycle()
-                                } catch (e: Exception) {
-                                    addLog("Failed to create placeholder: ${e.message}")
-                                }
-                            }
-                            if (placeholderFile.exists()) {
-                                validTextures.put("placeholder.png")
-                                fileRefs.put(texturesKey, validTextures)
-                                needsSave = true
-                            }
                         }
                     }
                 }
@@ -1109,129 +1090,12 @@ class Live2DWebView @JvmOverloads constructor(
         }
     }
 
-    private fun getSystemImageDirs(): List<File> {
-        val dirs = mutableListOf<File>()
-        val externalStorage = Environment.getExternalStorageDirectory()
-        listOf(
-            "Pictures", "DCIM", "Download", "Downloads",
-            "Pictures/QQ", "Pictures/WeChat", "Pictures/Screenshots",
-            "tencent/QQ_Images", "tencent/MicroMsg",
-            "Android/data/com.tencent.mobileqq/Tencent/MobileQQ",
-            "Android/data/com.tencent.mm/MicroMsg"
-        ).forEach { subPath ->
-            val dir = File(externalStorage, subPath)
-            if (dir.exists() && dir.isDirectory) dirs.add(dir)
-        }
-        context.getExternalFilesDirs(null).filterNotNull().forEach { dir ->
-            val parent = dir.parentFile?.parentFile
-            if (parent != null && parent.exists()) dirs.add(parent)
-        }
-        return dirs
-    }
-
-    private fun isValidTextureFile(file: File): Boolean {
-        if (file.length() < 1024) return false
-        try {
-            val header = ByteArray(8)
-            file.inputStream().use { it.read(header) }
-            val isPng = header[0] == 0x89.toByte() && header[1] == 0x50.toByte() && header[2] == 0x4E.toByte() && header[3] == 0x47.toByte()
-            val isJpg = header[0] == 0xFF.toByte() && header[1] == 0xD8.toByte()
-            val isWebp = header.size >= 4 && String(header, 0, 4) == "RIFF"
-            if (!isPng && !isJpg && !isWebp) return false
-        } catch (_: Exception) { return false }
-        try {
-            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(file.absolutePath, opts)
-            if (opts.outWidth <= 0 || opts.outHeight <= 0) return false
-            val isSquareish = Math.abs(opts.outWidth - opts.outHeight) <= opts.outWidth * 0.1
-            val isPowerOfTwo = (opts.outWidth and (opts.outWidth - 1)) == 0 && (opts.outHeight and (opts.outHeight - 1)) == 0
-            if (isSquareish && isPowerOfTwo) return true
-            if (isSquareish && opts.outWidth >= 256) return true
-            if (opts.outWidth >= 512 && opts.outHeight >= 512) return true
-        } catch (_: Exception) { return false }
-        return false
-    }
-
     private fun recoverTextureFromSystem(texFileName: String, modelDir: File): String? {
-        addLog("Searching system for texture: $texFileName")
-        val searchDirs = getSystemImageDirs()
-        for (searchDir in searchDirs) {
-            try {
-                val candidates = searchDir.walkTopDown()
-                    .filter { it.isFile && it.name.equals(texFileName, ignoreCase = true) }
-                    .toList()
-                for (candidate in candidates) {
-                    if (isValidTextureFile(candidate)) {
-                        addLog("Found valid texture in system: ${candidate.absolutePath}")
-                        val targetFile = File(modelDir, texFileName)
-                        try {
-                            targetFile.parentFile?.mkdirs()
-                            candidate.inputStream().use { input ->
-                                targetFile.outputStream().use { output ->
-                                    input.copyTo(output)
-                                }
-                            }
-                            addLog("Copied to model dir: $texFileName (${targetFile.length()}B)")
-                            return texFileName
-                        } catch (e: Exception) {
-                            addLog("Copy failed: ${e.message}")
-                        }
-                    } else {
-                        addLog("Found ${candidate.name} but not a valid texture, skipping")
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-        addLog("Texture not found in system: $texFileName")
         return null
     }
 
     private fun recoverAllTexturesFromSystem(modelDir: File): List<String> {
-        val recovered = mutableListOf<String>()
-        addLog("Full recovery: scanning system directories for model textures...")
-        val searchDirs = getSystemImageDirs()
-        val imageExts = listOf("png", "jpg", "jpeg", "webp")
-        for (searchDir in searchDirs) {
-            try {
-                val candidates = searchDir.walkTopDown()
-                    .filter { it.isFile && it.extension.lowercase() in imageExts }
-                    .filter { it.length() > 10000 }
-                    .toList()
-                for (candidate in candidates) {
-                    val name = candidate.name.lowercase()
-                    val isLikelyTexture = name.contains("texture") || name.contains("tex") ||
-                        name.matches(Regex(".*texture_?\\d+.*")) ||
-                        name.matches(Regex(".*tex_?\\d+.*"))
-                    if (isLikelyTexture && isValidTextureFile(candidate)) {
-                        try {
-                            val targetFile = File(modelDir, candidate.name)
-                            if (!targetFile.exists()) {
-                                candidate.inputStream().use { input ->
-                                    targetFile.outputStream().use { output ->
-                                        input.copyTo(output)
-                                    }
-                                }
-                                recovered.add(candidate.name)
-                                addLog("Full recovery: copied ${candidate.name} from ${candidate.parentFile?.name}")
-                            }
-                        } catch (_: Exception) {}
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-        if (recovered.isEmpty()) {
-            val modelDirImages = modelDir.walkTopDown()
-                .filter { it.isFile && it.extension.lowercase() in imageExts }
-                .toList()
-            for (img in modelDirImages) {
-                val relPath = img.relativeTo(modelDir).path.replace("\\", "/")
-                if (relPath !in recovered) {
-                    recovered.add(relPath)
-                    addLog("Full recovery: using existing file $relPath")
-                }
-            }
-        }
-        return recovered
+        return emptyList()
     }
 
     private fun findModelJsonRecursive(dir: File): File? {

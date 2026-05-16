@@ -30,7 +30,8 @@ class AchievementActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_achievement)
 
-        achievementManager = AchievementManager(this)
+        achievementManager = AchievementManager(this, getSharedPreferences("app_prefs", MODE_PRIVATE)
+            .getString("active_persona_id", "default") ?: "default")
         initViews()
         setupListeners()
         loadAchievements()

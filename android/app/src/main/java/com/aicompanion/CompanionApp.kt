@@ -4,10 +4,12 @@ package com.aicompanion
 import android.app.Application
 import android.util.Log
 import android.widget.Toast
+import com.aicompanion.AppContainer
 
 class CompanionApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        AppContainer.initialize(this)
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             Log.e("CompanionApp", "FATAL on ${thread.name}: ${throwable.javaClass.simpleName}: ${throwable.message}", throwable)
             try {

@@ -32,9 +32,9 @@ data class ScoredMemory(
     }
 }
 
-class MemorableMomentsManager(context: Context) {
+class MemorableMomentsManager(context: Context, private val personaId: String = "default") {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences("memorable_moments", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.getSharedPreferences("memorable_moments_$personaId", Context.MODE_PRIVATE)
     private val moments: MutableList<ScoredMemory> = mutableListOf()
 
     init {

@@ -23,7 +23,9 @@ import com.aicompanion.diary.DiaryManager
 import com.aicompanion.gamify.AchievementManager
 import com.aicompanion.memory.MemorableMomentsManager
 import com.aicompanion.memory.ScoredMemory
+import com.aicompanion.persona.PersonaManager
 import java.io.File
+import java.io.FileOutputStream
 
 class ProfileActivity : AppCompatActivity() {
 
@@ -32,6 +34,8 @@ class ProfileActivity : AppCompatActivity() {
         private const val REQUEST_USER_AVATAR = 201
     }
 
+    private var personaId: String = "default"
+    private lateinit var personaManager: PersonaManager
     private lateinit var affectionManager: AffectionManager
     private lateinit var achievementManager: AchievementManager
     private lateinit var momentsManager: MemorableMomentsManager
@@ -58,14 +62,29 @@ class ProfileActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_profile)
 
-        affectionManager = AffectionManager(this)
-        achievementManager = AchievementManager(this)
-        momentsManager = MemorableMomentsManager(this)
-        diaryManager = DiaryManager(this)
-        favoriteManager = FavoriteManager(this)
+        personaId = intent.getStringExtra("persona_id")
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
+                .getString("active_persona_id", "default") ?: "default"
+
+        personaManager = PersonaManager(this)
+        personaManager.load()
+
+        affectionManager = AffectionManager(this, personaId)
+        achievementManager = AchievementManager(this, personaId)
+        momentsManager = MemorableMomentsManager(this, personaId)
+        diaryManager = DiaryManager(this, personaId)
+        favoriteManager = FavoriteManager(this, personaId)
 
         initViews()
         loadData()
+        animateEntrance()
+    }
+
+    private fun animateEntrance() {
+        val toolbar = findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)
+        toolbar?.let {
+            com.aicompanion.anim.AnimeUtils.fadeInScale(it, delay = 50)
+        }
     }
 
     private fun initViews() {
@@ -90,8 +109,14 @@ class ProfileActivity : AppCompatActivity() {
 
         recyclerAchievements.layoutManager = LinearLayoutManager(this)
 
-        ivAiAvatar.setOnClickListener { pickAvatar(REQUEST_AI_AVATAR) }
-        ivUserAvatar.setOnClickListener { pickAvatar(REQUEST_USER_AVATAR) }
+        ivAiAvatar.setOnClickListener {
+            com.aicompanion.anim.AnimeUtils.pulse(it)
+            pickAvatar(REQUEST_AI_AVATAR)
+        }
+        ivUserAvatar.setOnClickListener {
+            com.aicompanion.anim.AnimeUtils.pulse(it)
+            pickAvatar(REQUEST_USER_AVATAR)
+        }
     }
 
     private fun loadData() {
@@ -102,11 +127,8 @@ class ProfileActivity : AppCompatActivity() {
         tvAffectionTitle.text = am.getAffectionTitle()
         tvDaysCount.text = "相伴 ${am.getDaysSinceFirstUse()} 天"
 
-        val personaName = getSharedPreferences("persona_data", MODE_PRIVATE)
-            .getString("persona_name", null)
-            ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
-                .getString("ai_name", "星尘") ?: "星尘"
-        tvAiName.text = personaName
+        val persona = personaManager.getPersona(personaId)
+        tvAiName.text = persona?.name ?: "星尘"
 
         val userCall = getSharedPreferences("persona_data", MODE_PRIVATE)
             .getString("user_nickname", null)
@@ -127,21 +149,19 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun loadAvatars() {
-        val prefs = getSharedPreferences("avatar_data", MODE_PRIVATE)
-        val aiPath = prefs.getString("ai_avatar", "")
-        val userPath = prefs.getString("user_avatar", "")
+        val persona = personaManager.getPersona(personaId)
+        val aiPath = persona?.avatarPath?.ifBlank {
+            getSharedPreferences("avatar_data", MODE_PRIVATE).getString("ai_avatar", "") ?: ""
+        } ?: ""
 
-        if (aiPath?.isNotEmpty() == true) {
-            val file = File(aiPath)
-            if (file.exists()) {
-                ivAiAvatar.setImageBitmap(BitmapFactory.decodeFile(aiPath))
-            }
+        if (aiPath.isNotEmpty() && File(aiPath).exists()) {
+            ivAiAvatar.setImageBitmap(BitmapFactory.decodeFile(aiPath))
         }
-        if (userPath?.isNotEmpty() == true) {
-            val file = File(userPath)
-            if (file.exists()) {
-                ivUserAvatar.setImageBitmap(BitmapFactory.decodeFile(userPath))
-            }
+
+        val userPath = getSharedPreferences("avatar_data", MODE_PRIVATE)
+            .getString("user_avatar", "") ?: ""
+        if (userPath.isNotEmpty() && File(userPath).exists()) {
+            ivUserAvatar.setImageBitmap(BitmapFactory.decodeFile(userPath))
         }
     }
 
@@ -159,20 +179,25 @@ class ProfileActivity : AppCompatActivity() {
 
         val uri = data.data!!
         try {
-            val prefix = if (requestCode == REQUEST_AI_AVATAR) "ai" else "user"
-            val file = File(filesDir, "${prefix}_avatar_${System.currentTimeMillis()}.jpg")
-            contentResolver.openInputStream(uri)?.use { input ->
-                file.outputStream().use { output -> input.copyTo(output) }
-            }
-
-            getSharedPreferences("avatar_data", MODE_PRIVATE).edit()
-                .putString("${prefix}_avatar", file.absolutePath).apply()
-
-            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
             if (requestCode == REQUEST_AI_AVATAR) {
-                ivAiAvatar.setImageBitmap(bitmap)
+                val dir = File(filesDir, "personas/avatars")
+                dir.mkdirs()
+                val file = File(dir, "avatar_${personaId}_${System.currentTimeMillis()}.jpg")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(file).use { output -> input.copyTo(output) }
+                }
+                personaManager.updatePersona(personaId) {
+                    it.copy(avatarPath = file.absolutePath)
+                }
+                ivAiAvatar.setImageBitmap(BitmapFactory.decodeFile(file.absolutePath))
             } else {
-                ivUserAvatar.setImageBitmap(bitmap)
+                val file = File(filesDir, "user_avatar_${System.currentTimeMillis()}.jpg")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(file).use { output -> input.copyTo(output) }
+                }
+                getSharedPreferences("avatar_data", MODE_PRIVATE).edit()
+                    .putString("user_avatar", file.absolutePath).apply()
+                ivUserAvatar.setImageBitmap(BitmapFactory.decodeFile(file.absolutePath))
             }
         } catch (e: Exception) {
             Toast.makeText(this, "设置头像失败", Toast.LENGTH_SHORT).show()

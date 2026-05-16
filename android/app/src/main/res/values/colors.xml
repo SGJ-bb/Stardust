@@ -8,28 +8,52 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <color name="bg_start">#0f0c29</color>
-    <color name="bg_center">#1a1a3e</color>
-    <color name="bg_end">#24243e</color>
+    <color name="bg_start">#0a0a1a</color>
+    <color name="bg_center">#12122e</color>
+    <color name="bg_end">#1a1a3e</color>
 
-    <color name="surface_dark">#1a1a30</color>
-    <color name="surface_card">#1e1e3a</color>
-    <color name="surface_input">#252550</color>
+    <color name="surface_dark">#14142a</color>
+    <color name="surface_card">#1a1a38</color>
+    <color name="surface_input">#1e1e44</color>
 
     <color name="accent_purple">#c4b5fd</color>
     <color name="accent_pink">#ff6b9d</color>
     <color name="accent_blue">#667eea</color>
     <color name="accent_cyan">#64ffda</color>
+    <color name="accent_magenta">#e040fb</color>
+    <color name="accent_orange">#ff9f43</color>
+    <color name="accent_lime">#a3e635</color>
 
-    <color name="text_primary">#e8e8f0</color>
-    <color name="text_secondary">#8899bb</color>
+    <color name="glow_purple">#9c7cff</color>
+    <color name="glow_blue">#4facfe</color>
+    <color name="glow_pink">#f093fb</color>
+    <color name="glow_cyan">#43e97b</color>
+
+    <color name="text_primary">#ececf4</color>
+    <color name="text_secondary">#99aabb</color>
     <color name="text_muted">#556677</color>
 
     <color name="bubble_user_start">#667eea</color>
     <color name="bubble_user_end">#764ba2</color>
-    <color name="bubble_pet_start">#1e1e3a</color>
+    <color name="bubble_pet_start">#1a1a3a</color>
     <color name="bubble_pet_end">#2a2a5a</color>
+
+    <color name="gradient_purple_start">#667eea</color>
+    <color name="gradient_purple_end">#764ba2</color>
+    <color name="gradient_pink_start">#ff6b9d</color>
+    <color name="gradient_pink_end">#c44dff</color>
+    <color name="gradient_cyan_start">#4facfe</color>
+    <color name="gradient_cyan_end">#00f2fe</color>
+    <color name="gradient_sunset_start">#fa709a</color>
+    <color name="gradient_sunset_end">#fee140</color>
+    <color name="gradient_ocean_start">#4facfe</color>
+    <color name="gradient_ocean_end">#667eea</color>
+    <color name="gradient_aurora_start">#43e97b</color>
+    <color name="gradient_aurora_end">#38f9d7</color>
 
     <color name="divider">#1a2030</color>
     <color name="stroke">#2a2a4a</color>
+
+    <color name="ripple_light">#1affffff</color>
+    <color name="ripple_accent">#1ac4b5fd</color>
 </resources>

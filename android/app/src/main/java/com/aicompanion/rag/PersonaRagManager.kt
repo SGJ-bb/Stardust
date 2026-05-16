@@ -5,7 +5,7 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class PersonaRagManager(private val context: Context) {
+class PersonaRagManager(private val context: Context, private val personaId: String = "default") {
 
     companion object {
         private const val TAG = "PersonaRagManager"
@@ -13,7 +13,7 @@ class PersonaRagManager(private val context: Context) {
 
     private val chunker = TextChunker()
     private val embedder = TfidfEmbedder()
-    private val store = VectorStore(context, "persona")
+    private val store = VectorStore(context, "persona_$personaId")
 
     private var personaHash: String = ""
     private var isIndexed = false

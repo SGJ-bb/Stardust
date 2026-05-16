@@ -15,11 +15,9 @@ import java.util.*
 
 class VoiceManager(context: Context) {
 
-    private var appContext: Context? = context.applicationContext
     private var speechRecognizer: SpeechRecognizer? = null
     private var textToSpeech: TextToSpeech? = null
     private var mediaPlayer: MediaPlayer? = null
-    private var isOfflineMode = false
     private var isListening = false
     private var isTTSReady = false
 
@@ -42,7 +40,14 @@ class VoiceManager(context: Context) {
             textToSpeech = TextToSpeech(context) { status ->
                 if (status == TextToSpeech.SUCCESS) {
                     isTTSReady = true
-                    textToSpeech?.language = Locale.CHINESE
+                    val cn = Locale.CHINESE
+                    if (textToSpeech?.isLanguageAvailable(cn) == TextToSpeech.LANG_AVAILABLE ||
+                        textToSpeech?.isLanguageAvailable(cn) == TextToSpeech.LANG_COUNTRY_AVAILABLE) {
+                        textToSpeech?.language = cn
+                    } else {
+                        textToSpeech?.language = Locale.getDefault()
+                        Log.w(TAG, "Chinese TTS not available, using default locale")
+                    }
                 } else {
                     Log.e(TAG, "TTS initialization failed with status: $status")
                 }
@@ -126,6 +131,16 @@ class VoiceManager(context: Context) {
         }
         if (text.isBlank()) return
         try {
+            val (pitch, rate) = when (emotion) {
+                Emotion.HAPPY -> 1.2f to 1.1f
+                Emotion.SAD -> 0.8f to 0.85f
+                Emotion.ANGRY -> 1.1f to 1.15f
+                Emotion.SURPRISED -> 1.3f to 1.1f
+                Emotion.TSUNDERE -> 1.05f to 1.0f
+                else -> 1.0f to 1.0f
+            }
+            textToSpeech?.setPitch(pitch)
+            textToSpeech?.setSpeechRate(rate)
             val utteranceId = UUID.randomUUID().toString()
             textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
         } catch (e: Exception) {
@@ -155,13 +170,6 @@ class VoiceManager(context: Context) {
             Log.e(TAG, "Failed to play speech: ${e.message}")
             cleanupMediaPlayer()
         }
-    }
-
-    fun setOfflineMode(enabled: Boolean) {
-        isOfflineMode = enabled
-    }
-
-    fun disableHighQualityAudio() {
     }
 
     private fun cleanupMediaPlayer() {
@@ -197,6 +205,5 @@ class VoiceManager(context: Context) {
         textToSpeech = null
 
         cleanupMediaPlayer()
-        appContext = null
     }
 }

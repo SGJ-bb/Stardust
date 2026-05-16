@@ -33,7 +33,7 @@ class AutoOperator {
             }
             ScreenRecognitionService.refreshScreenData()
             val screenText = ScreenRecognitionService.getLastScreenText()
-            val elements = ScreenRecognitionService.getClickableElements()
+            val elements = ScreenRecognitionService.getClickableData()
             if (screenText.isBlank() && elements.isEmpty()) {
                 return "(未检测到屏幕内容)"
             }
@@ -43,7 +43,7 @@ class AutoOperator {
             sb.appendLine()
             sb.appendLine("=== 可点击元素 ===")
             elements.forEachIndexed { i, elem ->
-                val label = if (elem.text.isNotBlank()) elem.text else elem.contentDescription
+                val label = if (elem.text.isNotBlank()) elem.text else elem.desc
                 sb.appendLine("[$i] $label")
             }
             return sb.toString()
