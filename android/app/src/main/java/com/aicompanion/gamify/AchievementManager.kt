@@ -8,13 +8,13 @@ import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 
-class AchievementManager(context: Context) {
+class AchievementManager(context: Context, private val personaId: String = "default") {
 
     companion object {
         private const val TAG = "AchievementManager"
     }
 
-    private val prefs: SharedPreferences = context.getSharedPreferences("achievement_data", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.getSharedPreferences("achievements_$personaId", Context.MODE_PRIVATE)
     private var achievements: MutableList<Achievement> = mutableListOf()
 
     private val allAchievements = listOf(

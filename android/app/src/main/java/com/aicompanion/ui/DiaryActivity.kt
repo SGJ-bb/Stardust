@@ -46,7 +46,7 @@ class DiaryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_diary)
 
-        diaryManager = DiaryManager(this)
+        diaryManager = DiaryManager(this, getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default") ?: "default")
         initViews()
         setupListeners()
         loadDiaries()

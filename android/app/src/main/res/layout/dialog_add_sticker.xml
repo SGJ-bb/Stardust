@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <ImageView
+            android:id="@+id/iv_sticker_preview"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_gravity="center"
+            android:scaleType="centerCrop"
+            android:contentDescription="预览" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="描述表情包表达的内容"
+            android:textSize="14sp"
+            android:textColor="#333333"
+            android:layout_marginTop="12dp" />
+
+        <EditText
+            android:id="@+id/et_sticker_description"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="如：一只猫在打瞌睡"
+            android:textSize="14sp"
+            android:inputType="text" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="表达的情感"
+            android:textSize="14sp"
+            android:textColor="#333333"
+            android:layout_marginTop="8dp" />
+
+        <EditText
+            android:id="@+id/et_sticker_emotion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="如：困倦、慵懒、放松"
+            android:textSize="14sp"
+            android:inputType="text" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="标签（逗号分隔）"
+            android:textSize="14sp"
+            android:textColor="#333333"
+            android:layout_marginTop="8dp" />
+
+        <EditText
+            android:id="@+id/et_sticker_tags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="如：猫,困,可爱"
+            android:textSize="14sp"
+            android:inputType="text" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="归属"
+            android:textSize="14sp"
+            android:textColor="#333333"
+            android:layout_marginTop="8dp" />
+
+        <RadioGroup
+            android:id="@+id/rg_sticker_owner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rb_owner_user"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="我的"
+                android:checked="true" />
+
+            <RadioButton
+                android:id="@+id/rb_owner_ai"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AI的"
+                android:layout_marginStart="24dp" />
+        </RadioGroup>
+
+    </LinearLayout>
+</ScrollView>

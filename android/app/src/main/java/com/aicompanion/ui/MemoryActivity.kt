@@ -44,7 +44,7 @@ class MemoryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_memory)
 
-        memoryManager = MemoryManager(this)
+        memoryManager = MemoryManager(this, getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default") ?: "default")
 
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         userId = prefs.getString("user_id", "anonymous") ?: "anonymous"

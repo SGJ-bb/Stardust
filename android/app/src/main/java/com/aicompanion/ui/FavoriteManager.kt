@@ -4,8 +4,8 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-class FavoriteManager(context: Context) {
-    private val prefs = context.getSharedPreferences("favorite_messages", Context.MODE_PRIVATE)
+class FavoriteManager(context: Context, private val personaId: String = "default") {
+    private val prefs = context.getSharedPreferences("favorites_$personaId", Context.MODE_PRIVATE)
 
     fun addFavorite(message: ChatMessage) {
         val favorites = getAll()

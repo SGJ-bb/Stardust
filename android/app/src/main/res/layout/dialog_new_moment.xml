@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#14142a">
+
+    <EditText
+        android:id="@+id/et_moment_content"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:hint="分享你的想法..."
+        android:textSize="15sp"
+        android:textColor="#e0e0f0"
+        android:textColorHint="#556677"
+        android:gravity="top"
+        android:inputType="textMultiLine"
+        android:background="@drawable/bg_edit_moment"
+        android:padding="14dp"
+        android:lineSpacingExtra="4dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="14dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/btn_add_image"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:text="📷 图片"
+            android:textSize="14sp"
+            android:textColor="#c4b5fd"
+            android:gravity="center"
+            android:background="@drawable/bg_btn_moment_action"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp" />
+
+        <TextView
+            android:id="@+id/btn_add_sticker"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:text="😄 表情包"
+            android:textSize="14sp"
+            android:textColor="#c4b5fd"
+            android:gravity="center"
+            android:background="@drawable/bg_btn_moment_action"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:layout_marginStart="10dp" />
+    </LinearLayout>
+
+</LinearLayout>

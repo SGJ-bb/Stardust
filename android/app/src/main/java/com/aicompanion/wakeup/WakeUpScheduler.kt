@@ -21,7 +21,16 @@ import java.util.*
 class WakeUpReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == ACTION_WAKE_UP) {
-            showWakeUpNotification(context, true)
+            val taskName = intent.getStringExtra("task_name") ?: ""
+            val taskDesc = intent.getStringExtra("task_description") ?: ""
+            if (taskName.isNotBlank()) {
+                showTaskNotification(context, taskName, taskDesc)
+            } else {
+                showWakeUpNotification(context, true)
+            }
+            val taskManager = WakeUpTaskManager(context)
+            taskManager.load()
+            taskManager.scheduleAll()
         }
     }
 
@@ -85,9 +94,24 @@ class WakeUpReceiver : BroadcastReceiver() {
                             hour < 18 -> "下午"
                             else -> "晚上"
                         }
+                        val activePersonaId = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                            .getString("active_persona_id", "default") ?: "default"
+                        val pm = com.aicompanion.persona.PersonaManager(context)
+                        pm.load()
+                        val persona = pm.getPersona(activePersonaId)
+                        val personaPrompt = if (persona != null) {
+                            buildString {
+                                append("你是「${persona.name}」。")
+                                if (persona.personality.isNotBlank()) append("\n性格：${persona.personality}")
+                                if (persona.speechStyle.isNotBlank()) append("\n说话风格：${persona.speechStyle}")
+                                if (persona.prompt.isNotBlank()) append("\n${persona.prompt}")
+                            }
+                        } else {
+                            "你是「星尘」。"
+                        }
                         val result = aiClient.sendProactiveChat(
-                            "星尘",
-                            "你是一个可爱的AI桌宠",
+                            persona?.name ?: "星尘",
+                            personaPrompt,
                             "现在是$timeHint，你想主动找用户打个招呼。回复1-2句话，自然可爱，语气像认识很久的朋友。不需要自我介绍。直接说想说的话就好。",
                             "（用户现在没在看手机，你想主动找ta说话）"
                         )
@@ -126,6 +150,51 @@ class WakeUpReceiver : BroadcastReceiver() {
             .build()
 
         notificationManager.notify(NOTIFICATION_ID_WAKEUP, notification)
+    }
+
+    private fun showTaskNotification(context: Context, taskName: String, taskDesc: String) {
+        val channelId = "ai_wakeup_channel"
+        val notificationManager = NotificationManagerCompat.from(context)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "AI唤醒",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "AI定时任务提醒"
+                enableVibration(true)
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val personaPrefs = context.getSharedPreferences("persona_data", Context.MODE_PRIVATE)
+        val aiName = personaPrefs.getString("persona_name", null)
+            ?: context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE).getString("ai_name", "星尘") ?: "星尘"
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("auto_wakeup", true)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("$aiName：$taskName")
+            .setContentText(taskDesc)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(taskDesc))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setTimeoutAfter(10000)
+            .build()
+
+        notificationManager.notify(taskName.hashCode() and 0x7FFFFFFF, notification)
     }
 
     companion object {

@@ -16,6 +16,9 @@ class BootReceiver : BroadcastReceiver() {
 
             WakeUpScheduler.rescheduleOnBoot(context)
 
+            val taskManager = com.aicompanion.wakeup.WakeUpTaskManager(context)
+            taskManager.rescheduleOnBoot()
+
             val settingsManager = SettingsManager(context)
             if (settingsManager.autoStart) {
                 try {

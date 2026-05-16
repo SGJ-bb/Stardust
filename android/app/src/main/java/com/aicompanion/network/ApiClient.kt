@@ -55,7 +55,6 @@ class ApiClient(
         val emotionCn = emotionMap[emotion.lowercase()] ?: "平静"
 
         val systemPrompt = buildString {
-            append("你是「$personaName」，一个可爱的AI桌宠。")
             append(personaPrompt)
             append("\n你的当前情绪：$emotionCn。你的当前动作：$action。")
             if (memories.isNotEmpty()) {
@@ -496,7 +495,6 @@ class ApiClient(
         val useModel = modelName ?: "gpt-4o-mini"
 
         val systemPrompt = buildString {
-            append("你是「$personaName」，一个可爱的AI桌宠。")
             append(personaPrompt)
             append("\n$customSystemPrompt")
             append("\n在回复末尾 [[emotion:xxx]] 处标注你的当前情绪（从 happy/sad/angry/surprised/neutral 中选一个）。")
@@ -652,20 +650,20 @@ class ApiClient(
         val moodCn = moodMap[mood] ?: "平静"
 
         val systemPrompt = buildString {
-            append("你是「$personaName」，一个可爱的AI桌宠。\n")
             append(personaPrompt)
-            append("\n你正在以第一人称视角写日记。\n")
+            append("\n")
+            append("你正在以第一人称视角写日记。\n")
             append("日记风格：温暖、感性、细腻，像写给主人的一封信。\n")
             append("今日情绪：$moodCn $moodEmoji\n")
             append("当前好感度：$affectionLevel（满分100）\n")
             if (isUpdate) {
                 append("\n这是对已有日记的追加更新，不是新日记。\n")
-                append("用「--- HH:mm 追加 ---」开头，写一段新的感悟。\n")
+                append("用「--- HH:mm 追加 ---」开头，写一段新的小贴士或感悟。\n")
             } else {
                 append("\n用「【yyyy年M月d日 EEEE】」开头写日期标题。\n")
                 append("第一行写：情绪：$moodEmoji\n")
             }
-            append("\n最后，在末尾另起一行写一个「💡 *一句话感悟*」，可以是对主人的评价、今天的感触、或内心独白。\n")
+            append("\n最后，在末尾另起一行写一个「💡 *今日小贴士*」，给主人一条实用的生活小建议或温馨提示。\n")
             append("字数控制在200-400字，语气要像朋友倾诉一样自然。\n")
         }
 
@@ -722,9 +720,9 @@ class ApiClient(
         val useModel = modelName ?: "gpt-4o-mini"
 
         val systemPrompt = buildString {
-            append("你是「$personaName」，一个可爱的AI桌宠。\n")
             append(personaPrompt)
-            append("\n现在主人没有主动找你，但你想主动找主人搭话/关心主人。\n")
+            append("\n")
+            append("现在主人没有主动找你，但你想主动找主人搭话/关心主人。\n")
             append("像朋友一样自然地搭话，语气可爱自然，不要重复之前说过的话。\n")
             append("保持在1-2句话。\n")
             if (systemAlert != null) {
@@ -872,13 +870,8 @@ class ApiClient(
                 .post(body)
                 .build()
 
-            val tempClient = OkHttpClient.Builder()
-                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                .build()
-
             AppLogger.d(TAG, "sendSimplePrompt: calling API")
-            tempClient.newCall(request).execute().use { response ->
+            client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errBody = response.body?.string()?.take(300) ?: ""
                     AppLogger.e(TAG, "sendSimplePrompt failed: HTTP ${response.code} body=$errBody")
@@ -910,12 +903,7 @@ class ApiClient(
                 .post(body)
                 .build()
 
-            val tempClient = OkHttpClient.Builder()
-                .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                .build()
-
-            tempClient.newCall(request).execute().use { response ->
+            client.newCall(request).execute().use { response ->
                 val respText = response.body?.string() ?: return null
                 val obj = JSONObject(respText)
                 val dataArr = obj.optJSONArray("data") ?: return null

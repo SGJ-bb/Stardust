@@ -11,7 +11,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
-class DiaryManager(private val context: Context) {
+class DiaryManager(private val context: Context, private val personaId: String = "default") {
 
     companion object {
         const val CURRENT_VERSION = 2
@@ -20,7 +20,7 @@ class DiaryManager(private val context: Context) {
         private const val TAG = "DiaryManager"
     }
 
-    private val diaryDir = File(context.filesDir, "diaries")
+    private val diaryDir = File(File(context.filesDir, "diaries"), personaId).apply { mkdirs() }
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     private val fullDateFormat = SimpleDateFormat("yyyy年M月d日 EEEE", Locale.CHINESE)
 

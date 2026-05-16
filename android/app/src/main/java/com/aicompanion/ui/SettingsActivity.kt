@@ -209,6 +209,8 @@ class SettingsActivity : AppCompatActivity() {
         switchOfflineMode = findViewById(R.id.switch_offline_mode)
         switchLive2d = findViewById(R.id.switch_live2d)
 
+        findViewById<Switch>(R.id.switch_safety_mode)?.isChecked = com.aicompanion.safety.ContentSafetyFilter.isEnabled(this)
+
         // Wake up settings
         switchWakeEnabled = findViewById(R.id.switch_wake_enabled)
         btnSetWakeTime = findViewById<View?>(R.id.btn_set_wake_time) as? com.google.android.material.button.MaterialButton
@@ -341,6 +343,18 @@ class SettingsActivity : AppCompatActivity() {
             showThemePicker()
         }
 
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_bubble_skin)?.setOnClickListener {
+            showBubbleSkinDialog()
+        }
+
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_ai_frame)?.setOnClickListener {
+            showAvatarFrameDialog(true)
+        }
+
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_user_frame)?.setOnClickListener {
+            showAvatarFrameDialog(false)
+        }
+
         btnViewLog?.setOnClickListener {
             showLive2DLog()
         }
@@ -373,58 +387,17 @@ class SettingsActivity : AppCompatActivity() {
             testChatApi()
         }
 
-        switchWakeEnabled?.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isIgnoringBatteryOptimizations()) {
-                    requestIgnoreBatteryOptimizations()
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val alarmManager = getSystemService(ALARM_SERVICE) as android.app.AlarmManager
-                    if (!alarmManager.canScheduleExactAlarms()) {
-                        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-                        startActivity(intent)
-                        Toast.makeText(this, "请授予定时闹钟权限", Toast.LENGTH_LONG).show()
-                        switchWakeEnabled?.isChecked = false
-                        return@setOnCheckedChangeListener
-                    }
-                }
-                val (hour, minute) = WakeUpScheduler.getWakeupTime(this)
-                WakeUpScheduler.setWakeupSettings(this, true, hour, minute)
-                Toast.makeText(this, "定时唤醒已开启", Toast.LENGTH_SHORT).show()
-            } else {
-                WakeUpScheduler.setWakeupSettings(this, false, 0, 0)
-                Toast.makeText(this, "定时唤醒已关闭", Toast.LENGTH_SHORT).show()
-            }
+        switchWakeEnabled?.setOnCheckedChangeListener { _, _ ->
+            startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
             updateWakeInfoDisplay()
         }
 
         btnSetWakeTime?.setOnClickListener {
-            val (currentHour, currentMinute) = WakeUpScheduler.getWakeupTime(this)
-            TimePickerDialog(this, { _, hour, minute ->
-                val enabled = switchWakeEnabled?.isChecked == true
-                WakeUpScheduler.setWakeupSettings(this, enabled, hour, minute)
-                updateWakeInfoDisplay()
-                Toast.makeText(this, "唤醒时间已设定为 ${String.format("%02d:%02d", hour, minute)}", Toast.LENGTH_SHORT).show()
-            }, currentHour, currentMinute, true).show()
+            startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
         }
 
         btnSetWakeMessage?.setOnClickListener {
-            val prefs = getSharedPreferences("wakeup_settings", MODE_PRIVATE)
-            val currentMessage = prefs.getString("wake_message", "早上好呀！今天想做什么？")
-            val input = android.widget.EditText(this)
-            input.hint = "AI唤醒时说的话"
-            input.setText(currentMessage)
-            android.app.AlertDialog.Builder(this)
-                .setTitle("编辑唤醒消息")
-                .setMessage("设置AI在定时唤醒时自动发送的问候消息")
-                .setView(input)
-                .setPositiveButton("保存") { _, _ ->
-                    val message = input.text.toString()
-                    prefs.edit().putString("wake_message", message).apply()
-                    Toast.makeText(this, "唤醒消息已保存", Toast.LENGTH_SHORT).show()
-                }
-                .setNegativeButton("取消", null)
-                .show()
+            startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
         }
 
         findViewById<View?>(R.id.tvBilibiliLink)?.setOnClickListener {
@@ -441,6 +414,24 @@ class SettingsActivity : AppCompatActivity() {
             val clipData = android.content.ClipData.newPlainText("抖音ID", "31991565756")
             clip.setPrimaryClip(clipData)
             Toast.makeText(this, "抖音ID已复制到剪贴板：31991565756", Toast.LENGTH_LONG).show()
+        }
+
+        findViewById<Switch>(R.id.switch_safety_mode)?.setOnCheckedChangeListener { _, isChecked ->
+            com.aicompanion.safety.ContentSafetyFilter.setEnabled(this, isChecked)
+        }
+
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_clear_chat_history)?.setOnClickListener {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("清空聊天记录")
+                .setMessage("确定要清空当前角色的所有聊天记录吗？此操作不可撤销。")
+                .setPositiveButton("清空") { _, _ ->
+                    val personaId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                        .getString("active_persona_id", "default") ?: "default"
+                    getSharedPreferences("chat_history_$personaId", MODE_PRIVATE).edit().clear().apply()
+                    Toast.makeText(this, "聊天记录已清空", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("取消", null)
+                .show()
         }
 
         findViewById<Switch>(R.id.switch_auto_start)?.setOnCheckedChangeListener { _, isChecked ->
@@ -466,6 +457,40 @@ class SettingsActivity : AppCompatActivity() {
                 dialog.dismiss()
                 applyTheme()
                 Toast.makeText(this, "已切换到 ${selectedScheme.name}", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showBubbleSkinDialog() {
+        val skins = com.aicompanion.theme.BubbleSkinManager.builtinSkins
+        val currentSkin = com.aicompanion.theme.BubbleSkinManager.getActiveSkin(this)
+        val items = skins.map { it.name }.toTypedArray()
+        val currentIndex = skins.indexOfFirst { it.id == currentSkin.id }.coerceAtLeast(0)
+        android.app.AlertDialog.Builder(this)
+            .setTitle("聊天气泡皮肤")
+            .setSingleChoiceItems(items, currentIndex) { dialog, which ->
+                com.aicompanion.theme.BubbleSkinManager.setActiveSkin(this, skins[which].id)
+                dialog.dismiss()
+                Toast.makeText(this, "气泡皮肤已切换为「${skins[which].name}」", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showAvatarFrameDialog(isAi: Boolean) {
+        val frames = com.aicompanion.theme.BubbleSkinManager.builtinFrames
+        val currentFrame = if (isAi) com.aicompanion.theme.BubbleSkinManager.getActiveAiFrame(this) else com.aicompanion.theme.BubbleSkinManager.getActiveUserFrame(this)
+        val items = frames.map { it.name }.toTypedArray()
+        val currentIndex = frames.indexOfFirst { it.id == currentFrame.id }.coerceAtLeast(0)
+        val title = if (isAi) "AI头像框" else "我的头像框"
+        android.app.AlertDialog.Builder(this)
+            .setTitle(title)
+            .setSingleChoiceItems(items, currentIndex) { dialog, which ->
+                if (isAi) com.aicompanion.theme.BubbleSkinManager.setActiveAiFrame(this, frames[which].id)
+                else com.aicompanion.theme.BubbleSkinManager.setActiveUserFrame(this, frames[which].id)
+                dialog.dismiss()
+                Toast.makeText(this, "头像框已切换为「${frames[which].name}」", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("取消", null)
             .show()

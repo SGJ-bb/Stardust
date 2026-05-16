@@ -10,10 +10,10 @@ data class DailyStats(
     val affectionChange: Int = 0
 )
 
-class AffectionManager(context: Context) {
+class AffectionManager(private val context: Context, private val personaId: String = "default") {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(
-        "affection_data",
+        "affection_data_$personaId",
         Context.MODE_PRIVATE
     )
 

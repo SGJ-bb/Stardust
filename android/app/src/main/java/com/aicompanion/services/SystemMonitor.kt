@@ -43,11 +43,15 @@ class SystemMonitor(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val aiChannel = NotificationChannel(
                 CHANNEL_AI_MESSAGE,
-                "AI消息",
+                "AI消息通知",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "AI主动发送的消息通知"
+                description = "AI桌宠的消息通知"
                 enableVibration(true)
+                enableLights(true)
+                lightColor = 0xFF667eea.toInt()
+                setShowBadge(true)
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
             }
             val alertChannel = NotificationChannel(
                 CHANNEL_SYSTEM_ALERT,
@@ -136,6 +140,7 @@ class SystemMonitor(private val context: Context) {
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(context, CHANNEL_AI_MESSAGE)
+                .setTimeoutAfter(8000)
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(context)
@@ -149,6 +154,8 @@ class SystemMonitor(private val context: Context) {
             .setContentIntent(pendingIntent)
             .setPriority(Notification.PRIORITY_HIGH)
             .setDefaults(Notification.DEFAULT_ALL)
+            .setCategory(Notification.CATEGORY_MESSAGE)
+            .setStyle(Notification.BigTextStyle().bigText(displayText))
             .build()
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
