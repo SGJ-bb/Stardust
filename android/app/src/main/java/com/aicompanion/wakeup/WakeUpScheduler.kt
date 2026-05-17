@@ -59,10 +59,12 @@ class WakeUpReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val prefs = context.getSharedPreferences("wakeup_settings", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("companion_settings", Context.MODE_PRIVATE)
         val customMessage = prefs.getString("wake_message", null)
 
-        val personaPrefs = context.getSharedPreferences("persona_data", Context.MODE_PRIVATE)
+        val activeId = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+            .getString("active_persona_id", "default") ?: "default"
+        val personaPrefs = context.getSharedPreferences("persona_data_$activeId", Context.MODE_PRIVATE)
         val aiName = personaPrefs.getString("persona_name", null) ?: "星尘"
 
         val baseGreeting = customMessage ?: run {
@@ -80,8 +82,21 @@ class WakeUpReceiver : BroadcastReceiver() {
         if (tryAI) {
             val settingsPrefs = context.getSharedPreferences("companion_settings", Context.MODE_PRIVATE)
             val apiUrl = settingsPrefs.getString("chat_api_url", "") ?: ""
-            val apiKey = settingsPrefs.getString("chat_api_key", "") ?: ""
             val apiModel = settingsPrefs.getString("chat_model", "gpt-4o-mini") ?: "gpt-4o-mini"
+            val apiKey = try {
+                val masterKey = androidx.security.crypto.MasterKey.Builder(context)
+                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                val securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
+                    context, "companion_secure_prefs", masterKey,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+                securePrefs.getString("chat_api_key", "") ?: ""
+            } catch (_: Exception) {
+                context.getSharedPreferences("companion_secure_prefs", Context.MODE_PRIVATE)
+                    .getString("chat_api_key", "") ?: ""
+            }
 
             if (apiUrl.isNotBlank()) {
                 Thread {
@@ -168,8 +183,10 @@ class WakeUpReceiver : BroadcastReceiver() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val personaPrefs = context.getSharedPreferences("persona_data", Context.MODE_PRIVATE)
-        val aiName = personaPrefs.getString("persona_name", null)
+        val activeId2 = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+            .getString("active_persona_id", "default") ?: "default"
+        val personaPrefs2 = context.getSharedPreferences("persona_data_$activeId2", Context.MODE_PRIVATE)
+        val aiName = personaPrefs2.getString("persona_name", null)
             ?: context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE).getString("ai_name", "星尘") ?: "星尘"
 
         val pendingIntent = PendingIntent.getActivity(
@@ -204,10 +221,10 @@ class WakeUpReceiver : BroadcastReceiver() {
 }
 
 object WakeUpScheduler {
-    private const val PREFS_NAME = "wakeup_settings"
-    private const val KEY_WAKEUP_ENABLED = "wakeup_enabled"
-    private const val KEY_WAKEUP_HOUR = "wakeup_hour"
-    private const val KEY_WAKEUP_MINUTE = "wakeup_minute"
+    private const val PREFS_NAME = "companion_settings"
+    private const val KEY_WAKEUP_ENABLED = "wake_enabled"
+    private const val KEY_WAKEUP_HOUR = "wake_hour"
+    private const val KEY_WAKEUP_MINUTE = "wake_minute"
 
     fun isWakeupEnabled(context: Context): Boolean {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

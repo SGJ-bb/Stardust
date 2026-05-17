@@ -27,6 +27,7 @@ import com.aicompanion.diary.DiaryManager
 import com.aicompanion.models.Emotion
 import com.aicompanion.theme.ThemeManager
 import com.aicompanion.wakeup.WakeUpScheduler
+import com.aicompanion.virtualworld.VirtualWorldManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -295,6 +296,13 @@ class SettingsActivity : AppCompatActivity() {
         etSearchApiKey?.text = sm.searchApiKey
         etSearchEngineId?.text = sm.searchEngineId
         updateSearchFieldsVisibility()
+
+        val vwManager = VirtualWorldManager(this)
+        findViewById<Switch>(R.id.switch_virtual_world)?.isChecked = vwManager.isEnabled
+
+        findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_url)?.setText(vwManager.imageApiUrl)
+        findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_key)?.setText(vwManager.imageApiKey)
+        findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_model)?.setText(vwManager.imageModel)
     }
 
     private fun updateWakeInfoDisplay() {
@@ -314,7 +322,11 @@ class SettingsActivity : AppCompatActivity() {
 
         btnPersonaEditor?.setOnClickListener {
             try {
-                startActivity(Intent(this, PersonaEditorActivity::class.java))
+                val intent = Intent(this, PersonaEditorActivity::class.java)
+                val personaId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                    .getString("active_persona_id", "default") ?: "default"
+                intent.putExtra("persona_id", personaId)
+                startActivity(intent)
             } catch (e: Exception) {
                 e.printStackTrace()
                 Toast.makeText(this, "无法打开角色设定: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -339,20 +351,48 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_local_model)?.setOnClickListener {
+            try {
+                startActivity(Intent(this, LocalModelActivity::class.java))
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this, "无法打开本地模型: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         btnChangeTheme?.setOnClickListener {
             showThemePicker()
         }
 
         findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_bubble_skin)?.setOnClickListener {
-            showBubbleSkinDialog()
+            try {
+                startActivity(Intent(this, SkinShopActivity::class.java))
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this, "无法打开皮肤商店", Toast.LENGTH_SHORT).show()
+            }
         }
 
         findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_ai_frame)?.setOnClickListener {
-            showAvatarFrameDialog(true)
+            try {
+                val intent = Intent(this, SkinShopActivity::class.java)
+                intent.putExtra("tab", 1)
+                startActivity(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this, "无法打开皮肤商店", Toast.LENGTH_SHORT).show()
+            }
         }
 
         findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_user_frame)?.setOnClickListener {
-            showAvatarFrameDialog(false)
+            try {
+                val intent = Intent(this, SkinShopActivity::class.java)
+                intent.putExtra("tab", 2)
+                startActivity(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this, "无法打开皮肤商店", Toast.LENGTH_SHORT).show()
+            }
         }
 
         btnViewLog?.setOnClickListener {
@@ -440,6 +480,39 @@ class SettingsActivity : AppCompatActivity() {
 
         findViewById<Switch>(R.id.switch_background_running)?.setOnCheckedChangeListener { _, isChecked ->
             settingsManager?.backgroundRunning = isChecked
+        }
+
+        findViewById<Switch>(R.id.switch_virtual_world)?.setOnCheckedChangeListener { _, isChecked ->
+            val vwMgr = VirtualWorldManager(this)
+            if (isChecked) {
+                if (!vwMgr.hasChatModelConfigured()) {
+                    Toast.makeText(this, "请先配置聊天API才能启用虚拟世界", Toast.LENGTH_LONG).show()
+                    findViewById<Switch>(R.id.switch_virtual_world)?.isChecked = false
+                    return@setOnCheckedChangeListener
+                }
+            }
+            vwMgr.isEnabled = isChecked
+            if (!isChecked) {
+                vwMgr.isRunning = false
+            }
+        }
+
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_virtual_world)?.setOnClickListener {
+            val vwMgr = VirtualWorldManager(this)
+            if (!vwMgr.isEnabled) {
+                Toast.makeText(this, "请先开启虚拟世界开关", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (!vwMgr.hasChatModelConfigured()) {
+                Toast.makeText(this, "请先配置聊天API", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            try {
+                startActivity(Intent(this, VirtualWorldActivity::class.java))
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this, "无法打开虚拟世界: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -736,6 +809,11 @@ class SettingsActivity : AppCompatActivity() {
         sm.searchApiUrl = etSearchApiUrl?.text?.toString() ?: ""
         sm.searchApiKey = etSearchApiKey?.text?.toString() ?: ""
         sm.searchEngineId = etSearchEngineId?.text?.toString() ?: ""
+
+        val vwMgr = VirtualWorldManager(this)
+        vwMgr.imageApiUrl = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_url)?.text?.toString() ?: ""
+        vwMgr.imageApiKey = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_key)?.text?.toString() ?: ""
+        vwMgr.imageModel = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_model)?.text?.toString() ?: "dall-e-3"
 
         Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show()
     }

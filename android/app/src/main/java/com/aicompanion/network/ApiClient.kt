@@ -56,13 +56,11 @@ class ApiClient(
 
         val systemPrompt = buildString {
             append(personaPrompt)
-            append("\n你的当前情绪：$emotionCn。你的当前动作：$action。")
+            append("\n情绪：$emotionCn。动作：$action。")
             if (memories.isNotEmpty()) {
-                append("\n你记得这些关于主人的事：${memories.takeLast(3).joinToString("；")}")
+                append("\n记得：${memories.takeLast(3).joinToString("；")}")
             }
-            append("\n规则：用自然的中文回复，像朋友一样聊天。保持在2-4句话以内。")
-            append("\n如果用户表达了情绪（如开心、难过、焦虑等），请根据用户的情绪给予适当的情感回应和安慰。")
-            append("\n最后，在回复末尾 [[emotion:xxx]] 处标注你的当前情绪（从 happy/sad/angry/surprised/neutral 中选一个）。")
+            append("\n【规则】像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]")
         }
 
         val messagesArray = JSONArray()
@@ -715,26 +713,26 @@ class ApiClient(
         personaName: String,
         personaPrompt: String,
         appCategory: String? = null,
-        systemAlert: String? = null
+        systemAlert: String? = null,
+        memoryContext: String? = null
     ): ChatResponse? {
         val useModel = modelName ?: "gpt-4o-mini"
 
         val systemPrompt = buildString {
             append(personaPrompt)
-            append("\n")
-            append("现在主人没有主动找你，但你想主动找主人搭话/关心主人。\n")
-            append("像朋友一样自然地搭话，语气可爱自然，不要重复之前说过的话。\n")
-            append("保持在1-2句话。\n")
+            append(" 主动搭话，1-2句，自然不重复。")
+            if (!memoryContext.isNullOrBlank()) {
+                append("\n[记忆]\n$memoryContext")
+            }
             if (systemAlert != null) {
-                append("\n系统提示：$systemAlert\n请根据此系统提示提醒/关心主人。\n")
+                append("\n提醒：$systemAlert")
             }
             if (appCategory != null && appCategory !in listOf("unknown", "")) {
                 val appNames = mapOf("game" to "玩游戏", "browser" to "浏览网页", "video" to "看视频",
                     "music" to "听音乐", "social" to "社交聊天", "work" to "工作")
-                val appName = appNames[appCategory] ?: appCategory
-                append("\n主人正在$appName，结合这个场景自然地搭话。\n")
+                append("\n主人在${appNames[appCategory] ?: appCategory}。")
             }
-            append("\n在回复末尾 [[emotion:xxx]] 处标注你的当前情绪（从 happy/sad/angry/surprised/neutral 中选一个）。\n")
+            append("\n末尾[[emotion:xxx]]。")
         }
 
         val messagesArray = JSONArray()

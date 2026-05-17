@@ -5,7 +5,6 @@ import com.aicompanion.network.ApiClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
-import org.json.JSONObject
 import java.util.UUID
 
 data class SessionInfo(
@@ -44,13 +43,9 @@ class SessionManager(private val context: Context) {
 
     fun checkMemoryLimit(memoryPool: MemoryPool): Boolean {
         val charCount = memoryPool.getPoolCharCount()
-        if (charCount > 5000 && charCount < 10000) {
-            onSessionWarning?.invoke("记忆池已达${charCount}字（接近上限），建议开启新会话以保持最佳记忆效果")
+        if (charCount > 800) {
+            onSessionWarning?.invoke("记忆池已达${charCount}字，即将自动整理")
             return false
-        }
-        if (charCount >= 10000) {
-            onSessionWarning?.invoke("记忆池已达${charCount}字！必须开启新会话，旧记忆将压缩保留")
-            return true
         }
         return false
     }
@@ -66,13 +61,9 @@ class SessionManager(private val context: Context) {
             diaryCallback(poolBlock)
         }
 
-        val compressedMemory = if (memoryPool.getPoolCharCount() > 10000) {
-            memoryPool.compress(apiClient, 500)
-        } else {
-            memoryPool.compress(apiClient, 500)
-        }
+        memoryPool.consolidate(apiClient)
 
-        memoryPool.clear()
+        val compressedMemory = memoryPool.getPoolBlock()
 
         val newSession = SessionInfo(
             startTime = System.currentTimeMillis(),
@@ -121,7 +112,7 @@ class SessionManager(private val context: Context) {
         try {
             val arr = JSONArray()
             for (session in sessions.take(MAX_SESSIONS)) {
-                val obj = JSONObject()
+                val obj = org.json.JSONObject()
                 obj.put("id", session.id)
                 obj.put("startTime", session.startTime)
                 obj.put("turnCount", session.turnCount)

@@ -17,7 +17,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_message_user"
-        android:maxWidth="280dp"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:paddingTop="8dp"
@@ -43,7 +42,9 @@
                 android:layout_height="wrap_content"
                 android:textColor="@android:color/white"
                 android:textSize="14sp"
-                android:lineSpacingExtra="2dp" />
+                android:lineSpacingExtra="2dp"
+                android:maxEms="16"
+                android:maxWidth="260dp" />
 
             <TextView
                 android:id="@+id/tv_message_time"
@@ -68,23 +69,33 @@
             android:visibility="gone" />
     </FrameLayout>
 
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/iv_user_avatar_chat"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+    <FrameLayout
+        android:id="@+id/frame_user_avatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_marginStart="6dp"
-        app:cardCornerRadius="18dp"
-        app:cardElevation="0dp"
-        app:cardBackgroundColor="#1a1a3e"
-        app:strokeWidth="1.5dp"
-        app:strokeColor="#ff6b9d">
+        android:layout_gravity="bottom"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
-        <ImageView
-            android:id="@+id/iv_user_avatar_img"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_avatar_default_user" />
-    </com.google.android.material.card.MaterialCardView>
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/iv_user_avatar_chat"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            app:cardCornerRadius="18dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="#1a1a3e"
+            app:strokeWidth="1.5dp"
+            app:strokeColor="#ff6b9d">
+
+            <ImageView
+                android:id="@+id/iv_user_avatar_img"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_avatar_default_user" />
+        </com.google.android.material.card.MaterialCardView>
+    </FrameLayout>
 
 </LinearLayout>

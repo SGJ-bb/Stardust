@@ -44,7 +44,7 @@ android {
     }
 
     androidResources {
-        noCompress 'moc3', 'moc'
+        noCompress 'moc3', 'moc', 'tflite'
     }
 }
 
@@ -61,6 +61,12 @@ dependencies {
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    
+    implementation 'org.tensorflow:tensorflow-lite:2.14.0'
+    implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
+    implementation 'org.tensorflow:tensorflow-lite-gpu:2.14.0'
+    implementation 'com.google.mlkit:text-recognition:16.0.0'
+    implementation 'com.google.mlkit:text-recognition-chinese:16.0.0'
     
     // Live2D Cubism SDK - 需要手动下载aar文件放入libs目录
     // implementation files('libs/live2d.aar')

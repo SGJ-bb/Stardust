@@ -19,12 +19,17 @@ class MemoryPoolActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        contextManager = ContextManager(this)
+        val personaId = intent.getStringExtra("persona_id")
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default")
+            ?: "default"
+
+        contextManager = ContextManager(this, personaId)
 
         val scrollView = ScrollView(this)
         container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 24, 32, 32)
+            setBackgroundColor(0xFF0a0a1a.toInt())
         }
 
         tvStats = TextView(this).apply {
@@ -48,7 +53,7 @@ class MemoryPoolActivity : AppCompatActivity() {
 
         if (entries.isEmpty()) {
             val emptyView = TextView(this).apply {
-                text = "记忆池为空\n\n开始聊天后，AI会自动提取并记录关于你的重要信息"
+                text = "记忆池为空\n\n开始聊天后，AI会自动提取并记录场景、剧情和关键信息\n每10轮对话会自动整理，不超过1000字"
                 textSize = 14f
                 setTextColor(0xFF667788.toInt())
                 gravity = android.view.Gravity.CENTER
@@ -60,7 +65,7 @@ class MemoryPoolActivity : AppCompatActivity() {
         }
 
         val grouped = entries.groupBy { it.category }
-        val categoryOrder = listOf("喜好", "习惯", "事实", "事件", "计划", "其他")
+        val categoryOrder = listOf("场景", "剧情", "喜好", "习惯", "事实", "事件", "计划", "继承", "其他")
 
         for (cat in categoryOrder) {
             val group = grouped[cat] ?: continue
@@ -75,7 +80,7 @@ class MemoryPoolActivity : AppCompatActivity() {
             }
             container.addView(catHeader)
 
-            for (entry in group.sortedByDescending { it.importance }) {
+            for (entry in group) {
                 addEntryView(entry)
             }
         }
@@ -121,14 +126,6 @@ class MemoryPoolActivity : AppCompatActivity() {
         }
         headerRow.addView(categoryBadge)
 
-        val importanceStars = TextView(this).apply {
-            text = " ★".repeat(entry.importance)
-            textSize = 11f
-            setTextColor(0xFFffd700.toInt())
-            setPadding(12, 0, 0, 0)
-        }
-        headerRow.addView(importanceStars)
-
         val spacer = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
         }
@@ -160,6 +157,8 @@ class MemoryPoolActivity : AppCompatActivity() {
     }
 
     private fun getCategoryColor(category: String): Int = when (category) {
+        "场景" -> 0xFF64ffda.toInt()
+        "剧情" -> 0xFF9c7cff.toInt()
         "喜好" -> 0xFF7ec8a0.toInt()
         "习惯" -> 0xFF7eb8e0.toInt()
         "事实" -> 0xFFe0c070.toInt()

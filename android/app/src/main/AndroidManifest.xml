@@ -16,6 +16,7 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <application
         android:name=".CompanionApp"
@@ -118,6 +119,32 @@
         <activity
             android:name="com.aicompanion.wakeup.WakeUpActivity"
             android:label="定时唤醒"
+            android:theme="@style/Theme.Companion" />
+
+        <activity
+            android:name="com.aicompanion.ui.SkinShopActivity"
+            android:label="皮肤商店"
+            android:theme="@style/Theme.Companion" />
+
+        <activity
+            android:name="com.aicompanion.groupchat.GroupChatListActivity"
+            android:label="群聊"
+            android:theme="@style/Theme.Companion" />
+
+        <activity
+            android:name="com.aicompanion.groupchat.GroupChatActivity"
+            android:label="群聊"
+            android:theme="@style/Theme.Companion" />
+
+        <activity
+            android:name="com.aicompanion.ui.LocalModelActivity"
+            android:label="本地模型"
+            android:theme="@style/Theme.Companion" />
+
+        <activity
+            android:name="com.aicompanion.ui.VirtualWorldActivity"
+            android:label="虚拟世界"
+            android:parentActivityName=".ui.SettingsActivity"
             android:theme="@style/Theme.Companion" />
 
         <service

@@ -129,5 +129,26 @@ $screenText
 {"action":"click|back|home|scroll|wait","text":"要点的文字","index":数字索引}
 """.trimIndent()
         }
+
+        fun formatScreenForLLM(localAnalysis: com.aicompanion.localmodel.ScreenAnalysisResult?): String {
+            val screenText = readScreenText()
+            val sb = StringBuilder()
+            sb.appendLine("当前屏幕内容：")
+            sb.appendLine(screenText)
+
+            if (localAnalysis != null) {
+                val visionBlock = localAnalysis.toContextBlock()
+                if (visionBlock.isNotBlank()) {
+                    sb.appendLine()
+                    sb.appendLine("=== 视觉识别 ===")
+                    sb.appendLine(visionBlock)
+                }
+            }
+
+            sb.appendLine()
+            sb.appendLine("请返回一个JSON数组，每个元素包含:")
+            sb.appendLine("{\"action\":\"click|back|home|scroll|wait\",\"text\":\"要点的文字\",\"index\":数字索引}")
+            return sb.toString()
+        }
     }
 }

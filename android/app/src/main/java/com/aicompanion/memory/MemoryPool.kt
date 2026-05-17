@@ -13,24 +13,24 @@ data class MemoryEntry(
     val id: String = UUID.randomUUID().toString().take(8),
     val content: String,
     val category: String = "其他",
-    val importance: Int = 2,
     val timestamp: Long = System.currentTimeMillis(),
     val sourceTurn: Int = 0
 )
 
-class MemoryPool(private val context: Context) {
+class MemoryPool(private val context: Context, private val personaId: String = "default") {
 
     companion object {
         private const val TAG = "MemoryPool"
-        private const val SAVE_INTERVAL = 10
-        private const val NEW_SESSION_THRESHOLD = 5000
-        private const val COMPRESS_THRESHOLD = 10000
+        private const val CONSOLIDATE_INTERVAL = 10
+        private const val MAX_CHARS = 1000
+        private const val COMPRESS_KEEP_CHARS = 800
     }
 
     private val entries = mutableListOf<MemoryEntry>()
-    private var turnsSinceLastSave = 0
+    private var turnsSinceLastConsolidate = 0
+    private var totalTurns = 0
     private var totalCharCount = 0
-    private val prefs = context.getSharedPreferences("memory_pool", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("memory_pool_$personaId", Context.MODE_PRIVATE)
 
     val isEmpty: Boolean get() = entries.isEmpty()
     val size: Int get() = entries.size
@@ -65,31 +65,30 @@ class MemoryPool(private val context: Context) {
     }
 
     fun incrementTurn() {
-        turnsSinceLastSave++
+        turnsSinceLastConsolidate++
+        totalTurns++
     }
 
-    fun needsSave(): Boolean = turnsSinceLastSave >= SAVE_INTERVAL
-
-    fun needsNewSession(): Boolean = totalCharCount > NEW_SESSION_THRESHOLD
+    fun needsConsolidate(): Boolean = turnsSinceLastConsolidate >= CONSOLIDATE_INTERVAL
 
     fun getPoolBlock(): String {
         if (entries.isEmpty()) return ""
 
         val grouped = entries.groupBy { it.category }
         val sb = StringBuilder()
-        sb.appendLine("[记忆池 - 关于用户的关键信息]")
+        sb.appendLine("[记忆池 - 场景、剧情与关键信息]")
 
-        val categoryOrder = listOf("喜好", "习惯", "事实", "事件", "计划", "其他")
+        val categoryOrder = listOf("场景", "剧情", "喜好", "习惯", "事实", "事件", "计划", "继承", "其他")
         for (cat in categoryOrder) {
             val group = grouped[cat] ?: continue
-            for (entry in group.sortedByDescending { it.importance }) {
-                sb.appendLine("- [${entry.category}/${entry.importance}] ${entry.content}")
+            for (entry in group) {
+                sb.appendLine("- [${entry.category}] ${entry.content}")
             }
         }
 
         val uncategorized = entries.filter { it.category !in categoryOrder }
-        for (entry in uncategorized.sortedByDescending { it.importance }) {
-            sb.appendLine("- [${entry.category}/${entry.importance}] ${entry.content}")
+        for (entry in uncategorized) {
+            sb.appendLine("- [${entry.category}] ${entry.content}")
         }
 
         return sb.toString().trimEnd()
@@ -97,22 +96,84 @@ class MemoryPool(private val context: Context) {
 
     fun getPoolCharCount(): Int = totalCharCount
 
-    suspend fun compress(client: ApiClient, keepChars: Int = 500): String = withContext(Dispatchers.IO) {
-        if (entries.isEmpty()) return@withContext ""
+    suspend fun consolidate(client: ApiClient): Boolean = withContext(Dispatchers.IO) {
+        if (entries.isEmpty()) {
+            turnsSinceLastConsolidate = 0
+            return@withContext false
+        }
+
+        AppLogger.d(TAG, "consolidate: starting with ${entries.size} entries, $totalCharCount chars")
 
         val fullPool = getPoolBlock()
-        val systemPrompt = "压缩以下用户记忆池，保留最重要的信息，输出${keepChars}字以内的精简版本。"
-        val userContent = fullPool
+        val systemPrompt = buildString {
+            append("整理以下记忆池，保留所有重要信息（场景、剧情、角色关系、用户喜好等），合并重复项，删除过时信息。")
+            append("\n输出格式：每行一条记忆，格式为 - [分类] 内容")
+            append("\n分类可选：场景/剧情/喜好/习惯/事实/事件/计划/其他")
+            append("\n总字数不超过${MAX_CHARS}字。只输出记忆条目，不要其他内容。")
+        }
 
         try {
-            val response = client.sendSimplePrompt(systemPrompt, userContent)
+            val response = client.sendSimplePrompt(systemPrompt, fullPool)
             if (response != null && response.text.isNotBlank()) {
-                response.text.take(keepChars)
-            } else {
-                fullPool.take(keepChars)
+                val newEntries = parseConsolidatedResult(response.text)
+                if (newEntries.isNotEmpty()) {
+                    entries.clear()
+                    entries.addAll(newEntries)
+                    recalcCharCount()
+                    saveToStorage()
+                    AppLogger.d(TAG, "consolidate: done, ${entries.size} entries, $totalCharCount chars")
+                    turnsSinceLastConsolidate = 0
+                    return@withContext true
+                }
             }
-        } catch (_: Exception) {
-            fullPool.take(keepChars)
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "consolidate failed: ${e.message}")
+        }
+
+        if (totalCharCount > MAX_CHARS) {
+            trimToLimit()
+            saveToStorage()
+        }
+        turnsSinceLastConsolidate = 0
+        return@withContext false
+    }
+
+    private fun parseConsolidatedResult(text: String): List<MemoryEntry> {
+        val results = mutableListOf<MemoryEntry>()
+        val lines = text.lines()
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.isBlank() || trimmed.startsWith("[记忆池")) continue
+
+            val content: String
+            val category: String
+
+            val bracketMatch = Regex("^-\\s*\\[(.+?)\\]\\s*(.+)").find(trimmed)
+            if (bracketMatch != null) {
+                category = bracketMatch.groupValues[1].trim()
+                content = bracketMatch.groupValues[2].trim()
+            } else {
+                val cleanLine = trimmed.removePrefix("-").removePrefix("•").trim()
+                if (cleanLine.isBlank()) continue
+                category = "其他"
+                content = cleanLine
+            }
+
+            if (content.isNotBlank()) {
+                results.add(MemoryEntry(
+                    content = content,
+                    category = category,
+                    sourceTurn = totalTurns
+                ))
+            }
+        }
+        return results
+    }
+
+    private fun trimToLimit() {
+        while (totalCharCount > MAX_CHARS && entries.size > 1) {
+            entries.removeAt(entries.lastIndex)
+            recalcCharCount()
         }
     }
 
@@ -126,10 +187,15 @@ class MemoryPool(private val context: Context) {
         if (userMsg.isBlank() || aiMsg.isBlank()) return@withContext emptyList()
 
         val poolBlock = if (entries.isEmpty()) "（空）" else getPoolBlock()
-        AppLogger.d(TAG, "evaluateTurn #$turnNumber: pool=${entries.size} entries, evaluating...")
+        AppLogger.d(TAG, "evaluateTurn #$turnNumber: pool=${entries.size} entries")
 
         val nick = userNickname.ifBlank { "用户" }
-        val systemPrompt = "你是记忆管理助手。分析对话，判断$nick 的哪些信息值得记住。只输出JSON数组，不需要更新时输出[]。提到$nick 时用「$nick」称呼。分类：喜好/习惯/事实/事件/计划/其他。重要性1-5。"
+        val systemPrompt = buildString {
+            append("你是记忆管理助手。分析对话，提取值得记住的信息（场景、剧情、角色关系、用户喜好等）。")
+            append("\n只输出JSON数组，不需要更新时输出[]。")
+            append("\n分类：场景/剧情/喜好/习惯/事实/事件/计划/其他")
+            append("\n提到$nick 时用「$nick」称呼。")
+        }
 
         val userContent = buildString {
             appendLine("[当前记忆池]")
@@ -140,19 +206,17 @@ class MemoryPool(private val context: Context) {
             appendLine("AI: $aiMsg")
             appendLine()
             appendLine("输出JSON数组（不要Markdown代码块）：")
-            appendLine("[{\"action\":\"add\",\"content\":\"${nick}18岁\",\"category\":\"事实\",\"importance\":5}]")
+            appendLine("[{\"action\":\"add\",\"content\":\"...\",\"category\":\"场景\"}]")
             appendLine("update: remove+add合并, delete: 删除")
         }
 
         try {
             val response = client.sendSimplePrompt(systemPrompt, userContent)
             if (response != null && response.text.isNotBlank()) {
-                AppLogger.d(TAG, "evaluateTurn #$turnNumber raw: ${response.text.take(200)}")
                 val result = parseEvaluationResult(response.text, turnNumber)
                 AppLogger.d(TAG, "evaluateTurn #$turnNumber result: ${result.size} new entries")
                 result
             } else {
-                AppLogger.w(TAG, "evaluateTurn #$turnNumber: LLM returned empty")
                 emptyList()
             }
         } catch (e: Exception) {
@@ -165,7 +229,6 @@ class MemoryPool(private val context: Context) {
         val results = mutableListOf<MemoryEntry>()
         try {
             var cleaned = jsonText.trim()
-
             cleaned = cleaned.replace(Regex("```(?:json)?\\s*"), "").replace("```", "").trim()
 
             val bracketStart = cleaned.indexOf('[')
@@ -190,7 +253,6 @@ class MemoryPool(private val context: Context) {
                             results.add(MemoryEntry(
                                 content = content,
                                 category = obj.optString("category", "其他"),
-                                importance = obj.optInt("importance", 2).coerceIn(1, 5),
                                 sourceTurn = turnNumber
                             ))
                         }
@@ -208,7 +270,6 @@ class MemoryPool(private val context: Context) {
                                 results.add(matched.copy(
                                     content = newContent,
                                     category = obj.optString("category", matched.category),
-                                    importance = obj.optInt("importance", matched.importance).coerceIn(1, 5),
                                     timestamp = System.currentTimeMillis(),
                                     sourceTurn = turnNumber
                                 ))
@@ -216,7 +277,6 @@ class MemoryPool(private val context: Context) {
                                 results.add(MemoryEntry(
                                     content = newContent,
                                     category = obj.optString("category", "其他"),
-                                    importance = obj.optInt("importance", 2).coerceIn(1, 5),
                                     sourceTurn = turnNumber
                                 ))
                             }
@@ -231,7 +291,7 @@ class MemoryPool(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "parseEvaluationResult error: ${e.message}, raw=$jsonText")
+            AppLogger.e(TAG, "parseEvaluationResult error: ${e.message}")
         }
         return results
     }
@@ -244,16 +304,15 @@ class MemoryPool(private val context: Context) {
                 obj.put("id", entry.id)
                 obj.put("content", entry.content)
                 obj.put("category", entry.category)
-                obj.put("importance", entry.importance)
                 obj.put("timestamp", entry.timestamp)
                 obj.put("sourceTurn", entry.sourceTurn)
                 arr.put(obj)
             }
             prefs.edit()
                 .putString("entries", arr.toString())
-                .putInt("turns_since_save", 0)
+                .putInt("turns_since_consolidate", turnsSinceLastConsolidate)
+                .putInt("total_turns", totalTurns)
                 .apply()
-            turnsSinceLastSave = 0
         } catch (_: Exception) {}
     }
 
@@ -268,12 +327,12 @@ class MemoryPool(private val context: Context) {
                     id = obj.optString("id", UUID.randomUUID().toString().take(8)),
                     content = obj.getString("content"),
                     category = obj.optString("category", "其他"),
-                    importance = obj.optInt("importance", 2),
                     timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
                     sourceTurn = obj.optInt("sourceTurn", 0)
                 ))
             }
-            turnsSinceLastSave = prefs.getInt("turns_since_save", 0)
+            turnsSinceLastConsolidate = prefs.getInt("turns_since_consolidate", 0)
+            totalTurns = prefs.getInt("total_turns", 0)
             recalcCharCount()
         } catch (_: Exception) {
             entries.clear()
@@ -287,7 +346,8 @@ class MemoryPool(private val context: Context) {
     fun clear() {
         entries.clear()
         totalCharCount = 0
-        turnsSinceLastSave = 0
+        turnsSinceLastConsolidate = 0
+        totalTurns = 0
         prefs.edit().clear().apply()
     }
 

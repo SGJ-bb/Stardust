@@ -36,6 +36,14 @@ class HomeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        if (!prefs.getBoolean("is_activated", false)) {
+            startActivity(Intent(this, ActivationActivity::class.java))
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_home)
 
         personaManager = PersonaManager(this)
@@ -55,6 +63,12 @@ class HomeActivity : AppCompatActivity() {
         com.aicompanion.anim.AnimeUtils.setupTouchScale(btnMoments)
         btnMoments.setOnClickListener {
             startActivity(Intent(this, com.aicompanion.moments.MomentsActivity::class.java))
+        }
+
+        val btnGroupChat = findViewById<View>(R.id.btn_group_chat_entry)
+        com.aicompanion.anim.AnimeUtils.setupTouchScale(btnGroupChat)
+        btnGroupChat.setOnClickListener {
+            startActivity(Intent(this, com.aicompanion.groupchat.GroupChatListActivity::class.java))
         }
 
         val btnSettings = findViewById<View>(R.id.btn_settings_entry)

@@ -47,7 +47,9 @@ class MomentsActivity : AppCompatActivity() {
     }
 
     private fun getPersonaInfo(): Pair<String, String> {
-        val personaPrefs = getSharedPreferences("persona_data", MODE_PRIVATE)
+        val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            .getString("active_persona_id", "default") ?: "default"
+        val personaPrefs = getSharedPreferences("persona_data_$activeId", MODE_PRIVATE)
         val appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         val name = personaPrefs.getString("persona_name", null)
             ?: appPrefs.getString("ai_name", "星尘") ?: "星尘"
