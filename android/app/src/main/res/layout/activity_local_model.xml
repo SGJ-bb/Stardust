@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0a0a1a"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🧠 本地模型管理"
+            android:textColor="#ffffff"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#1a1a2e"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📱 设备信息"
+                    android:textColor="#ffffff"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvDeviceInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#aaaaaa"
+                    android:textSize="13sp"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvRamInfo"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#aaaaaa"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvStorageInfo"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#aaaaaa"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvRecommendedTier"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#4CAF50"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="8dp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#1a1a2e"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="⚙️ 功能开关"
+                    android:textColor="#ffffff"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchOcr"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="OCR 文字识别"
+                    android:textColor="#cccccc"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="识别屏幕截图中的文字（游戏/图片中的文字）"
+                    android:textColor="#888888"
+                    android:textSize="11sp"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchScene"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="场景分类"
+                    android:textColor="#cccccc"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="自动识别当前屏幕场景类型（聊天/游戏/浏览器等）"
+                    android:textColor="#888888"
+                    android:textSize="11sp"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchAutoAnalyze"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="自动分析屏幕"
+                    android:textColor="#cccccc"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="开启后AI搭话时会自动分析屏幕内容作为上下文"
+                    android:textColor="#888888"
+                    android:textSize="11sp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📦 可用模型"
+            android:textColor="#ffffff"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/modelListContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#1a1a2e"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            android:layout_marginTop="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📸 屏幕截图"
+                    android:textColor="#ffffff"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvCaptureStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="未开启截屏权限"
+                    android:textColor="#aaaaaa"
+                    android:textSize="13sp"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRequestCapture"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="请求截屏权限"
+                    app:backgroundTint="#2196F3"
+                    app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTestCapture"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="测试截图"
+                    app:backgroundTint="#4CAF50"
+                    app:cornerRadius="8dp"
+                    android:layout_marginTop="4dp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#1a1a2e"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            android:layout_marginTop="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="💡 说明"
+                    android:textColor="#ffffff"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="• 轻量模型已内置，无需下载即可使用\n• 标准版和专业版模型需根据设备性能选择下载\n• 模型越大，识别越准确，但消耗更多资源\n• OCR模型首次使用时会自动下载（约20MB）\n• TFLite模型文件放置在 assets/models/ 目录即可内置"
+                    android:textColor="#888888"
+                    android:textSize="12sp"
+                    android:lineSpacingExtra="4dp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

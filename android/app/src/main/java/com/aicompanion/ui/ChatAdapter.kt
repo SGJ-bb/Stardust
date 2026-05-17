@@ -409,11 +409,23 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
             bindReaction(message)
             applyBubbleColor(bubble, color, radius)
             loadUserAvatar()
-            val userSkin = com.aicompanion.theme.BubbleSkinManager.getActiveSkin(itemView.context)
-            com.aicompanion.theme.BubbleSkinManager.applyBubbleSkin(bubble, userSkin, true)
-            val userFrame = com.aicompanion.theme.BubbleSkinManager.getActiveUserFrame(itemView.context)
+            val imageBubble = com.aicompanion.theme.BubbleSkinManager.getActiveImageBubble(itemView.context)
+            if (imageBubble != null) {
+                com.aicompanion.theme.BubbleSkinManager.applyImageBubbleSkin(bubble, itemView.context, imageBubble)
+            } else {
+                val userSkin = com.aicompanion.theme.BubbleSkinManager.getActiveSkin(itemView.context)
+                com.aicompanion.theme.BubbleSkinManager.applyBubbleSkin(bubble, userSkin, true)
+            }
+            val userImageFrame = com.aicompanion.theme.BubbleSkinManager.getActiveUserImageFrame(itemView.context)
             val userAvatarCard = itemView.findViewById<com.google.android.material.card.MaterialCardView>(R.id.iv_user_avatar_chat)
-            if (userAvatarCard != null) com.aicompanion.theme.BubbleSkinManager.applyAvatarFrame(userAvatarCard, userFrame)
+            val userFrameLayout = itemView.findViewById<android.widget.FrameLayout>(R.id.frame_user_avatar)
+            if (userImageFrame != null && userFrameLayout != null) {
+                com.aicompanion.theme.BubbleSkinManager.applyImageAvatarFrame(userFrameLayout, itemView.context, userImageFrame)
+            } else {
+                userFrameLayout?.let { com.aicompanion.theme.BubbleSkinManager.clearImageAvatarFrame(it) }
+                val userFrame = com.aicompanion.theme.BubbleSkinManager.getActiveUserFrame(itemView.context)
+                if (userAvatarCard != null) com.aicompanion.theme.BubbleSkinManager.applyAvatarFrame(userAvatarCard, userFrame)
+            }
             bubble.setOnLongClickListener {
                 showPopupMenu(bubble, currentPosition, message)
                 true
@@ -552,11 +564,23 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
             applyBubbleColor(bubble, color, radius)
             loadAiAvatar()
 
-            val skin = com.aicompanion.theme.BubbleSkinManager.getActiveSkin(itemView.context)
-            com.aicompanion.theme.BubbleSkinManager.applyBubbleSkin(bubble, skin, false)
-            val aiFrame = com.aicompanion.theme.BubbleSkinManager.getActiveAiFrame(itemView.context)
+            val imageBubble = com.aicompanion.theme.BubbleSkinManager.getActiveImageBubble(itemView.context)
+            if (imageBubble != null) {
+                com.aicompanion.theme.BubbleSkinManager.applyImageBubbleSkin(bubble, itemView.context, imageBubble)
+            } else {
+                val skin = com.aicompanion.theme.BubbleSkinManager.getActiveSkin(itemView.context)
+                com.aicompanion.theme.BubbleSkinManager.applyBubbleSkin(bubble, skin, false)
+            }
+            val aiImageFrame = com.aicompanion.theme.BubbleSkinManager.getActiveAiImageFrame(itemView.context)
             val aiAvatarCard = itemView.findViewById<com.google.android.material.card.MaterialCardView>(R.id.iv_ai_avatar_chat)
-            if (aiAvatarCard != null) com.aicompanion.theme.BubbleSkinManager.applyAvatarFrame(aiAvatarCard, aiFrame)
+            val aiFrameLayout = itemView.findViewById<android.widget.FrameLayout>(R.id.frame_ai_avatar)
+            if (aiImageFrame != null && aiFrameLayout != null) {
+                com.aicompanion.theme.BubbleSkinManager.applyImageAvatarFrame(aiFrameLayout, itemView.context, aiImageFrame)
+            } else {
+                aiFrameLayout?.let { com.aicompanion.theme.BubbleSkinManager.clearImageAvatarFrame(it) }
+                val aiFrame = com.aicompanion.theme.BubbleSkinManager.getActiveAiFrame(itemView.context)
+                if (aiAvatarCard != null) com.aicompanion.theme.BubbleSkinManager.applyAvatarFrame(aiAvatarCard, aiFrame)
+            }
 
             btnLike.alpha = 0f
             btnDislike.alpha = 0f

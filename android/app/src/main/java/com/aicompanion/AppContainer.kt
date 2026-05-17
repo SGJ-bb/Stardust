@@ -30,6 +30,7 @@ object AppContainer {
     private var _stickerManager: StickerManager? = null
     private var _searchMemoryPlugin: SearchMemoryPlugin? = null
     private var _nicknamePlugin: NicknamePlugin? = null
+    private var _generateImagePlugin: GenerateImagePlugin? = null
 
     val settingsManager: SettingsManager get() = _settingsManager!!
     val affectionManager: AffectionManager get() = _affectionManager!!
@@ -81,6 +82,8 @@ object AppContainer {
         PluginRegistry.register(_nicknamePlugin!!)
         val sendStickerPlugin = SendStickerPlugin(context)
         PluginRegistry.register(sendStickerPlugin)
+        _generateImagePlugin = GenerateImagePlugin(context)
+        PluginRegistry.register(_generateImagePlugin!!)
     }
 
     fun setSearchMemoryCallback(callback: (String, Int) -> String) {
@@ -94,6 +97,18 @@ object AppContainer {
     fun setStickerCallback(callback: (String) -> Unit) {
         val plugin = PluginRegistry.getPlugin("send_sticker") as? SendStickerPlugin
         plugin?.onStickerSent = callback
+    }
+
+    fun setImageGeneratedCallback(callback: (String) -> Unit) {
+        _generateImagePlugin?.onImageGenerated = callback
+    }
+
+    fun setAssociatedEventId(eventId: String?) {
+        _generateImagePlugin?.associatedEventId = eventId
+    }
+
+    fun setImagePluginWorldId(worldId: String) {
+        _generateImagePlugin?.worldId = worldId
     }
 
     fun isInitialized(): Boolean = _settingsManager != null

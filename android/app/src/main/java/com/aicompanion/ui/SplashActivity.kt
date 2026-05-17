@@ -12,6 +12,34 @@ class SplashActivity : android.app.Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        val ageConfirmed = prefs.getBoolean("age_confirmed", false)
+
+        if (!ageConfirmed) {
+            showAgeConfirmation()
+            return
+        }
+
+        showSplash()
+    }
+
+    private fun showAgeConfirmation() {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("📋 使用须知")
+            .setMessage("1. 本应用仅供娱乐和创意交流使用。\n\n2. AI生成的内容不代表开发者立场，用户需自行判断和负责。\n\n3. 用户使用本应用产生的任何行为和后果，均与开发者无关。\n\n4. 请确认您已年满18岁。\n\n⚠️ 继续使用即表示您同意以上条款。")
+            .setCancelable(false)
+            .setPositiveButton("我已满18岁，同意以上条款") { _, _ ->
+                getSharedPreferences("app_prefs", MODE_PRIVATE)
+                    .edit().putBoolean("age_confirmed", true).apply()
+                showSplash()
+            }
+            .setNegativeButton("不同意") { _, _ ->
+                finish()
+            }
+            .show()
+    }
+
+    private fun showSplash() {
         val imageView = ImageView(this)
         imageView.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
         imageView.setImageResource(R.drawable.tubiao)
@@ -50,6 +78,4 @@ class SplashActivity : android.app.Activity() {
                 .start()
         }, 1500)
     }
-
-    private val easeInCubic = android.view.animation.Interpolator { t -> t * t * t }
 }

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0a0a1a">
+
+    <ImageView
+        android:id="@+id/iv_group_chat_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0.3" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#cc0a0a1a"
+            android:elevation="6dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="12dp">
+
+            <ImageView
+                android:id="@+id/btn_back"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:src="@android:drawable/ic_menu_revert"
+                android:padding="10dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="返回" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/tv_group_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="17sp"
+                    android:textColor="@android:color/white"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/tv_member_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="11sp"
+                    android:textColor="#8899bb" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/btn_speak_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="🤖 自动"
+                android:textSize="12sp"
+                android:textColor="#aabbdd"
+                android:background="@drawable/bg_edit_moment"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/btn_add_member"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:gravity="center"
+                android:text="➕"
+                android:textSize="14sp"
+                android:layout_marginStart="6dp"
+                android:textColor="#64ffda"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_group_messages"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="48dp" />
+
+        <LinearLayout
+            android:id="@+id/layout_manual_select"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#1a1a3e"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:visibility="gone">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chip_group_personas"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:singleSelection="false"
+                app:chipSpacingHorizontal="6dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#14142a"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp">
+
+            <TextView
+                android:id="@+id/btn_at"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:gravity="center"
+                android:text="@"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#667eea"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <ImageView
+                android:id="@+id/btn_image_upload"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_menu_gallery"
+                android:scaleType="centerInside"
+                android:padding="6dp"
+                android:layout_marginStart="2dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                app:tint="#667eea" />
+
+            <EditText
+                android:id="@+id/et_message"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:hint="说点什么..."
+                android:textSize="14sp"
+                android:textColor="#e0e0f0"
+                android:textColorHint="#556677"
+                android:background="@drawable/bg_edit_moment"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:maxLines="3"
+                android:inputType="textMultiLine"
+                android:importantForAutofill="no" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_send"
+                android:layout_width="48dp"
+                android:layout_height="42dp"
+                android:layout_marginStart="8dp"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="21dp"
+                app:icon="@android:drawable/ic_menu_send"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:backgroundTint="#667eea"
+                android:contentDescription="发送" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_virtual_world"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="🌍 虚拟世界"
+            android:textSize="14sp"
+            android:textColor="#c4b5fd"
+            app:cornerRadius="0dp"
+            app:backgroundTint="#1a1a3e"
+            app:strokeColor="#3a3a6e"
+            app:strokeWidth="0.5dp"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:drawableEnd="@android:drawable/ic_media_play"
+            android:letterSpacing="0.05" />
+    </LinearLayout>
+</FrameLayout>

@@ -186,8 +186,6 @@ class WakeUpTaskManager(private val context: Context) {
 
     private fun cancelOrphanedAlarms(alarmManager: AlarmManager) {
         val validIds = tasks.map { it.id }.toSet()
-        val oldSchedulerPrefs = context.getSharedPreferences("wakeup_settings", Context.MODE_PRIVATE)
-        oldSchedulerPrefs.edit().clear().apply()
     }
 
     fun rescheduleOnBoot() {

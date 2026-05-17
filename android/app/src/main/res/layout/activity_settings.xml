@@ -117,6 +117,20 @@
                     app:backgroundTint="@android:color/transparent"
                     style="@style/Widget.Material3.Button.OutlinedButton" />
 
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_local_model"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:text="🧠 本地模型管理"
+                    android:textSize="14sp"
+                    android:layout_marginTop="8dp"
+                    app:cornerRadius="22dp"
+                    app:strokeColor="#4CAF50"
+                    app:strokeWidth="1dp"
+                    android:textColor="#66bb6a"
+                    app:backgroundTint="@android:color/transparent"
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
+
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
@@ -951,6 +965,139 @@
                     android:textSize="12sp"
                     android:textColor="#557788"
                     android:layout_marginTop="4dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#2a2a4a"
+                    android:layout_marginVertical="12dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🌍 虚拟世界"
+                            android:textSize="15sp"
+                            android:textColor="#ffffff" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="AI在虚拟世界中自主推演剧情"
+                            android:textSize="12sp"
+                            android:textColor="#557788"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switch_virtual_world"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_virtual_world"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:text="🌍 进入虚拟世界"
+                    android:textSize="14sp"
+                    android:layout_marginTop="8dp"
+                    app:cornerRadius="22dp"
+                    app:strokeColor="#9c7cff"
+                    app:strokeWidth="1dp"
+                    android:textColor="#c4b5fd"
+                    app:backgroundTint="@android:color/transparent"
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#2a2a4a"
+                    android:layout_marginVertical="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🖼️ 图片生成API"
+                    android:textSize="15sp"
+                    android:textColor="#ffffff" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="用于虚拟世界配图和AI生图工具"
+                    android:textSize="12sp"
+                    android:textColor="#557788"
+                    android:layout_marginTop="2dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="图片生成API地址"
+                    app:boxBackgroundColor="#151525"
+                    app:boxStrokeColor="#2a2a4a"
+                    app:hintTextColor="#556677"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_image_api_url"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textUri"
+                        android:textColor="#d0d0e0"
+                        android:textColorHint="#556677" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="图片生成API Key"
+                    app:boxBackgroundColor="#151525"
+                    app:boxStrokeColor="#2a2a4a"
+                    app:hintTextColor="#556677"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_image_api_key"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:textColor="#d0d0e0"
+                        android:textColorHint="#556677" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="图片生成模型名称"
+                    app:boxBackgroundColor="#151525"
+                    app:boxStrokeColor="#2a2a4a"
+                    app:hintTextColor="#556677"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_image_model"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:text="dall-e-3"
+                        android:textColor="#d0d0e0"
+                        android:textColorHint="#556677" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -1418,6 +1565,41 @@
                     android:paddingEnd="32dp"
                     android:layout_marginTop="16dp"
                     style="@style/Widget.Material3.Button" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            app:cardBackgroundColor="#1a1a3e"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="#2a2a5a">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📋 免责声明"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="#ff6b9d"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1. 本应用仅供娱乐和创意交流使用，AI生成的内容不代表开发者立场。\n2. 用户使用本应用产生的任何行为和后果，均与开发者无关。\n3. 用户应遵守当地法律法规，对自身行为负责。\n4. 本应用不收集任何个人隐私数据。"
+                    android:textSize="12sp"
+                    android:textColor="#8899bb"
+                    android:lineSpacingExtra="4dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

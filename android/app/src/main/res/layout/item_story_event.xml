@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    app:cardBackgroundColor="#12122e"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="1dp"
+    app:strokeWidth="0.5dp"
+    app:strokeColor="#2a2a5a">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tv_event_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="第1天 08:00"
+                android:textSize="10sp"
+                android:textColor="#667eea"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/tv_event_speaker"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="旁白"
+                android:textSize="10sp"
+                android:textColor="#9c7cff" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_event_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="剧情内容"
+            android:textSize="13sp"
+            android:textColor="#d0d0e8"
+            android:lineSpacingExtra="3dp"
+            android:layout_marginTop="6dp" />
+
+        <ImageView
+            android:id="@+id/iv_event_image"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:scaleType="centerCrop"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            android:contentDescription="剧情配图" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

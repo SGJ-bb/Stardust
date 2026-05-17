@@ -10,6 +10,7 @@ class CompanionApp : Application() {
     override fun onCreate() {
         super.onCreate()
         AppContainer.initialize(this)
+        com.aicompanion.migration.DataMigrationManager.migrateIfNeeded(this)
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             Log.e("CompanionApp", "FATAL on ${thread.name}: ${throwable.javaClass.simpleName}: ${throwable.message}", throwable)
             try {

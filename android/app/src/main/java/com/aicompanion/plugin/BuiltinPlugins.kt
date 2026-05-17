@@ -11,6 +11,8 @@ import com.aicompanion.search.WebSearchEngine
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.util.AppLogger
 import com.aicompanion.sticker.StickerManager
+import com.aicompanion.virtualworld.VirtualWorldManager
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -247,5 +249,67 @@ class SendStickerPlugin(private val context: Context) : ToolPlugin {
             onStickerSent?.invoke(sticker.filePath)
         }
         return "已发送表情包：${sticker.description.ifBlank { sticker.emotion }}（${sticker.id.removePrefix("builtin_")}）"
+    }
+}
+
+class GenerateImagePlugin(private val context: Context) : ToolPlugin {
+    override val name = "generate_image"
+    override val description = "AI生成图片"
+    var onImageGenerated: ((String) -> Unit)? = null
+    var associatedEventId: String? = null
+    var worldId: String = ""
+
+    override fun isEnabled(): Boolean {
+        val vwManager = VirtualWorldManager(context, worldId)
+        if (vwManager.hasImageModelConfigured()) return true
+        val globalVw = VirtualWorldManager(context, "")
+        return globalVw.hasImageModelConfigured()
+    }
+
+    override fun getDefinition() = ToolDefinition(
+        name = "generate_image",
+        description = "根据文字描述生成一张图片。适用场景：1)虚拟世界推演时，为重要场景或关键时刻生成配图；2)用户让你画图、生成图片时；3)你想用图片展示某个场景时。只在确实需要图片时调用，不要每次都调用。",
+        parameters = mapOf(
+            "type" to "object",
+            "properties" to mapOf(
+                "prompt" to mapOf("type" to "string", "description" to "图片描述，用英文描述效果更好，如：a girl standing under cherry blossoms, anime style, soft lighting"),
+                "style" to mapOf("type" to "string", "description" to "风格提示，可选。如：anime style, realistic, watercolor, pixel art等")
+            ),
+            "required" to listOf("prompt")
+        )
+    )
+
+    override fun execute(arguments: String): String {
+        val args = JSONObject(arguments)
+        val prompt = args.optString("prompt", "")
+        if (prompt.isBlank()) return "请提供图片描述"
+        val style = args.optString("style", "")
+        val fullPrompt = if (style.isNotBlank()) "$prompt, $style" else prompt
+
+        val vwManager = VirtualWorldManager(context, worldId)
+        val effectiveManager = if (vwManager.hasImageModelConfigured()) vwManager
+            else VirtualWorldManager(context, "")
+
+        if (!effectiveManager.hasImageModelConfigured()) {
+            return "图片生成API未配置，请在虚拟世界设置中配置图片生成API"
+        }
+
+        val eventId = associatedEventId ?: java.util.UUID.randomUUID().toString()
+        AppLogger.d("GenerateImagePlugin", "generate_image: prompt=$fullPrompt, eventId=$eventId")
+
+        return try {
+            val result = runBlocking {
+                effectiveManager.generateImageForEvent(fullPrompt, eventId)
+            }
+            if (result != null) {
+                onImageGenerated?.invoke(result)
+                "图片已生成成功，路径：$result"
+            } else {
+                "图片生成失败，请稍后再试"
+            }
+        } catch (e: Exception) {
+            AppLogger.e("GenerateImagePlugin", "execute failed: ${e.message}")
+            "图片生成失败：${e.message}"
+        }
     }
 }

@@ -7,24 +7,34 @@
     android:padding="4dp"
     android:gravity="start">
 
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/iv_ai_avatar_chat"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+    <FrameLayout
+        android:id="@+id/frame_ai_avatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_marginEnd="6dp"
-        app:cardCornerRadius="18dp"
-        app:cardElevation="0dp"
-        app:cardBackgroundColor="#1a1a3e"
-        app:strokeWidth="1.5dp"
-        app:strokeColor="#667eea">
+        android:layout_gravity="bottom"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
-        <ImageView
-            android:id="@+id/iv_ai_avatar_img"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_avatar_default_ai" />
-    </com.google.android.material.card.MaterialCardView>
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/iv_ai_avatar_chat"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            app:cardCornerRadius="18dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="#1a1a3e"
+            app:strokeWidth="1.5dp"
+            app:strokeColor="#667eea">
+
+            <ImageView
+                android:id="@+id/iv_ai_avatar_img"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_avatar_default_ai" />
+        </com.google.android.material.card.MaterialCardView>
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"
@@ -37,7 +47,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_message_pet"
-            android:maxWidth="260dp"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
             android:paddingTop="8dp"
@@ -54,7 +63,8 @@
                     android:layout_height="wrap_content"
                     android:textColor="#e8e8e8"
                     android:textSize="14sp"
-                    android:lineSpacingExtra="2dp" />
+                    android:lineSpacingExtra="2dp"
+                    android:maxWidth="260dp" />
             </LinearLayout>
 
             <TextView

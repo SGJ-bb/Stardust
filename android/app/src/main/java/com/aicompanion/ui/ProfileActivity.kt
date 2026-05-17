@@ -24,6 +24,7 @@ import com.aicompanion.gamify.AchievementManager
 import com.aicompanion.memory.MemorableMomentsManager
 import com.aicompanion.memory.ScoredMemory
 import com.aicompanion.persona.PersonaManager
+import com.aicompanion.stats.PersonaStatsManager
 import java.io.File
 import java.io.FileOutputStream
 
@@ -41,6 +42,7 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var momentsManager: MemorableMomentsManager
     private lateinit var diaryManager: DiaryManager
     private lateinit var favoriteManager: FavoriteManager
+    private lateinit var statsManager: PersonaStatsManager
 
     private lateinit var ivAiAvatar: ImageView
     private lateinit var ivUserAvatar: ImageView
@@ -74,6 +76,7 @@ class ProfileActivity : AppCompatActivity() {
         momentsManager = MemorableMomentsManager(this, personaId)
         diaryManager = DiaryManager(this, personaId)
         favoriteManager = FavoriteManager(this, personaId)
+        statsManager = PersonaStatsManager(this, personaId)
 
         initViews()
         loadData()
@@ -84,6 +87,29 @@ class ProfileActivity : AppCompatActivity() {
         val toolbar = findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)
         toolbar?.let {
             com.aicompanion.anim.AnimeUtils.fadeInScale(it, delay = 50)
+        }
+
+        val cardStats = findViewById<com.google.android.material.card.MaterialCardView>(R.id.card_stats)
+        cardStats?.let {
+            it.alpha = 0f
+            it.translationY = 30f
+            it.animate().alpha(1f).translationY(0f).setDuration(500).setStartDelay(150).start()
+        }
+
+        val statIds = intArrayOf(
+            R.id.tv_stat_total_msgs, R.id.tv_stat_chat_days, R.id.tv_stat_streak,
+            R.id.tv_stat_user_msgs, R.id.tv_stat_ai_msgs, R.id.tv_stat_stickers,
+            R.id.tv_stat_words, R.id.tv_stat_avg_day, R.id.tv_stat_peak_hour
+        )
+        for ((i, id) in statIds.withIndex()) {
+            val tv = findViewById<TextView>(id)
+            tv?.let {
+                it.alpha = 0f
+                it.scaleX = 0.5f
+                it.scaleY = 0.5f
+                it.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(350).setStartDelay(300L + i * 60L).start()
+            }
         }
     }
 
@@ -130,7 +156,7 @@ class ProfileActivity : AppCompatActivity() {
         val persona = personaManager.getPersona(personaId)
         tvAiName.text = persona?.name ?: "星尘"
 
-        val userCall = getSharedPreferences("persona_data", MODE_PRIVATE)
+        val userCall = getSharedPreferences("persona_data_$personaId", MODE_PRIVATE)
             .getString("user_nickname", null)
             ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
                 .getString("user_call_name", "") ?: ""
@@ -146,7 +172,33 @@ class ProfileActivity : AppCompatActivity() {
         loadAvatars()
         loadMoments()
         loadFavorites()
+        loadStats()
     }
+
+    private fun loadStats() {
+        val stats = statsManager
+        findViewById<TextView>(R.id.tv_stat_total_msgs)?.text = formatNumber(stats.totalMessages)
+        findViewById<TextView>(R.id.tv_stat_chat_days)?.text = stats.totalChatDays.toString()
+        findViewById<TextView>(R.id.tv_stat_streak)?.text = stats.currentStreak.toString()
+        findViewById<TextView>(R.id.tv_stat_user_msgs)?.text = formatNumber(stats.userMessages)
+        findViewById<TextView>(R.id.tv_stat_ai_msgs)?.text = formatNumber(stats.aiMessages)
+        findViewById<TextView>(R.id.tv_stat_stickers)?.text = formatNumber(stats.stickersSent + stats.stickersReceived)
+        val totalWords = stats.totalWordsUser + stats.totalWordsAi
+        findViewById<TextView>(R.id.tv_stat_words)?.text = formatNumber(totalWords)
+        findViewById<TextView>(R.id.tv_stat_avg_day)?.text = String.format("%.1f", stats.getAvgMessagesPerDay())
+        val peakHour = stats.getPeakChatHour()
+        findViewById<TextView>(R.id.tv_stat_peak_hour)?.text = if (peakHour >= 0) "${peakHour}:00" else "--"
+    }
+
+    private fun formatNumber(n: Long): String {
+        return when {
+            n >= 10000 -> String.format("%.1fw", n / 10000.0)
+            n >= 1000 -> String.format("%.1fk", n / 1000.0)
+            else -> n.toString()
+        }
+    }
+
+    private fun formatNumber(n: Int): String = formatNumber(n.toLong())
 
     private fun loadAvatars() {
         val persona = personaManager.getPersona(personaId)
