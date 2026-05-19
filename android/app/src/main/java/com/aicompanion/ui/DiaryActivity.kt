@@ -271,10 +271,10 @@ class DiaryActivity : AppCompatActivity() {
         contentView.findViewById<TextView>(R.id.tv_detail_tags)?.text = if (diary.tags.isNotEmpty()) "标签: ${diary.tags.joinToString(", ")}" else ""
         contentView.findViewById<TextView>(R.id.tv_detail_content)?.text = diary.content
 
-        android.app.AlertDialog.Builder(this)
-            .setTitle(diary.title)
-            .setView(contentView)
-            .setPositiveButton("关闭", null)
-            .show()
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        sheet.setContentView(contentView)
+        sheet.behavior.peekHeight = (resources.displayMetrics.heightPixels * 0.85).toInt()
+        sheet.behavior.isDraggable = true
+        sheet.show()
     }
 }

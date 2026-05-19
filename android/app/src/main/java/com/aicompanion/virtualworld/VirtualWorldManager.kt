@@ -2,6 +2,9 @@ package com.aicompanion.virtualworld
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.aicompanion.memory.MemoryManager
 import com.aicompanion.network.ApiClient
 import com.aicompanion.persona.PersonaManager
@@ -11,12 +14,14 @@ import com.aicompanion.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
+import java.util.concurrent.TimeUnit
 
 class VirtualWorldManager(private val context: Context, worldId: String = "") {
 
@@ -28,6 +33,8 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
         private const val KEY_STATE = "vw_state"
         private const val KEY_STORY = "vw_story"
         private const val KEY_LAST_TICK = "vw_last_tick"
+        private const val KEY_TICK_INDEX = "vw_tick_index"
+        private const val KEY_TICK_COUNT = "vw_tick_count"
         private const val KEY_IMAGE_API_URL = "vw_image_api_url"
         private const val KEY_IMAGE_API_KEY = "vw_image_api_key"
         private const val KEY_IMAGE_MODEL = "vw_image_model"
@@ -37,11 +44,44 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
         }
     }
 
+    private val downloadClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
     private val prefs: SharedPreferences =
         context.getSharedPreferences(prefsNameForWorld(worldId), Context.MODE_PRIVATE)
 
     private val globalPrefs: SharedPreferences =
         context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+
+    private val securePrefs: SharedPreferences by lazy {
+        try {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            EncryptedSharedPreferences.create(
+                context,
+                "companion_secure_prefs",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to create EncryptedSharedPreferences, falling back to regular prefs", e)
+            context.getSharedPreferences("companion_prefs_fallback", Context.MODE_PRIVATE)
+        }
+    }
+
+    init {
+        for (key in listOf("image_api_url", "image_api_key", "image_model")) {
+            val oldValue = globalPrefs.getString(key, null)
+            if (oldValue != null && securePrefs.getString(key, null) == null) {
+                securePrefs.edit().putString(key, oldValue).apply()
+                globalPrefs.edit().remove(key).apply()
+            }
+        }
+    }
 
     val currentWorldId: String = worldId
 
@@ -74,16 +114,16 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
         set(value) = prefs.edit().putLong(KEY_LAST_TICK, value).apply()
 
     var imageApiUrl: String
-        get() = globalPrefs.getString("image_api_url", "") ?: ""
-        set(value) = globalPrefs.edit().putString("image_api_url", value).apply()
+        get() = securePrefs.getString("image_api_url", "") ?: ""
+        set(value) = securePrefs.edit().putString("image_api_url", value).apply()
 
     var imageApiKey: String
-        get() = globalPrefs.getString("image_api_key", "") ?: ""
-        set(value) = globalPrefs.edit().putString("image_api_key", value).apply()
+        get() = securePrefs.getString("image_api_key", "") ?: ""
+        set(value) = securePrefs.edit().putString("image_api_key", value).apply()
 
     var imageModel: String
-        get() = globalPrefs.getString("image_model", "dall-e-3") ?: "dall-e-3"
-        set(value) = globalPrefs.edit().putString("image_model", value).apply()
+        get() = securePrefs.getString("image_model", "dall-e-3") ?: "dall-e-3"
+        set(value) = securePrefs.edit().putString("image_model", value).apply()
 
     fun getStoryEvents(): List<StoryEvent> {
         val json = prefs.getString(KEY_STORY, "[]") ?: "[]"
@@ -126,17 +166,21 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
         val tickMinutes = config.tickIntervalMinutes
         val virtualMinutesAdvanced = tickMinutes * ratio
 
-        var newHour = currentState.hourOfDay + (virtualMinutesAdvanced / 60)
+        var totalMinutes = currentState.hourOfDay * 60 + currentState.minuteOfHour + virtualMinutesAdvanced
         var newDay = currentState.dayCount
 
-        while (newHour >= 24) {
-            newHour -= 24
+        while (totalMinutes >= 24 * 60) {
+            totalMinutes -= 24 * 60
             newDay++
         }
+
+        val newHour = totalMinutes / 60
+        val newMinute = totalMinutes % 60
 
         val newState = currentState.copy(
             dayCount = newDay,
             hourOfDay = newHour,
+            minuteOfHour = newMinute,
             virtualTimeMs = currentState.virtualTimeMs + virtualMinutesAdvanced * 60_000L
         )
         state = newState
@@ -144,27 +188,77 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
         return newState
     }
 
+    var tickCount: Int
+        get() = prefs.getInt(KEY_TICK_COUNT, 0)
+        set(value) = prefs.edit().putInt(KEY_TICK_COUNT, value).apply()
+
+    fun getTickIndexList(): List<TickIndex> {
+        val json = prefs.getString(KEY_TICK_INDEX, "[]") ?: "[]"
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { TickIndex.fromJson(arr.getJSONObject(it)) }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun addTickIndex(index: TickIndex) {
+        val indices = getTickIndexList().toMutableList()
+        indices.add(index)
+        if (indices.size > 500) {
+            val kept = indices.takeLast(500)
+            prefs.edit().putString(KEY_TICK_INDEX, JSONArray().apply {
+                kept.forEach { put(it.toJson()) }
+            }.toString()).apply()
+        } else {
+            prefs.edit().putString(KEY_TICK_INDEX, JSONArray().apply {
+                indices.forEach { put(it.toJson()) }
+            }.toString()).apply()
+        }
+    }
+
+    fun getEventsByTickIndex(tickIdx: Int): List<StoryEvent> {
+        return getStoryEvents().filter { it.tickIndex == tickIdx }
+    }
+
     suspend fun runSimulationTick(): StoryEvent? {
         val sm = SettingsManager(context)
         if (sm.chatApiUrl.isBlank()) return null
 
         val config = this.config
+        val currentTickIdx = tickCount + 1
+        tickCount = currentTickIdx
         val currentState = advanceVirtualTime()
         val personaManager = PersonaManager(context)
         personaManager.load()
 
-        return if (config.isGroupSimulation && config.memberPersonaIds.size > 1) {
-            runGroupSimulation(sm, config, currentState, personaManager)
+        val result = if (config.isGroupSimulation && config.memberPersonaIds.size > 1) {
+            runGroupSimulation(sm, config, currentState, personaManager, currentTickIdx)
         } else {
-            runSoloSimulation(sm, config, currentState, personaManager)
+            runSoloSimulation(sm, config, currentState, personaManager, currentTickIdx)
         }
+
+        if (result != null) {
+            addTickIndex(TickIndex(
+                tickIndex = currentTickIdx,
+                virtualDay = currentState.dayCount,
+                virtualHour = currentState.hourOfDay,
+                virtualMinute = currentState.minuteOfHour,
+                summary = result.content.take(80),
+                eventCount = 1,
+                eventType = result.eventType
+            ))
+        }
+
+        return result
     }
 
     private suspend fun runSoloSimulation(
         sm: SettingsManager,
         config: WorldConfig,
         currentState: WorldState,
-        personaManager: PersonaManager
+        personaManager: PersonaManager,
+        currentTickIdx: Int
     ): StoryEvent? = withContext(Dispatchers.IO) {
         val personaId = config.memberPersonaIds.firstOrNull() ?: "default"
         val persona = personaManager.getPersona(personaId)
@@ -195,7 +289,9 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
             }
         }
 
-        val client = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel)
+        val client = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel,
+            sm.llmTemperature, sm.llmTopP, sm.llmFrequencyPenalty, sm.llmPresencePenalty, sm.llmMaxTokens,
+            sm.apiProvider)
         return@withContext try {
             val imageToolDef = if (config.imageGenEnabled && hasImageModelConfigured()) {
                 com.aicompanion.plugin.PluginRegistry.getPlugin("generate_image")?.getDefinition()
@@ -258,8 +354,10 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
                 )
 
                 val event = StoryEvent(
+                    tickIndex = currentTickIdx,
                     virtualDay = currentState.dayCount,
                     virtualHour = currentState.hourOfDay,
+                    virtualMinute = currentState.minuteOfHour,
                     content = content,
                     speakerName = identity.name,
                     eventType = "action"
@@ -278,7 +376,8 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
         sm: SettingsManager,
         config: WorldConfig,
         currentState: WorldState,
-        personaManager: PersonaManager
+        personaManager: PersonaManager,
+        currentTickIdx: Int
     ): StoryEvent? = withContext(Dispatchers.IO) {
         val recentEvents = getStoryEvents().takeLast(5).map {
             "[第${it.virtualDay}天${it.virtualHour}时] ${it.speakerName}：${it.content}"
@@ -304,7 +403,9 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
             }
         }
 
-        val client = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel)
+        val client = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel,
+            sm.llmTemperature, sm.llmTopP, sm.llmFrequencyPenalty, sm.llmPresencePenalty, sm.llmMaxTokens,
+            sm.apiProvider)
         return@withContext try {
             val imageToolDef = if (config.imageGenEnabled && hasImageModelConfigured()) {
                 com.aicompanion.plugin.PluginRegistry.getPlugin("generate_image")?.getDefinition()
@@ -366,8 +467,10 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
                 )
 
                 val event = StoryEvent(
+                    tickIndex = currentTickIdx,
                     virtualDay = currentState.dayCount,
                     virtualHour = currentState.hourOfDay,
+                    virtualMinute = currentState.minuteOfHour,
                     content = content,
                     speakerName = "群像",
                     eventType = "group_narrative"
@@ -439,8 +542,13 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
             val dir = File(context.filesDir, "virtual_world/images")
             dir.mkdirs()
             val file = File(dir, "img_${eventId}.jpg")
-            URL(url).openStream().use { input ->
-                FileOutputStream(file).use { output -> input.copyTo(output) }
+            val request = okhttp3.Request.Builder().url(url).build()
+            downloadClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                val body = response.body ?: return null
+                body.byteStream().use { input ->
+                    FileOutputStream(file).use { output -> input.copyTo(output) }
+                }
             }
             file.absolutePath
         } catch (_: Exception) {
@@ -461,6 +569,8 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
         state = WorldState()
         clearStory()
         lastTickTime = 0L
+        tickCount = 0
+        prefs.edit().remove(KEY_TICK_INDEX).apply()
     }
 
     fun saveUploadedImage(sourceUri: android.net.Uri): String? {

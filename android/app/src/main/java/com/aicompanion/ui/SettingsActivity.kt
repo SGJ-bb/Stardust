@@ -23,6 +23,7 @@ import com.aicompanion.R
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.settings.LanguageStyle
 import com.aicompanion.settings.NagFrequency
+import com.aicompanion.settings.ProviderProfile
 import com.aicompanion.diary.DiaryManager
 import com.aicompanion.models.Emotion
 import com.aicompanion.theme.ThemeManager
@@ -230,6 +231,8 @@ class SettingsActivity : AppCompatActivity() {
 
         setupOverlaySize()
         setupEndpointAutoComplete()
+        setupLlmParams()
+        setupTtsParams()
     }
 
     private fun loadSettings() {
@@ -303,6 +306,8 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_url)?.setText(vwManager.imageApiUrl)
         findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_key)?.setText(vwManager.imageApiKey)
         findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_model)?.setText(vwManager.imageModel)
+
+        findViewById<Switch>(R.id.switch_emotion_analysis)?.isChecked = sm.emotionAnalysisEnabled
     }
 
     private fun updateWakeInfoDisplay() {
@@ -643,6 +648,7 @@ class SettingsActivity : AppCompatActivity() {
                     tvApiProviderHint?.visibility = android.view.View.VISIBLE
                 }
                 settingsManager?.apiProvider = providerId
+                updateParamsForProvider(providerId)
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -687,6 +693,215 @@ class SettingsActivity : AppCompatActivity() {
                 return
             }
         }
+    }
+
+    private fun setupLlmParams() {
+        val sm = settingsManager ?: return
+
+        val seekTemp = findViewById<SeekBar>(R.id.seek_temperature)
+        val tvTemp = findViewById<TextView>(R.id.tv_temperature_value)
+        val seekTopP = findViewById<SeekBar>(R.id.seek_top_p)
+        val tvTopP = findViewById<TextView>(R.id.tv_top_p_value)
+        val seekFreqP = findViewById<SeekBar>(R.id.seek_freq_penalty)
+        val tvFreqP = findViewById<TextView>(R.id.tv_freq_penalty_value)
+        val seekPresP = findViewById<SeekBar>(R.id.seek_presence_penalty)
+        val tvPresP = findViewById<TextView>(R.id.tv_presence_penalty_value)
+        val seekMaxTok = findViewById<SeekBar>(R.id.seek_max_tokens)
+        val etMaxTok = findViewById<android.widget.EditText>(R.id.et_max_tokens)
+        val layoutFreqP = findViewById<View>(R.id.layout_freq_penalty)
+        val layoutPresP = findViewById<View>(R.id.layout_presence_penalty)
+        val tvProviderHint = findViewById<TextView>(R.id.tv_provider_param_hint)
+        val tvMaxTokLimit = findViewById<TextView>(R.id.tv_max_tokens_limit_hint)
+
+        seekTemp?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = progress / 100f
+                tvTemp?.text = String.format("%.2f", value)
+                sm.llmTemperature = value
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        seekTopP?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = progress / 100f
+                tvTopP?.text = String.format("%.2f", value)
+                sm.llmTopP = value
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        seekFreqP?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val profile = sm.getCurrentProfile()
+                val range = profile.freqPenaltyRange ?: (-2f)..2f
+                val value = range.start + (progress / 400f) * (range.endInclusive - range.start)
+                tvFreqP?.text = String.format("%.2f", value)
+                sm.llmFrequencyPenalty = value
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        seekPresP?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val profile = sm.getCurrentProfile()
+                val range = profile.presPenaltyRange ?: (-2f)..2f
+                val value = range.start + (progress / 400f) * (range.endInclusive - range.start)
+                tvPresP?.text = String.format("%.2f", value)
+                sm.llmPresencePenalty = value
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        seekMaxTok?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val limit = sm.getEffectiveMaxTokensLimit()
+                val value = if (limit <= 10000) {
+                    progress.coerceIn(50, limit)
+                } else {
+                    val scaled = (progress / 10000f * limit).toInt()
+                    scaled.coerceIn(50, limit)
+                }
+                etMaxTok?.setText("$value")
+                sm.llmMaxTokens = value
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        etMaxTok?.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                val text = etMaxTok.text?.toString()?.trim() ?: ""
+                val value = text.toIntOrNull()?.coerceIn(50, sm.getEffectiveMaxTokensLimit()) ?: sm.llmMaxTokens
+                etMaxTok.setText("$value")
+                sm.llmMaxTokens = value
+                updateMaxTokensSeekBar(seekMaxTok, value, sm.getEffectiveMaxTokensLimit())
+            }
+        }
+
+        updateParamsForProvider(sm.apiProvider)
+    }
+
+    private fun updateMaxTokensSeekBar(seekBar: SeekBar?, value: Int, limit: Int) {
+        if (limit <= 10000) {
+            seekBar?.max = limit
+            seekBar?.progress = value.coerceIn(0, limit)
+        } else {
+            seekBar?.max = 10000
+            seekBar?.progress = (value.toFloat() / limit * 10000).toInt().coerceIn(0, 10000)
+        }
+    }
+
+    fun updateParamsForProvider(providerId: String) {
+        val sm = settingsManager ?: return
+        val profile = ProviderProfile.getProfile(providerId)
+
+        val seekTemp = findViewById<SeekBar>(R.id.seek_temperature)
+        val tvTemp = findViewById<TextView>(R.id.tv_temperature_value)
+        val seekTopP = findViewById<SeekBar>(R.id.seek_top_p)
+        val tvTopP = findViewById<TextView>(R.id.tv_top_p_value)
+        val seekFreqP = findViewById<SeekBar>(R.id.seek_freq_penalty)
+        val tvFreqP = findViewById<TextView>(R.id.tv_freq_penalty_value)
+        val seekPresP = findViewById<SeekBar>(R.id.seek_presence_penalty)
+        val tvPresP = findViewById<TextView>(R.id.tv_presence_penalty_value)
+        val seekMaxTok = findViewById<SeekBar>(R.id.seek_max_tokens)
+        val etMaxTok = findViewById<android.widget.EditText>(R.id.et_max_tokens)
+        val layoutFreqP = findViewById<View>(R.id.layout_freq_penalty)
+        val layoutPresP = findViewById<View>(R.id.layout_presence_penalty)
+        val tvProviderHint = findViewById<TextView>(R.id.tv_provider_param_hint)
+        val tvMaxTokLimit = findViewById<TextView>(R.id.tv_max_tokens_limit_hint)
+
+        seekTemp?.max = (profile.tempRange.endInclusive * 100).toInt()
+        val currentTemp = sm.llmTemperature.coerceIn(profile.tempRange)
+        seekTemp?.progress = (currentTemp * 100).toInt()
+        tvTemp?.text = String.format("%.2f", currentTemp)
+
+        seekTopP?.max = (profile.topPRange.endInclusive * 100).toInt()
+        val currentTopP = sm.llmTopP.coerceIn(profile.topPRange)
+        seekTopP?.progress = (currentTopP * 100).toInt()
+        tvTopP?.text = String.format("%.2f", currentTopP)
+
+        layoutFreqP?.visibility = if (profile.supportsFreqPenalty) View.VISIBLE else View.GONE
+        if (profile.supportsFreqPenalty && profile.freqPenaltyRange != null) {
+            val range = profile.freqPenaltyRange
+            val currentFreqP = sm.llmFrequencyPenalty.coerceIn(range)
+            val progress = ((currentFreqP - range.start) / (range.endInclusive - range.start) * 400).toInt()
+            seekFreqP?.progress = progress.coerceIn(0, 400)
+            tvFreqP?.text = String.format("%.2f", currentFreqP)
+        }
+
+        layoutPresP?.visibility = if (profile.supportsPresPenalty) View.VISIBLE else View.GONE
+        if (profile.supportsPresPenalty && profile.presPenaltyRange != null) {
+            val range = profile.presPenaltyRange
+            val currentPresP = sm.llmPresencePenalty.coerceIn(range)
+            val progress = ((currentPresP - range.start) / (range.endInclusive - range.start) * 400).toInt()
+            seekPresP?.progress = progress.coerceIn(0, 400)
+            tvPresP?.text = String.format("%.2f", currentPresP)
+        }
+
+        val limit = profile.maxTokensLimit
+        val currentMaxTok = sm.llmMaxTokens.coerceIn(50, limit)
+        sm.llmMaxTokens = currentMaxTok
+        etMaxTok?.setText("$currentMaxTok")
+        updateMaxTokensSeekBar(seekMaxTok, currentMaxTok, limit)
+        tvMaxTokLimit?.text = "上限: ${formatTokenCount(limit)} (当前厂商: ${profile.displayName})"
+
+        val hints = profile.paramHints
+        if (hints.isNotEmpty()) {
+            val hintBuilder = StringBuilder()
+            hints.values.forEach { hint ->
+                hintBuilder.appendLine("• $hint")
+            }
+            tvProviderHint?.text = hintBuilder.toString().trim()
+            tvProviderHint?.visibility = View.VISIBLE
+        } else {
+            tvProviderHint?.visibility = View.GONE
+        }
+    }
+
+    private fun formatTokenCount(count: Int): String {
+        return when {
+            count >= 1000 -> "${count / 1000}K"
+            else -> "$count"
+        }
+    }
+
+    private fun setupTtsParams() {
+        val sm = settingsManager ?: return
+
+        val seekPitch = findViewById<SeekBar>(R.id.seek_tts_pitch)
+        val tvPitch = findViewById<TextView>(R.id.tv_tts_pitch_value)
+        val seekRate = findViewById<SeekBar>(R.id.seek_tts_rate)
+        val tvRate = findViewById<TextView>(R.id.tv_tts_rate_value)
+
+        seekPitch?.progress = (sm.ttsPitch * 100).toInt().coerceIn(50, 150)
+        tvPitch?.text = String.format("%.2f", sm.ttsPitch)
+        seekRate?.progress = (sm.ttsRate * 100).toInt().coerceIn(50, 200)
+        tvRate?.text = String.format("%.2f", sm.ttsRate)
+
+        seekPitch?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = progress / 100f
+                tvPitch?.text = String.format("%.2f", value)
+                sm.ttsPitch = value
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        seekRate?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = progress / 100f
+                tvRate?.text = String.format("%.2f", value)
+                sm.ttsRate = value
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
     }
 
     private fun setupOverlaySize() {
@@ -814,6 +1029,8 @@ class SettingsActivity : AppCompatActivity() {
         vwMgr.imageApiUrl = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_url)?.text?.toString() ?: ""
         vwMgr.imageApiKey = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_key)?.text?.toString() ?: ""
         vwMgr.imageModel = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_model)?.text?.toString() ?: "dall-e-3"
+
+        sm.emotionAnalysisEnabled = findViewById<Switch>(R.id.switch_emotion_analysis)?.isChecked ?: false
 
         Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show()
     }

@@ -113,8 +113,8 @@
             android:label="调整模型"
             android:parentActivityName=".ui.SettingsActivity" />
 
-        <activity android:name="com.aicompanion.sticker.StickerActivity" android:theme="@style/Theme.AppCompat.Light.DarkActionBar" />
-        <activity android:name="com.aicompanion.moments.MomentsActivity" android:theme="@style/Theme.AppCompat.Light.DarkActionBar" />
+        <activity android:name="com.aicompanion.sticker.StickerActivity" android:theme="@style/Theme.Companion" />
+        <activity android:name="com.aicompanion.moments.MomentsActivity" android:theme="@style/Theme.Companion" />
 
         <activity
             android:name="com.aicompanion.wakeup.WakeUpActivity"
@@ -156,6 +156,11 @@
             android:name=".services.BackgroundService"
             android:exported="false"
             android:foregroundServiceType="specialUse" />
+
+        <service
+            android:name=".localmodel.ScreenCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
 
         <receiver
             android:name=".wakeup.WakeUpReceiver"

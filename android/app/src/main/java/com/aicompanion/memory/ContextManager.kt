@@ -4,14 +4,14 @@ import android.content.Context
 import com.aicompanion.network.ApiClient
 import com.aicompanion.util.AppLogger
 
-class ContextManager(context: Context, personaId: String = "default") {
+class ContextManager(context: Context, personaId: String = "default", scope: String = "private") {
 
     companion object {
         private const val TAG = "ContextManager"
         private const val EVAL_INTERVAL = 2
     }
 
-    val memoryPool = MemoryPool(context, personaId)
+    val memoryPool = MemoryPool(context, personaId, scope)
     val sessionManager = SessionManager(context)
 
     private var rawTurns: MutableList<ConversationTurn> = mutableListOf()

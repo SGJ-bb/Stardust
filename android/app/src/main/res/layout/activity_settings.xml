@@ -516,6 +516,297 @@
                     android:textColor="#8899cc"
                     app:backgroundTint="@android:color/transparent"
                     style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#2a2a4a"
+                    android:layout_marginVertical="12dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="LLM 参数调节"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#c4b5fd" />
+
+                <TextView
+                    android:id="@+id/tv_provider_param_hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="11sp"
+                    android:textColor="#f59e0b"
+                    android:visibility="gone"
+                    android:layout_marginTop="4dp"
+                    android:lineSpacingMultiplier="1.3" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="温度 (Temperature)"
+                    android:textSize="12sp"
+                    android:textColor="#8899bb"
+                    android:layout_marginTop="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginEnd="4dp" />
+
+                    <SeekBar
+                        android:id="@+id/seek_temperature"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="200"
+                        android:min="0"
+                        android:progress="105" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2.0"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginStart="4dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_temperature_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.05"
+                    android:textSize="12sp"
+                    android:textColor="#7c5cfc"
+                    android:gravity="center" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Top P"
+                    android:textSize="12sp"
+                    android:textColor="#8899bb"
+                    android:layout_marginTop="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginEnd="4dp" />
+
+                    <SeekBar
+                        android:id="@+id/seek_top_p"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:min="0"
+                        android:progress="92" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1.0"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginStart="4dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_top_p_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.92"
+                    android:textSize="12sp"
+                    android:textColor="#7c5cfc"
+                    android:gravity="center" />
+
+                <LinearLayout
+                    android:id="@+id/layout_freq_penalty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="频率惩罚 (Frequency Penalty)"
+                    android:textSize="12sp"
+                    android:textColor="#8899bb"
+                    android:layout_marginTop="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="-2"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginEnd="4dp" />
+
+                    <SeekBar
+                        android:id="@+id/seek_freq_penalty"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="400"
+                        android:min="0"
+                        android:progress="235" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2.0"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginStart="4dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_freq_penalty_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.35"
+                    android:textSize="12sp"
+                    android:textColor="#7c5cfc"
+                    android:gravity="center" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/layout_presence_penalty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="存在惩罚 (Presence Penalty)"
+                    android:textSize="12sp"
+                    android:textColor="#8899bb"
+                    android:layout_marginTop="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="-2"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginEnd="4dp" />
+
+                    <SeekBar
+                        android:id="@+id/seek_presence_penalty"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="400"
+                        android:min="0"
+                        android:progress="250" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2.0"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginStart="4dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_presence_penalty_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0.50"
+                    android:textSize="12sp"
+                    android:textColor="#7c5cfc"
+                    android:gravity="center" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="最大输出 Token"
+                    android:textSize="12sp"
+                    android:textColor="#8899bb"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:id="@+id/tv_max_tokens_limit_hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="10sp"
+                    android:textColor="#667788" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="50"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginEnd="4dp" />
+
+                    <SeekBar
+                        android:id="@+id/seek_max_tokens"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="10000"
+                        android:min="0"
+                        android:progress="500" />
+
+                    <EditText
+                        android:id="@+id/et_max_tokens"
+                        android:layout_width="80dp"
+                        android:layout_height="36dp"
+                        android:inputType="number"
+                        android:text="500"
+                        android:textSize="12sp"
+                        android:textColor="#7c5cfc"
+                        android:gravity="center"
+                        android:background="@android:color/transparent"
+                        android:hint="自定义"
+                        android:textColorHint="#445566"
+                        android:layout_marginStart="4dp" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -730,6 +1021,158 @@
                         android:textColor="#d0d0e0"
                         android:textColorHint="#556677" />
                 </com.google.android.material.textfield.TextInputLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#2a2a4a"
+                    android:layout_marginVertical="12dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="TTS 参数调节"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#c4b5fd" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="声调 (Pitch)"
+                    android:textSize="12sp"
+                    android:textColor="#8899bb"
+                    android:layout_marginTop="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0.5"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginEnd="4dp" />
+
+                    <SeekBar
+                        android:id="@+id/seek_tts_pitch"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="150"
+                        android:min="50"
+                        android:progress="100" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2.0"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginStart="4dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_tts_pitch_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.00"
+                    android:textSize="12sp"
+                    android:textColor="#7c5cfc"
+                    android:gravity="center" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="语速 (Rate)"
+                    android:textSize="12sp"
+                    android:textColor="#8899bb"
+                    android:layout_marginTop="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0.5"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginEnd="4dp" />
+
+                    <SeekBar
+                        android:id="@+id/seek_tts_rate"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="200"
+                        android:min="50"
+                        android:progress="100" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2.0"
+                        android:textSize="11sp"
+                        android:textColor="#667788"
+                        android:layout_marginStart="4dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_tts_rate_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.00"
+                    android:textSize="12sp"
+                    android:textColor="#7c5cfc"
+                    android:gravity="center" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#2a2a4a"
+                    android:layout_marginVertical="12dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🎭 情绪分析模块"
+                            android:textSize="15sp"
+                            android:textColor="#ffffff" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="AI根据情绪动态调整温度和TTS参数"
+                            android:textSize="12sp"
+                            android:textColor="#557788"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switch_emotion_analysis"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

@@ -83,6 +83,12 @@ class WakeUpReceiver : BroadcastReceiver() {
             val settingsPrefs = context.getSharedPreferences("companion_settings", Context.MODE_PRIVATE)
             val apiUrl = settingsPrefs.getString("chat_api_url", "") ?: ""
             val apiModel = settingsPrefs.getString("chat_model", "gpt-4o-mini") ?: "gpt-4o-mini"
+            val llmTemp = settingsPrefs.getFloat("llm_temperature", 1.05f)
+            val llmTopP = settingsPrefs.getFloat("llm_top_p", 0.92f)
+            val llmFreqPenalty = settingsPrefs.getFloat("llm_frequency_penalty", 0.35f)
+            val llmPresPenalty = settingsPrefs.getFloat("llm_presence_penalty", 0.5f)
+            val llmMaxTokens = settingsPrefs.getInt("llm_max_tokens", 500)
+            val apiProvider = settingsPrefs.getString("api_provider", "custom") ?: "custom"
             val apiKey = try {
                 val masterKey = androidx.security.crypto.MasterKey.Builder(context)
                     .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
@@ -93,15 +99,18 @@ class WakeUpReceiver : BroadcastReceiver() {
                     androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
                 securePrefs.getString("chat_api_key", "") ?: ""
-            } catch (_: Exception) {
-                context.getSharedPreferences("companion_secure_prefs", Context.MODE_PRIVATE)
+            } catch (e: Exception) {
+                Log.w("WakeUpReceiver", "EncryptedSharedPreferences unavailable, falling back to plaintext storage", e)
+                context.getSharedPreferences("companion_prefs_fallback", Context.MODE_PRIVATE)
                     .getString("chat_api_key", "") ?: ""
             }
 
             if (apiUrl.isNotBlank()) {
                 Thread {
                     try {
-                        val aiClient = ApiClient(apiUrl, apiKey, apiModel)
+                        val aiClient = ApiClient(apiUrl, apiKey, apiModel,
+                            llmTemp, llmTopP, llmFreqPenalty, llmPresPenalty, llmMaxTokens,
+                            apiProvider)
                         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
                         val timeHint = when {
                             hour < 6 -> "凌晨"

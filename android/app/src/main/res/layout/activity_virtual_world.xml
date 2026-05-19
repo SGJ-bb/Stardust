@@ -419,6 +419,20 @@
                 android:textColor="#ff6b9d"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_tick_index"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginBottom="8dp"
+                android:text="📋 推演索引"
+                android:textSize="13sp"
+                app:cornerRadius="22dp"
+                app:strokeColor="#ffb347"
+                app:strokeWidth="1.5dp"
+                app:backgroundTint="@android:color/transparent"
+                android:textColor="#ffb347"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
             <HorizontalScrollView
                 android:id="@+id/scroll_uploaded_images"
                 android:layout_width="match_parent"

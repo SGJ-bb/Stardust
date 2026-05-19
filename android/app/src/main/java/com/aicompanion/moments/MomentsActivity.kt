@@ -1,7 +1,6 @@
 package com.aicompanion.moments
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -14,12 +13,14 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.aicompanion.AppContainer
 import com.aicompanion.R
+import com.aicompanion.persona.PersonaManager
 import com.aicompanion.sticker.StickerActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,16 +28,45 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 class MomentsActivity : AppCompatActivity() {
-    companion object {
-        private const val PICK_IMAGE = 3001
-        private const val PICK_STICKER = 3002
-    }
 
     private lateinit var momentsManager: MomentsManager
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: MomentAdapter
     private var pendingImagePath: String? = null
     private var pendingStickerPath: String? = null
+    private lateinit var personaManager: PersonaManager
+    private var currentMomentDialog: com.google.android.material.dialog.MaterialAlertDialogBuilder? = null
+    private var currentMomentContentView: View? = null
+    private var currentMomentEt: EditText? = null
+
+    private val imagePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val uri = result.data?.data ?: return@registerForActivityResult
+            try {
+                val tmp = File(cacheDir, "moment_img_${System.currentTimeMillis()}.jpg")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    tmp.outputStream().use { output -> input.copyTo(output) }
+                }
+                pendingImagePath = tmp.absolutePath
+                Toast.makeText(this, "图片已选择", Toast.LENGTH_SHORT).show()
+                updateMomentDialogPreview()
+            } catch (e: Exception) {
+                Toast.makeText(this, "图片选择失败", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private val stickerPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            pendingStickerPath = result.data?.getStringExtra("sticker_path")
+            Toast.makeText(this, "表情包已选择", Toast.LENGTH_SHORT).show()
+            updateMomentDialogPreview()
+        }
+    }
 
     private var cachedPersonaName: String? = null
     private fun getCachedPersonaName(): String {
@@ -49,10 +79,16 @@ class MomentsActivity : AppCompatActivity() {
     private fun getPersonaInfo(): Pair<String, String> {
         val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
             .getString("active_persona_id", "default") ?: "default"
-        val personaPrefs = getSharedPreferences("persona_data_$activeId", MODE_PRIVATE)
-        val appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-        val name = personaPrefs.getString("persona_name", null)
-            ?: appPrefs.getString("ai_name", "星尘") ?: "星尘"
+        return getPersonaInfoById(activeId)
+    }
+
+    private fun getPersonaInfoById(personaId: String): Pair<String, String> {
+        val personaPrefs = getSharedPreferences("persona_data_$personaId", MODE_PRIVATE)
+        val name = com.aicompanion.persona.PersonaManager(this).let { pm ->
+            pm.load()
+            pm.getPersona(personaId)?.name
+        } ?: personaPrefs.getString("persona_name", null)
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("ai_name", "星尘") ?: "星尘"
         val prompt = buildString {
             append("你是「$name」。")
             personaPrefs.getString("persona_desc", "")?.takeIf { it.isNotBlank() }?.let { append("\n简介：$it") }
@@ -62,12 +98,21 @@ class MomentsActivity : AppCompatActivity() {
         return Pair(name, prompt)
     }
 
+    private fun getPersonaNameById(personaId: String): String {
+        val persona = personaManager.getPersona(personaId)
+        if (persona != null) return persona.name
+        val prefs = getSharedPreferences("persona_data_$personaId", MODE_PRIVATE)
+        return prefs.getString("persona_name", "AI") ?: "AI"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_moments)
         applySharedTheme()
         momentsManager = MomentsManager(this)
         momentsManager.loadMoments()
+        personaManager = PersonaManager(this)
+        personaManager.load()
         recyclerView = findViewById(R.id.rv_moments)
         adapter = MomentAdapter(momentsManager.getAllMoments())
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -158,14 +203,19 @@ class MomentsActivity : AppCompatActivity() {
         val btnImage = view.findViewById<View>(R.id.btn_add_image)
         val btnSticker = view.findViewById<View>(R.id.btn_add_sticker)
 
+        currentMomentContentView = view
+        currentMomentEt = etContent
+
         btnImage.setOnClickListener {
             val intent = Intent(Intent.ACTION_PICK).apply { type = "image/*" }
-            startActivityForResult(intent, PICK_IMAGE)
+            imagePickerLauncher.launch(intent)
         }
         btnSticker.setOnClickListener {
             val intent = Intent(this, StickerActivity::class.java)
-            startActivityForResult(intent, PICK_STICKER)
+            stickerPickerLauncher.launch(intent)
         }
+
+        updateMomentDialogPreview()
 
         com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
             .setTitle("✏️ 发动态")
@@ -176,19 +226,55 @@ class MomentsActivity : AppCompatActivity() {
                     Toast.makeText(this, "请输入内容", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
+                val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                    .getString("active_persona_id", "default") ?: "default"
                 val moment = Moment(
                     id = java.util.UUID.randomUUID().toString(),
                     author = "user",
+                    authorPersonaId = activeId,
                     content = content,
                     imagePath = copyToPermanent(pendingImagePath),
                     stickerPath = pendingStickerPath
                 )
                 momentsManager.addMoment(moment)
+                pendingImagePath = null
+                pendingStickerPath = null
+                currentMomentContentView = null
+                currentMomentEt = null
                 refreshMoments()
                 triggerAiReplyToUserMoment(moment)
             }
-            .setNegativeButton("取消", null)
+            .setNegativeButton("取消") { _, _ ->
+                pendingImagePath = null
+                pendingStickerPath = null
+                currentMomentContentView = null
+                currentMomentEt = null
+            }
+            .setOnCancelListener {
+                pendingImagePath = null
+                pendingStickerPath = null
+                currentMomentContentView = null
+                currentMomentEt = null
+            }
             .show()
+    }
+
+    private fun updateMomentDialogPreview() {
+        val view = currentMomentContentView ?: return
+        val ivPreview = view.findViewById<ImageView>(R.id.iv_moment_image_preview)
+        if (ivPreview == null) return
+
+        if (pendingImagePath != null) {
+            try {
+                val bmp = decodeSampledBitmap(pendingImagePath!!, 200, 200)
+                if (bmp != null) {
+                    ivPreview.setImageBitmap(bmp)
+                    ivPreview.visibility = View.VISIBLE
+                }
+            } catch (_: Exception) {}
+        } else {
+            ivPreview.visibility = View.GONE
+        }
     }
 
     private fun copyToPermanent(tempPath: String?): String? {
@@ -205,40 +291,22 @@ class MomentsActivity : AppCompatActivity() {
         val apiClient = AppContainer.apiClient ?: return
         val persona = getPersonaInfo()
         lifecycleScope.launch {
-            val reply = momentsManager.generateAiReply(
+            val reply = momentsManager.generateAiCommentOnUserMoment(
                 apiClient,
                 persona.first,
                 persona.second,
-                moment.content,
-                "(用户发了动态)"
+                moment.content
             )
             if (reply != null) {
+                val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                    .getString("active_persona_id", "default") ?: "default"
                 momentsManager.addComment(moment.id, Comment(
                     id = java.util.UUID.randomUUID().toString(),
                     author = "ai",
+                    authorPersonaId = activeId,
                     content = reply
                 ))
                 refreshMoments()
-            }
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != Activity.RESULT_OK || data == null) return
-        when (requestCode) {
-            PICK_IMAGE -> {
-                val uri = data.data ?: return
-                val tmp = File(cacheDir, "moment_img_${System.currentTimeMillis()}.jpg")
-                contentResolver.openInputStream(uri)?.use { input ->
-                    tmp.outputStream().use { output -> input.copyTo(output) }
-                }
-                pendingImagePath = tmp.absolutePath
-                Toast.makeText(this, "图片已选择", Toast.LENGTH_SHORT).show()
-            }
-            PICK_STICKER -> {
-                pendingStickerPath = data.getStringExtra("sticker_path")
-                Toast.makeText(this, "表情包已选择", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -264,7 +332,11 @@ class MomentsActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: VH, position: Int) {
             val moment = items[position]
             val authorName = if (moment.author == "ai") {
-                getCachedPersonaName()
+                if (!moment.authorPersonaId.isNullOrBlank()) {
+                    getPersonaNameById(moment.authorPersonaId)
+                } else {
+                    getCachedPersonaName()
+                }
             } else {
                 "我"
             }
@@ -298,38 +370,29 @@ class MomentsActivity : AppCompatActivity() {
 
             holder.commentsContainer.removeAllViews()
             for (comment in moment.comments) {
-                val commentView = LayoutInflater.from(this@MomentsActivity)
-                    .inflate(R.layout.item_comment, holder.commentsContainer, false)
-                val tvCommentAuthor = commentView.findViewById<TextView>(R.id.tv_comment_author)
-                val tvCommentContent = commentView.findViewById<TextView>(R.id.tv_comment_content)
-                tvCommentAuthor.text = if (comment.author == "ai") getCachedPersonaName() else "我"
-                tvCommentContent.text = comment.content
-                holder.commentsContainer.addView(commentView)
+                try {
+                    val commentView = LayoutInflater.from(this@MomentsActivity)
+                        .inflate(R.layout.item_comment, holder.commentsContainer, false)
+                    val tvCommentAuthor = commentView.findViewById<TextView>(R.id.tv_comment_author)
+                    val tvCommentContent = commentView.findViewById<TextView>(R.id.tv_comment_content)
+                    tvCommentAuthor.text = if (comment.author == "ai") {
+                        if (!comment.authorPersonaId.isNullOrBlank()) {
+                            getPersonaNameById(comment.authorPersonaId)
+                        } else {
+                            getCachedPersonaName()
+                        }
+                    } else {
+                        "我"
+                    }
+                    tvCommentContent.text = comment.content
+                    holder.commentsContainer.addView(commentView)
+                } catch (e: Exception) {
+                    android.util.Log.w("MomentsActivity", "Failed to render comment: ${e.message}")
+                }
             }
 
             holder.btnComment.setOnClickListener {
-                val input = EditText(this@MomentsActivity)
-                input.hint = "写评论..."
-                input.setTextColor(0xFFe0e0f0.toInt())
-                input.setHintTextColor(0xFF556677.toInt())
-                com.google.android.material.dialog.MaterialAlertDialogBuilder(this@MomentsActivity)
-                    .setTitle("💬 评论")
-                    .setView(input)
-                    .setPositiveButton("发送") { _, _ ->
-                        val text = input.text.toString().trim()
-                        if (text.isBlank()) return@setPositiveButton
-                        momentsManager.addComment(moment.id, Comment(
-                            id = java.util.UUID.randomUUID().toString(),
-                            author = "user",
-                            content = text
-                        ))
-                        refreshMoments()
-                        if (moment.author == "ai") {
-                            triggerAiReplyToComment(moment, text)
-                        }
-                    }
-                    .setNegativeButton("取消", null)
-                    .show()
+                showCommentDialog(moment)
             }
 
             holder.btnDelete.setOnClickListener {
@@ -353,22 +416,86 @@ class MomentsActivity : AppCompatActivity() {
         }
     }
 
+    private fun showCommentDialog(moment: Moment) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 0)
+        }
+        val input = EditText(this).apply {
+            hint = "写评论..."
+            setHintTextColor(0xFF556677.toInt())
+            setTextColor(0xFFe0e0f0.toInt())
+            textSize = 14f
+        }
+        container.addView(input)
+
+        try {
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("💬 评论")
+                .setView(container)
+                .setPositiveButton("发送") { _, _ ->
+                    val text = input.text?.toString()?.trim() ?: ""
+                    if (text.isBlank()) return@setPositiveButton
+                    val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                        .getString("active_persona_id", "default") ?: "default"
+                    momentsManager.addComment(moment.id, Comment(
+                        id = java.util.UUID.randomUUID().toString(),
+                        author = "user",
+                        authorPersonaId = activeId,
+                        content = text
+                    ))
+                    refreshMoments()
+                    triggerAiReplyToComment(moment, text)
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        } catch (e: IllegalArgumentException) {
+            val text = input.text?.toString()?.trim() ?: ""
+            if (text.isNotBlank()) {
+                val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                    .getString("active_persona_id", "default") ?: "default"
+                momentsManager.addComment(moment.id, Comment(
+                    id = java.util.UUID.randomUUID().toString(),
+                    author = "user",
+                    authorPersonaId = activeId,
+                    content = text
+                ))
+                refreshMoments()
+            }
+        }
+    }
+
     private fun triggerAiReplyToComment(moment: Moment, commentText: String) {
-        if (moment.author != "ai") return
         val apiClient = AppContainer.apiClient ?: return
-        val persona = getPersonaInfo()
+        val authorId = moment.authorPersonaId
+        val persona = if (!authorId.isNullOrBlank()) {
+            getPersonaInfoById(authorId)
+        } else {
+            getPersonaInfo()
+        }
         lifecycleScope.launch {
-            val reply = momentsManager.generateAiReply(
-                apiClient,
-                persona.first,
-                persona.second,
-                moment.content,
-                commentText
-            )
+            val reply = if (moment.author == "ai") {
+                momentsManager.generateAiReply(
+                    apiClient,
+                    persona.first,
+                    persona.second,
+                    moment.content,
+                    commentText
+                )
+            } else {
+                momentsManager.generateAiCommentOnUserMoment(
+                    apiClient,
+                    persona.first,
+                    persona.second,
+                    "${moment.content}\n\n用户评论了：「$commentText」"
+                )
+            }
             if (reply != null) {
                 momentsManager.addComment(moment.id, Comment(
                     id = java.util.UUID.randomUUID().toString(),
                     author = "ai",
+                    authorPersonaId = authorId ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
+                        .getString("active_persona_id", "default") ?: "default",
                     content = reply
                 ))
                 refreshMoments()

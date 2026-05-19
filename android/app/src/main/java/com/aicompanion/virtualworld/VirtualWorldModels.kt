@@ -80,7 +80,8 @@ data class WorldState(
     val currentWeather: String = "晴朗",
     val currentMood: String = "平静",
     val dayCount: Int = 1,
-    val hourOfDay: Int = 8
+    val hourOfDay: Int = 8,
+    val minuteOfHour: Int = 0
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("virtualTimeMs", virtualTimeMs)
@@ -89,6 +90,7 @@ data class WorldState(
         put("currentMood", currentMood)
         put("dayCount", dayCount)
         put("hourOfDay", hourOfDay)
+        put("minuteOfHour", minuteOfHour)
     }
 
     companion object {
@@ -98,28 +100,35 @@ data class WorldState(
             currentWeather = obj.optString("currentWeather", "晴朗"),
             currentMood = obj.optString("currentMood", "平静"),
             dayCount = obj.optInt("dayCount", 1),
-            hourOfDay = obj.optInt("hourOfDay", 8)
+            hourOfDay = obj.optInt("hourOfDay", 8),
+            minuteOfHour = obj.optInt("minuteOfHour", 0)
         )
     }
 }
 
 data class StoryEvent(
     val id: String = UUID.randomUUID().toString(),
+    val tickIndex: Int = 0,
     val virtualDay: Int,
     val virtualHour: Int,
+    val virtualMinute: Int = 0,
     val content: String,
     val speakerName: String = "旁白",
     val eventType: String = "narrative",
+    val summary: String = "",
     val imageUrl: String = "",
     val timestamp: Long = System.currentTimeMillis()
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
+        put("tickIndex", tickIndex)
         put("virtualDay", virtualDay)
         put("virtualHour", virtualHour)
+        put("virtualMinute", virtualMinute)
         put("content", content)
         put("speakerName", speakerName)
         put("eventType", eventType)
+        put("summary", summary)
         put("imageUrl", imageUrl)
         put("timestamp", timestamp)
     }
@@ -127,12 +136,50 @@ data class StoryEvent(
     companion object {
         fun fromJson(obj: JSONObject): StoryEvent = StoryEvent(
             id = obj.optString("id", UUID.randomUUID().toString()),
+            tickIndex = obj.optInt("tickIndex", 0),
             virtualDay = obj.optInt("virtualDay", 1),
             virtualHour = obj.optInt("virtualHour", 8),
+            virtualMinute = obj.optInt("virtualMinute", 0),
             content = obj.optString("content", ""),
             speakerName = obj.optString("speakerName", "旁白"),
             eventType = obj.optString("eventType", "narrative"),
+            summary = obj.optString("summary", ""),
             imageUrl = obj.optString("imageUrl", ""),
+            timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+        )
+    }
+}
+
+data class TickIndex(
+    val tickIndex: Int,
+    val virtualDay: Int,
+    val virtualHour: Int,
+    val virtualMinute: Int,
+    val summary: String,
+    val eventCount: Int,
+    val eventType: String,
+    val timestamp: Long = System.currentTimeMillis()
+) {
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("tickIndex", tickIndex)
+        put("virtualDay", virtualDay)
+        put("virtualHour", virtualHour)
+        put("virtualMinute", virtualMinute)
+        put("summary", summary)
+        put("eventCount", eventCount)
+        put("eventType", eventType)
+        put("timestamp", timestamp)
+    }
+
+    companion object {
+        fun fromJson(obj: JSONObject): TickIndex = TickIndex(
+            tickIndex = obj.optInt("tickIndex", 0),
+            virtualDay = obj.optInt("virtualDay", 1),
+            virtualHour = obj.optInt("virtualHour", 8),
+            virtualMinute = obj.optInt("virtualMinute", 0),
+            summary = obj.optString("summary", ""),
+            eventCount = obj.optInt("eventCount", 1),
+            eventType = obj.optString("eventType", "narrative"),
             timestamp = obj.optLong("timestamp", System.currentTimeMillis())
         )
     }

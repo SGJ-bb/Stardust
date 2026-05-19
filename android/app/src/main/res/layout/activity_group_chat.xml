@@ -85,6 +85,18 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:clickable="true"
                 android:focusable="true" />
+
+            <TextView
+                android:id="@+id/btn_memory_pool"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:gravity="center"
+                android:text="🧠"
+                android:textSize="14sp"
+                android:layout_marginStart="6dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true" />
         </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
@@ -117,6 +129,25 @@
                 app:singleSelection="false"
                 app:chipSpacingHorizontal="6dp" />
         </LinearLayout>
+
+        <HorizontalScrollView
+            android:id="@+id/scroll_predictions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#14142a"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="4dp"
+            android:visibility="gone"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/layout_predictions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical" />
+        </HorizontalScrollView>
 
         <LinearLayout
             android:id="@+id/layout_input"
