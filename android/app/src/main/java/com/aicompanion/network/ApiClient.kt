@@ -15,7 +15,13 @@ import java.util.concurrent.TimeUnit
 class ApiClient(
     val chatApiUrl: String,
     val apiKey: String? = null,
-    val modelName: String? = null
+    val modelName: String? = null,
+    val temperature: Float = 1.05f,
+    val topP: Float = 0.92f,
+    val frequencyPenalty: Float = 0.35f,
+    val presencePenalty: Float = 0.5f,
+    val maxTokens: Int = 500,
+    val providerId: String = "custom"
 ) {
     companion object {
         private const val TAG = "ApiClient"
@@ -42,7 +48,12 @@ class ApiClient(
         systemContext: String = "",
         chatHistory: List<Pair<Boolean, String>> = emptyList(),
         tools: List<ToolDefinition> = emptyList(),
-        extraMessages: List<Pair<String, String>> = emptyList()
+        extraMessages: List<Pair<String, String>> = emptyList(),
+        overrideTemperature: Float? = null,
+        overrideTopP: Float? = null,
+        overrideFrequencyPenalty: Float? = null,
+        overridePresencePenalty: Float? = null,
+        overrideMaxTokens: Int? = null
     ): ChatResponse? {
         val useModel = modelName ?: "gpt-4o-mini"
 
@@ -60,7 +71,10 @@ class ApiClient(
             if (memories.isNotEmpty()) {
                 append("\n记得：${memories.takeLast(3).joinToString("；")}")
             }
-            append("\n【规则】像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]")
+            append("\n【规则】\n")
+            append("- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]\n")
+            append("- 用()描述你的动作、表情、状态、情绪，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)\n")
+            append("- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定")
         }
 
         val messagesArray = JSONArray()
@@ -118,14 +132,26 @@ class ApiClient(
             messagesArray.put(msgObj)
         }
 
+        val effectiveTemp = overrideTemperature ?: temperature
+        val effectiveTopP = overrideTopP ?: topP
+        val effectiveFreqPenalty = overrideFrequencyPenalty ?: frequencyPenalty
+        val effectivePresPenalty = overridePresencePenalty ?: presencePenalty
+        val effectiveMaxTokens = overrideMaxTokens ?: maxTokens
+
+        val profile = com.aicompanion.settings.ProviderProfile.getProfile(providerId)
+
         val requestBody = JSONObject().apply {
             put("model", useModel)
             put("messages", messagesArray)
-            put("temperature", 1.05)
-            put("max_tokens", 500)
-            put("top_p", 0.92)
-            put("frequency_penalty", 0.35)
-            put("presence_penalty", 0.5)
+            put("temperature", effectiveTemp.toDouble())
+            put("max_tokens", effectiveMaxTokens)
+            put("top_p", effectiveTopP.toDouble())
+            if (profile.supportsFreqPenalty) {
+                put("frequency_penalty", effectiveFreqPenalty.toDouble())
+            }
+            if (profile.supportsPresPenalty) {
+                put("presence_penalty", effectivePresPenalty.toDouble())
+            }
             if (tools.isNotEmpty()) {
                 put("tools", buildToolsJson(tools))
             }
@@ -146,7 +172,7 @@ class ApiClient(
                 requestBuilder.header("Authorization", "Bearer $apiKey")
             }
 
-            AppLogger.d(TAG, "sendChat: POST $chatApiUrl model=$useModel tools=${tools.size}")
+            AppLogger.d(TAG, "sendChat: POST ${sanitizeUrl(chatApiUrl)} model=$useModel tools=${tools.size}")
             client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errBody = response.body?.string()?.take(500) ?: ""
@@ -164,11 +190,14 @@ class ApiClient(
                         if (!apiKey.isNullOrEmpty()) {
                             retryReq.header("Authorization", "Bearer $apiKey")
                         }
-                        val retryResp = client.newCall(retryReq.build()).execute()
-                        val retryStr = retryResp.body?.string() ?: "{}"
-                        AppLogger.d(TAG, "Retry without tools: HTTP ${retryResp.code}")
-                        if (retryResp.isSuccessful) {
-                            return@use parseOpenAIResponse(retryStr)
+                        client.newCall(retryReq.build()).execute().use { retryResp ->
+                            val retryStr = retryResp.body?.string() ?: "{}"
+                            AppLogger.d(TAG, "Retry without tools: HTTP ${retryResp.code}")
+                            if (retryResp.isSuccessful) {
+                                parseOpenAIResponse(retryStr)
+                            } else {
+                                null
+                            }
                         }
                     }
 
@@ -511,7 +540,7 @@ class ApiClient(
         val requestBody = JSONObject().apply {
             put("model", useModel)
             put("messages", messagesArray)
-            put("temperature", 0.95)
+            put("temperature", (temperature * 0.9f).coerceIn(0f, 2f).toDouble())
             put("max_tokens", 150)
         }
 
@@ -525,7 +554,7 @@ class ApiClient(
             if (!apiKey.isNullOrEmpty()) {
                 requestBuilder.header("Authorization", "Bearer $apiKey")
             }
-            AppLogger.d(TAG, "sendProactiveChat: POST $chatApiUrl model=$useModel")
+            AppLogger.d(TAG, "sendProactiveChat: POST ${sanitizeUrl(chatApiUrl)} model=$useModel")
             client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errBody = response.body?.string()?.take(200) ?: ""
@@ -680,7 +709,7 @@ class ApiClient(
         val requestBody = JSONObject().apply {
             put("model", useModel)
             put("messages", messagesArray)
-            put("temperature", 0.85)
+            put("temperature", (temperature * 0.8f).coerceIn(0f, 2f).toDouble())
             put("max_tokens", 800)
         }
 
@@ -714,7 +743,8 @@ class ApiClient(
         personaPrompt: String,
         appCategory: String? = null,
         systemAlert: String? = null,
-        memoryContext: String? = null
+        memoryContext: String? = null,
+        chatHistory: List<Pair<Boolean, String>> = emptyList()
     ): ChatResponse? {
         val useModel = modelName ?: "gpt-4o-mini"
 
@@ -740,6 +770,17 @@ class ApiClient(
             put("role", "system")
             put("content", systemPrompt)
         })
+
+        if (chatHistory.isNotEmpty()) {
+            val recentHistory = chatHistory.takeLast(10)
+            for ((isUser, text) in recentHistory) {
+                messagesArray.put(JSONObject().apply {
+                    put("role", if (isUser) "user" else "assistant")
+                    put("content", text)
+                })
+            }
+        }
+
         messagesArray.put(JSONObject().apply {
             put("role", "user")
             put("content", "你想和主人说点什么？")
@@ -748,7 +789,7 @@ class ApiClient(
         val requestBody = JSONObject().apply {
             put("model", useModel)
             put("messages", messagesArray)
-            put("temperature", 0.9)
+            put("temperature", (temperature * 0.85f).coerceIn(0f, 2f).toDouble())
             put("max_tokens", 200)
         }
 
@@ -858,7 +899,7 @@ class ApiClient(
                 put("model", modelName)
                 put("messages", messagesArray)
                 put("temperature", 0.3)
-                put("max_tokens", 500)
+                put("max_tokens", 1500)
                 put("top_p", 0.9)
             }
             val body = requestBody.toString().toRequestBody(jsonMediaType)
@@ -916,5 +957,11 @@ class ApiClient(
         } catch (e: Exception) {
             null
         }
+    }
+
+    private fun sanitizeUrl(url: String): String {
+        return url
+            .replace(Regex("(key|api[_-]?key|token|secret|access[_-]?token)=([^&\\s]+)", RegexOption.IGNORE_CASE), "$1=***")
+            .replace(Regex("/sk-[a-zA-Z0-9_-]+"), "/sk-***")
     }
 }

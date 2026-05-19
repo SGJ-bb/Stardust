@@ -13,16 +13,22 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.aicompanion.AppContainer
 import com.aicompanion.R
 import com.aicompanion.persona.Persona
 import com.aicompanion.persona.PersonaManager
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
@@ -56,6 +62,7 @@ class HomeActivity : AppCompatActivity() {
 
         findViewById<FloatingActionButton>(R.id.fab_add_persona).setOnClickListener {
             com.aicompanion.anim.AnimeUtils.pulse(it)
+            com.aicompanion.anim.AnimeUtils.springScale(it, 0.9f, 1f, 400)
             showAddPersonaDialog()
         }
 
@@ -65,10 +72,39 @@ class HomeActivity : AppCompatActivity() {
             startActivity(Intent(this, com.aicompanion.moments.MomentsActivity::class.java))
         }
 
+        val btnDiary = findViewById<View>(R.id.btn_diary_entry)
+        com.aicompanion.anim.AnimeUtils.setupTouchScale(btnDiary)
+        btnDiary.setOnClickListener {
+            showPersonaPicker("日记") { personaId ->
+                val intent = Intent(this, com.aicompanion.ui.DiaryActivity::class.java)
+                intent.putExtra("persona_id", personaId)
+                startActivity(intent)
+            }
+        }
+
         val btnGroupChat = findViewById<View>(R.id.btn_group_chat_entry)
         com.aicompanion.anim.AnimeUtils.setupTouchScale(btnGroupChat)
         btnGroupChat.setOnClickListener {
             startActivity(Intent(this, com.aicompanion.groupchat.GroupChatListActivity::class.java))
+        }
+
+        val btnVirtualWorld = findViewById<View>(R.id.btn_virtual_world_entry)
+        com.aicompanion.anim.AnimeUtils.setupTouchScale(btnVirtualWorld)
+        btnVirtualWorld.setOnClickListener {
+            showPersonaPicker("虚拟世界") { personaId ->
+                val intent = Intent(this, com.aicompanion.ui.VirtualWorldActivity::class.java)
+                startActivity(intent)
+            }
+        }
+
+        val btnProfile = findViewById<View>(R.id.btn_profile_entry)
+        com.aicompanion.anim.AnimeUtils.setupTouchScale(btnProfile)
+        btnProfile.setOnClickListener {
+            showPersonaPicker("档案") { personaId ->
+                val intent = Intent(this, com.aicompanion.ui.ProfileActivity::class.java)
+                intent.putExtra("persona_id", personaId)
+                startActivity(intent)
+            }
         }
 
         val btnSettings = findViewById<View>(R.id.btn_settings_entry)
@@ -88,6 +124,12 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        pendingAvatarIv = null
+        pendingAvatarPath = null
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == RESULT_OK && data != null) {
@@ -98,6 +140,7 @@ class HomeActivity : AppCompatActivity() {
                     pendingAvatarPath = savedPath
                     pendingAvatarIv?.let { iv ->
                         loadAvatarIntoView(iv, savedPath)
+                        com.aicompanion.anim.AnimeUtils.springScale(iv, 0.8f, 1f, 400)
                     }
                 }
             }
@@ -136,6 +179,99 @@ class HomeActivity : AppCompatActivity() {
         adapter.updateData(personaManager.getAllPersonas())
     }
 
+    private data class AIGeneratedPersona(
+        val name: String,
+        val desc: String,
+        val greeting: String,
+        val personality: String,
+        val speechStyle: String,
+        val catchphrases: String,
+        val appearance: String,
+        val preferences: String,
+        val worldSetting: String,
+        val worldRelationship: String,
+        val worldRules: String,
+        val userIdentity: String = "",
+        val userAbilities: String = ""
+    )
+
+    private fun generatePersonaWithAI(keywords: String): AIGeneratedPersona? {
+        val apiClient = com.aicompanion.AppContainer.apiClient ?: return null
+        val prompt = buildString {
+            append("请为一个AI角色生成完整、详尽的角色设定。\n")
+            if (keywords.isNotBlank()) {
+                append("用户关键词：$keywords\n")
+            } else {
+                append("请随机发挥创意，生成一个有趣的角色设定。\n")
+            }
+            append("\n请严格按照以下JSON格式输出，不要加任何其他文字：\n")
+            append("{\n")
+            append("  \"name\": \"角色名（2-6个字，有特色）\",\n")
+            append("  \"desc\": \"角色简介（20-40字，一句话概括角色身份和特点）\",\n")
+            append("  \"greeting\": \"开场白（角色第一次见到用户时说的话，30-60字，体现角色性格）\",\n")
+            append("  \"personality\": \"性格描述（40-80字，描述核心性格特征、情感表达方式、内心矛盾）\",\n")
+            append("  \"speechStyle\": \"说话风格（30-50字，描述口癖、语气、常用表达方式）\",\n")
+            append("  \"catchphrases\": \"口头禅（3-5个，用换行分隔，如：哼\\n才不是呢\\n笨蛋）\",\n")
+            append("  \"appearance\": \"外貌描述（30-50字，描述外观特征、穿着、标志性特征）\",\n")
+            append("  \"preferences\": \"喜好（喜欢和讨厌的事物，各2-3个，用换行分隔）\",\n")
+            append("  \"worldSetting\": \"世界观设定（40-80字，描述角色所处的世界背景、身份地位）\",\n")
+            append("  \"worldRelationship\": \"关系设定（30-50字，描述角色与用户的关系、称呼方式）\",\n")
+            append("  \"worldRules\": \"行为规则（3条，用换行分隔，描述角色必须遵守的行为准则）\",\n")
+            append("  \"userIdentity\": \"用户身份（20-40字，描述用户在这个角色眼中的身份，如：主人、勇者、同班同学）\",\n")
+            append("  \"userAbilities\": \"用户能力/特征（20-40字，描述用户拥有的能力或特征，如：会魔法、温柔善良、擅长做饭）\"\n")
+            append("}\n")
+        }
+
+        return try {
+            val response = apiClient.sendSimplePrompt(prompt, "生成角色设定")
+            val text = response?.text?.trim() ?: return null
+            val jsonStr = extractJson(text) ?: return null
+            val json = org.json.JSONObject(jsonStr)
+            AIGeneratedPersona(
+                name = json.optString("name", "").ifBlank { return null },
+                desc = json.optString("desc", ""),
+                greeting = json.optString("greeting", ""),
+                personality = json.optString("personality", ""),
+                speechStyle = json.optString("speechStyle", ""),
+                catchphrases = json.optString("catchphrases", ""),
+                appearance = json.optString("appearance", ""),
+                preferences = json.optString("preferences", ""),
+                worldSetting = json.optString("worldSetting", ""),
+                worldRelationship = json.optString("worldRelationship", ""),
+                worldRules = json.optString("worldRules", ""),
+                userIdentity = json.optString("userIdentity", ""),
+                userAbilities = json.optString("userAbilities", "")
+            )
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.e("HomeActivity", "generatePersonaWithAI failed: ${e.message}")
+            null
+        }
+    }
+
+    private fun extractJson(text: String): String? {
+        val start = text.indexOf('{')
+        val end = text.lastIndexOf('}')
+        if (start < 0 || end < 0 || end <= start) return null
+        return text.substring(start, end + 1)
+    }
+
+    private fun buildAutoPrompt(result: AIGeneratedPersona): String {
+        return buildString {
+            append("你是「${result.name}」。")
+            if (result.desc.isNotBlank()) append("\n简介：${result.desc}")
+            if (result.appearance.isNotBlank()) append("\n外貌：${result.appearance}")
+            if (result.personality.isNotBlank()) append("\n性格：${result.personality}")
+            if (result.speechStyle.isNotBlank()) append("\n说话风格：${result.speechStyle}")
+            if (result.catchphrases.isNotBlank()) append("\n常用口头禅：${result.catchphrases}")
+            if (result.preferences.isNotBlank()) append("\n喜好：${result.preferences}")
+            if (result.worldSetting.isNotBlank()) append("\n世界观设定：${result.worldSetting}")
+            if (result.worldRelationship.isNotBlank()) append("\n你和用户的关系：${result.worldRelationship}")
+            if (result.worldRules.isNotBlank()) append("\n规则：${result.worldRules}")
+            if (result.userIdentity.isNotBlank()) append("\n用户身份：${result.userIdentity}")
+            if (result.userAbilities.isNotBlank()) append("\n用户能力/特征：${result.userAbilities}")
+        }
+    }
+
     private fun applyTheme() {
         val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
         try {
@@ -148,14 +284,47 @@ class HomeActivity : AppCompatActivity() {
         } catch (_: Exception) {}
     }
 
+    private fun showPersonaPicker(featureName: String, onSelect: (String) -> Unit) {
+        val personas = personaManager.getAllPersonas()
+        if (personas.isEmpty()) {
+            Toast.makeText(this, "暂无角色，请先创建角色", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (personas.size == 1) {
+            onSelect(personas.first().id)
+            return
+        }
+        val names = personas.map { it.name }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("选择查看${featureName}的角色")
+            .setItems(names) { _, which ->
+                onSelect(personas[which].id)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
     private fun showAddPersonaDialog() {
         pendingAvatarPath = null
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_add_persona, null)
         val etName = view.findViewById<EditText>(R.id.et_persona_name)
+        val etDesc = view.findViewById<EditText>(R.id.et_persona_desc)
+        val etGreeting = view.findViewById<EditText>(R.id.et_persona_greeting)
+        val etUserIdentity = view.findViewById<EditText>(R.id.et_user_identity)
+        val etUserAbilities = view.findViewById<EditText>(R.id.et_user_abilities)
         val etPersonality = view.findViewById<EditText>(R.id.et_persona_personality)
         val etSpeech = view.findViewById<EditText>(R.id.et_persona_speech)
+        val etCatchphrases = view.findViewById<EditText>(R.id.et_persona_catchphrases)
+        val etAppearance = view.findViewById<EditText>(R.id.et_persona_appearance)
+        val etPreferences = view.findViewById<EditText>(R.id.et_persona_preferences)
+        val etWorldSetting = view.findViewById<EditText>(R.id.et_world_setting)
+        val etWorldRelationship = view.findViewById<EditText>(R.id.et_world_relationship)
+        val etWorldRules = view.findViewById<EditText>(R.id.et_world_rules)
         val etPrompt = view.findViewById<EditText>(R.id.et_persona_prompt)
         val ivPreview = view.findViewById<ImageView>(R.id.iv_persona_avatar_preview)
+        val etKeywords = view.findViewById<EditText>(R.id.et_ai_keywords)
+        val btnAiGenerate = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_ai_generate)
+        val progressAi = view.findViewById<ProgressBar>(R.id.progress_ai_generate)
         pendingAvatarIv = ivPreview
 
         view.findViewById<View>(R.id.btn_select_avatar).setOnClickListener {
@@ -166,45 +335,162 @@ class HomeActivity : AppCompatActivity() {
             startActivityForResult(intent, 1001)
         }
 
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle("✨ 新建角色")
-            .setView(view)
-            .setPositiveButton("创建") { _, _ ->
-                val name = etName.text.toString().trim()
-                if (name.isBlank()) {
-                    Toast.makeText(this, "请输入角色名", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
+        btnAiGenerate.setOnClickListener {
+            com.aicompanion.anim.AnimeUtils.pulse(it)
+            val keywords = etKeywords.text.toString().trim()
+            btnAiGenerate.isEnabled = false
+            btnAiGenerate.text = "生成中..."
+            progressAi.visibility = View.VISIBLE
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    generatePersonaWithAI(keywords)
                 }
-                val persona = Persona(
-                    id = java.util.UUID.randomUUID().toString(),
-                    name = name,
-                    personality = etPersonality.text.toString().trim(),
-                    speechStyle = etSpeech.text.toString().trim(),
-                    prompt = etPrompt.text.toString().trim(),
-                    avatarPath = pendingAvatarPath ?: ""
-                )
-                personaManager.addPersona(persona)
-                refreshList()
-                Toast.makeText(this, "角色「$name」已创建", Toast.LENGTH_SHORT).show()
+                btnAiGenerate.isEnabled = true
+                btnAiGenerate.text = "生成"
+                progressAi.visibility = View.GONE
+                if (result != null) {
+                    etName.setText(result.name)
+                    etDesc.setText(result.desc)
+                    etGreeting.setText(result.greeting)
+                    etPersonality.setText(result.personality)
+                    etSpeech.setText(result.speechStyle)
+                    etCatchphrases.setText(result.catchphrases)
+                    etAppearance.setText(result.appearance)
+                    etPreferences.setText(result.preferences)
+                    etWorldSetting.setText(result.worldSetting)
+                    etWorldRelationship.setText(result.worldRelationship)
+                    etWorldRules.setText(result.worldRules)
+                    etUserIdentity.setText(result.userIdentity)
+                    etUserAbilities.setText(result.userAbilities)
+                    val autoPrompt = buildAutoPrompt(result)
+                    etPrompt.setText(autoPrompt)
+                    com.aicompanion.anim.AnimeUtils.springScale(etName)
+                    etDesc.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etDesc) }, 50)
+                    etGreeting.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etGreeting) }, 100)
+                    etPersonality.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etPersonality) }, 150)
+                    etSpeech.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etSpeech) }, 200)
+                    etCatchphrases.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etCatchphrases) }, 250)
+                    etAppearance.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etAppearance) }, 300)
+                    etPreferences.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etPreferences) }, 350)
+                    etWorldSetting.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etWorldSetting) }, 400)
+                    etWorldRelationship.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etWorldRelationship) }, 450)
+                    etWorldRules.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etWorldRules) }, 500)
+                    Toast.makeText(this@HomeActivity, "✨ 角色设定已生成", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@HomeActivity, "生成失败，请检查API配置", Toast.LENGTH_SHORT).show()
+                }
             }
-            .setNegativeButton("取消", null)
-            .show()
+        }
+
+        val sheet = BottomSheetDialog(this)
+        sheet.setContentView(view)
+        sheet.behavior.peekHeight = (resources.displayMetrics.heightPixels * 0.85).toInt()
+
+        sheet.setOnShowListener {
+            com.aicompanion.anim.AnimeUtils.fadeInScale(ivPreview, 100)
+            com.aicompanion.anim.AnimeUtils.slideInFromBottom(etName, 150)
+        }
+
+        view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_create_persona).setOnClickListener {
+            com.aicompanion.anim.AnimeUtils.pulse(it)
+            val name = etName.text.toString().trim()
+            if (name.isBlank()) {
+                etName.animate().translationXBy(-20f).setDuration(60).withEndAction {
+                    etName.animate().translationXBy(40f).setDuration(60).withEndAction {
+                        etName.animate().translationXBy(-20f).setDuration(60).withEndAction {
+                            etName.animate().translationX(0f).setDuration(100).start()
+                        }.start()
+                    }.start()
+                }.start()
+                return@setOnClickListener
+            }
+            val personaId = java.util.UUID.randomUUID().toString()
+            val personality = etPersonality.text.toString().trim()
+            val speechStyle = etSpeech.text.toString().trim()
+            val desc = etDesc.text.toString().trim()
+            val greeting = etGreeting.text.toString().trim()
+            val userIdentity = etUserIdentity.text.toString().trim()
+            val userAbilities = etUserAbilities.text.toString().trim()
+            val catchphrases = etCatchphrases.text.toString().trim()
+            val appearance = etAppearance.text.toString().trim()
+            val preferences = etPreferences.text.toString().trim()
+            val worldSetting = etWorldSetting.text.toString().trim()
+            val worldRelationship = etWorldRelationship.text.toString().trim()
+            val worldRules = etWorldRules.text.toString().trim()
+            val prompt = etPrompt.text.toString().trim()
+
+            val persona = Persona(
+                id = personaId,
+                name = name,
+                personality = personality,
+                speechStyle = speechStyle,
+                prompt = prompt,
+                avatarPath = pendingAvatarPath ?: ""
+            )
+            personaManager.addPersona(persona)
+
+            val personaPrefs = getSharedPreferences("persona_data_$personaId", MODE_PRIVATE)
+            personaPrefs.edit().apply {
+                putString("persona_desc", desc)
+                putString("persona_greeting", greeting)
+                putString("user_identity", userIdentity)
+                putString("user_abilities", userAbilities)
+                putString("persona_catchphrases", catchphrases)
+                putString("persona_appearance", appearance)
+                putString("persona_preferences", preferences)
+                putString("world_setting", worldSetting)
+                putString("world_relationship", worldRelationship)
+                putString("world_rules", worldRules)
+                apply()
+            }
+
+            refreshList()
+            sheet.dismiss()
+            Toast.makeText(this@HomeActivity, "角色「$name」已创建", Toast.LENGTH_SHORT).show()
+        }
+
+        sheet.show()
     }
 
     private fun showEditPersonaDialog(persona: Persona) {
         pendingAvatarPath = persona.avatarPath
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_add_persona, null)
         val etName = view.findViewById<EditText>(R.id.et_persona_name)
+        val etDesc = view.findViewById<EditText>(R.id.et_persona_desc)
+        val etGreeting = view.findViewById<EditText>(R.id.et_persona_greeting)
+        val etUserIdentity = view.findViewById<EditText>(R.id.et_user_identity)
+        val etUserAbilities = view.findViewById<EditText>(R.id.et_user_abilities)
         val etPersonality = view.findViewById<EditText>(R.id.et_persona_personality)
         val etSpeech = view.findViewById<EditText>(R.id.et_persona_speech)
+        val etCatchphrases = view.findViewById<EditText>(R.id.et_persona_catchphrases)
+        val etAppearance = view.findViewById<EditText>(R.id.et_persona_appearance)
+        val etPreferences = view.findViewById<EditText>(R.id.et_persona_preferences)
+        val etWorldSetting = view.findViewById<EditText>(R.id.et_world_setting)
+        val etWorldRelationship = view.findViewById<EditText>(R.id.et_world_relationship)
+        val etWorldRules = view.findViewById<EditText>(R.id.et_world_rules)
         val etPrompt = view.findViewById<EditText>(R.id.et_persona_prompt)
         val ivPreview = view.findViewById<ImageView>(R.id.iv_persona_avatar_preview)
+        val etKeywords = view.findViewById<EditText>(R.id.et_ai_keywords)
+        val btnAiGenerate = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_ai_generate)
+        val progressAi = view.findViewById<ProgressBar>(R.id.progress_ai_generate)
         pendingAvatarIv = ivPreview
 
         etName.setText(persona.name)
         etPersonality.setText(persona.personality)
         etSpeech.setText(persona.speechStyle)
         etPrompt.setText(persona.prompt)
+
+        val personaPrefs = getSharedPreferences("persona_data_${persona.id}", MODE_PRIVATE)
+        etDesc.setText(personaPrefs.getString("persona_desc", ""))
+        etGreeting.setText(personaPrefs.getString("persona_greeting", ""))
+        etUserIdentity.setText(personaPrefs.getString("user_identity", ""))
+        etUserAbilities.setText(personaPrefs.getString("user_abilities", ""))
+        etCatchphrases.setText(personaPrefs.getString("persona_catchphrases", ""))
+        etAppearance.setText(personaPrefs.getString("persona_appearance", ""))
+        etPreferences.setText(personaPrefs.getString("persona_preferences", ""))
+        etWorldSetting.setText(personaPrefs.getString("world_setting", ""))
+        etWorldRelationship.setText(personaPrefs.getString("world_relationship", ""))
+        etWorldRules.setText(personaPrefs.getString("world_rules", ""))
 
         if (persona.avatarPath.isNotBlank() && File(persona.avatarPath).exists()) {
             loadAvatarIntoView(ivPreview, persona.avatarPath)
@@ -218,36 +504,127 @@ class HomeActivity : AppCompatActivity() {
             startActivityForResult(intent, 1002)
         }
 
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle("✏️ 编辑角色")
-            .setView(view)
-            .setPositiveButton("保存") { _, _ ->
-                val name = etName.text.toString().trim()
-                if (name.isBlank()) {
-                    Toast.makeText(this, "请输入角色名", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
+        btnAiGenerate.setOnClickListener {
+            com.aicompanion.anim.AnimeUtils.pulse(it)
+            val keywords = etKeywords.text.toString().trim()
+            btnAiGenerate.isEnabled = false
+            btnAiGenerate.text = "生成中..."
+            progressAi.visibility = View.VISIBLE
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    generatePersonaWithAI(keywords)
                 }
-                personaManager.updatePersona(persona.id) {
-                    it.copy(
-                        name = name,
-                        personality = etPersonality.text.toString().trim(),
-                        speechStyle = etSpeech.text.toString().trim(),
-                        prompt = etPrompt.text.toString().trim(),
-                        avatarPath = pendingAvatarPath ?: it.avatarPath
-                    )
-                }
-                refreshList()
-            }
-            .setNegativeButton("取消", null)
-            .setNeutralButton("删除") { _, _ ->
-                if (persona.id == "default") {
-                    Toast.makeText(this, "默认角色不可删除", Toast.LENGTH_SHORT).show()
+                btnAiGenerate.isEnabled = true
+                btnAiGenerate.text = "生成"
+                progressAi.visibility = View.GONE
+                if (result != null) {
+                    etName.setText(result.name)
+                    etDesc.setText(result.desc)
+                    etGreeting.setText(result.greeting)
+                    etPersonality.setText(result.personality)
+                    etSpeech.setText(result.speechStyle)
+                    etCatchphrases.setText(result.catchphrases)
+                    etAppearance.setText(result.appearance)
+                    etPreferences.setText(result.preferences)
+                    etWorldSetting.setText(result.worldSetting)
+                    etWorldRelationship.setText(result.worldRelationship)
+                    etWorldRules.setText(result.worldRules)
+                    etUserIdentity.setText(result.userIdentity)
+                    etUserAbilities.setText(result.userAbilities)
+                    val autoPrompt = buildAutoPrompt(result)
+                    etPrompt.setText(autoPrompt)
+                    com.aicompanion.anim.AnimeUtils.springScale(etName)
+                    etPersonality.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etPersonality) }, 100)
+                    etSpeech.postDelayed({ com.aicompanion.anim.AnimeUtils.springScale(etSpeech) }, 200)
+                    Toast.makeText(this@HomeActivity, "✨ 角色设定已生成", Toast.LENGTH_SHORT).show()
                 } else {
-                    personaManager.deletePersona(persona.id)
-                    refreshList()
+                    Toast.makeText(this@HomeActivity, "生成失败，请检查API配置", Toast.LENGTH_SHORT).show()
                 }
             }
-            .show()
+        }
+
+        val sheet = BottomSheetDialog(this)
+        sheet.setContentView(view)
+        sheet.behavior.peekHeight = (resources.displayMetrics.heightPixels * 0.85).toInt()
+
+        sheet.setOnShowListener {
+            com.aicompanion.anim.AnimeUtils.fadeInScale(ivPreview, 100)
+            com.aicompanion.anim.AnimeUtils.slideInFromBottom(etName, 150)
+        }
+
+        val btnCreate = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_create_persona)
+        val btnDelete = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_delete_persona)
+        btnCreate.text = "保存"
+        btnDelete.visibility = View.VISIBLE
+
+        btnDelete.setOnClickListener {
+            com.aicompanion.anim.AnimeUtils.pulse(it)
+            if (persona.id == "default") {
+                Toast.makeText(this@HomeActivity, "默认角色不可删除", Toast.LENGTH_SHORT).show()
+            } else {
+                personaManager.deletePersona(persona.id)
+                refreshList()
+                sheet.dismiss()
+            }
+        }
+
+        btnCreate.setOnClickListener {
+            com.aicompanion.anim.AnimeUtils.pulse(it)
+            val name = etName.text.toString().trim()
+            if (name.isBlank()) {
+                etName.animate().translationXBy(-20f).setDuration(60).withEndAction {
+                    etName.animate().translationXBy(40f).setDuration(60).withEndAction {
+                        etName.animate().translationXBy(-20f).setDuration(60).withEndAction {
+                            etName.animate().translationX(0f).setDuration(100).start()
+                        }.start()
+                    }.start()
+                }.start()
+                return@setOnClickListener
+            }
+            val personality = etPersonality.text.toString().trim()
+            val speechStyle = etSpeech.text.toString().trim()
+            val desc = etDesc.text.toString().trim()
+            val greeting = etGreeting.text.toString().trim()
+            val userIdentity = etUserIdentity.text.toString().trim()
+            val userAbilities = etUserAbilities.text.toString().trim()
+            val catchphrases = etCatchphrases.text.toString().trim()
+            val appearance = etAppearance.text.toString().trim()
+            val preferences = etPreferences.text.toString().trim()
+            val worldSetting = etWorldSetting.text.toString().trim()
+            val worldRelationship = etWorldRelationship.text.toString().trim()
+            val worldRules = etWorldRules.text.toString().trim()
+            val prompt = etPrompt.text.toString().trim()
+
+            personaManager.updatePersona(persona.id) {
+                it.copy(
+                    name = name,
+                    personality = personality,
+                    speechStyle = speechStyle,
+                    prompt = prompt,
+                    avatarPath = pendingAvatarPath ?: it.avatarPath
+                )
+            }
+
+            val editPrefs = getSharedPreferences("persona_data_${persona.id}", MODE_PRIVATE)
+            editPrefs.edit().apply {
+                putString("persona_desc", desc)
+                putString("persona_greeting", greeting)
+                putString("user_identity", userIdentity)
+                putString("user_abilities", userAbilities)
+                putString("persona_catchphrases", catchphrases)
+                putString("persona_appearance", appearance)
+                putString("persona_preferences", preferences)
+                putString("world_setting", worldSetting)
+                putString("world_relationship", worldRelationship)
+                putString("world_rules", worldRules)
+                apply()
+            }
+
+            refreshList()
+            sheet.dismiss()
+        }
+
+        sheet.show()
     }
 
     inner class PersonaAdapter(private var items: List<Persona>) : RecyclerView.Adapter<PersonaAdapter.VH>() {

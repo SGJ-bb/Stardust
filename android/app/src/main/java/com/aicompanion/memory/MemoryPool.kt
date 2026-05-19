@@ -12,25 +12,80 @@ import java.util.UUID
 data class MemoryEntry(
     val id: String = UUID.randomUUID().toString().take(8),
     val content: String,
-    val category: String = "其他",
+    val category: String = "总结",
     val timestamp: Long = System.currentTimeMillis(),
-    val sourceTurn: Int = 0
-)
+    val sourceTurn: Int = 0,
+    val eventTime: String = "",
+    val place: String = "",
+    val people: String = "",
+    val event: String = "",
+    val scene: String = "",
+    val details: String = "",
+    val relationships: String = ""
+) {
+    fun toStructuredText(): String {
+        val parts = mutableListOf<String>()
+        if (eventTime.isNotBlank()) parts.add("时间:$eventTime")
+        if (place.isNotBlank()) parts.add("地点:$place")
+        if (people.isNotBlank()) parts.add("人物:$people")
+        if (event.isNotBlank()) parts.add("事件:$event")
+        if (scene.isNotBlank()) parts.add("场景:$scene")
+        if (details.isNotBlank()) parts.add("细节:$details")
+        if (relationships.isNotBlank()) parts.add("关系:$relationships")
+        return if (parts.isNotEmpty()) parts.joinToString(" | ") else content
+    }
 
-class MemoryPool(private val context: Context, private val personaId: String = "default") {
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("id", id)
+        put("content", content)
+        put("category", category)
+        put("timestamp", timestamp)
+        put("sourceTurn", sourceTurn)
+        put("eventTime", eventTime)
+        put("place", place)
+        put("people", people)
+        put("event", event)
+        put("scene", scene)
+        put("details", details)
+        put("relationships", relationships)
+    }
+
+    companion object {
+        fun fromJson(obj: JSONObject): MemoryEntry = MemoryEntry(
+            id = obj.optString("id", UUID.randomUUID().toString().take(8)),
+            content = obj.optString("content", ""),
+            category = obj.optString("category", "总结"),
+            timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
+            sourceTurn = obj.optInt("sourceTurn", 0),
+            eventTime = obj.optString("eventTime", ""),
+            place = obj.optString("place", ""),
+            people = obj.optString("people", ""),
+            event = obj.optString("event", ""),
+            scene = obj.optString("scene", ""),
+            details = obj.optString("details", ""),
+            relationships = obj.optString("relationships", "")
+        )
+    }
+}
+
+class MemoryPool(
+    private val context: Context,
+    private val personaId: String = "default",
+    private val scope: String = "private"
+) {
 
     companion object {
         private const val TAG = "MemoryPool"
         private const val CONSOLIDATE_INTERVAL = 10
-        private const val MAX_CHARS = 1000
-        private const val COMPRESS_KEEP_CHARS = 800
+        private const val MAX_CHARS = 3000
     }
 
     private val entries = mutableListOf<MemoryEntry>()
     private var turnsSinceLastConsolidate = 0
     private var totalTurns = 0
     private var totalCharCount = 0
-    private val prefs = context.getSharedPreferences("memory_pool_$personaId", Context.MODE_PRIVATE)
+    private val prefsKey = if (scope == "private") "memory_pool_$personaId" else "memory_pool_${personaId}_${scope}"
+    private val prefs = context.getSharedPreferences(prefsKey, Context.MODE_PRIVATE)
 
     val isEmpty: Boolean get() = entries.isEmpty()
     val size: Int get() = entries.size
@@ -73,24 +128,16 @@ class MemoryPool(private val context: Context, private val personaId: String = "
 
     fun getPoolBlock(): String {
         if (entries.isEmpty()) return ""
-
-        val grouped = entries.groupBy { it.category }
         val sb = StringBuilder()
-        sb.appendLine("[记忆池 - 场景、剧情与关键信息]")
-
-        val categoryOrder = listOf("场景", "剧情", "喜好", "习惯", "事实", "事件", "计划", "继承", "其他")
-        for (cat in categoryOrder) {
-            val group = grouped[cat] ?: continue
-            for (entry in group) {
-                sb.appendLine("- [${entry.category}] ${entry.content}")
+        sb.appendLine("[记忆池 - 剧情与关键信息]")
+        for (entry in entries) {
+            val structured = entry.toStructuredText()
+            if (structured != entry.content && entry.event.isNotBlank()) {
+                sb.appendLine("- $structured")
+            } else {
+                sb.appendLine("- ${entry.content}")
             }
         }
-
-        val uncategorized = entries.filter { it.category !in categoryOrder }
-        for (entry in uncategorized) {
-            sb.appendLine("- [${entry.category}] ${entry.content}")
-        }
-
         return sb.toString().trimEnd()
     }
 
@@ -106,16 +153,23 @@ class MemoryPool(private val context: Context, private val personaId: String = "
 
         val fullPool = getPoolBlock()
         val systemPrompt = buildString {
-            append("整理以下记忆池，保留所有重要信息（场景、剧情、角色关系、用户喜好等），合并重复项，删除过时信息。")
-            append("\n输出格式：每行一条记忆，格式为 - [分类] 内容")
-            append("\n分类可选：场景/剧情/喜好/习惯/事实/事件/计划/其他")
-            append("\n总字数不超过${MAX_CHARS}字。只输出记忆条目，不要其他内容。")
+            append("你是一个记忆总结助手。请将以下记忆池内容重新整理总结。\n")
+            append("要求：\n")
+            append("- 简短精炼，但保留所有重要细节\n")
+            append("- 保留：剧情进展、场景变化、角色关系、已发生的事件、用户喜好、重要的小事\n")
+            append("- 场景描述要具体，事件经过要完整\n")
+            append("- 合并重复内容，删除过时信息\n")
+            append("- 每条记忆必须包含结构化字段，按以下JSON格式输出：\n")
+            append("  {\"content\":\"总结内容\",\"eventTime\":\"时间\",\"place\":\"地点\",\"people\":\"人物\",\"event\":\"事件\",\"scene\":\"场景\",\"details\":\"细节\",\"relationships\":\"关系变化\"}\n")
+            append("- 字段可以为空字符串，但必须存在\n")
+            append("- 总字数不超过${MAX_CHARS}字\n")
+            append("- 只输出JSON数组，不要其他内容\n")
         }
 
         try {
             val response = client.sendSimplePrompt(systemPrompt, fullPool)
             if (response != null && response.text.isNotBlank()) {
-                val newEntries = parseConsolidatedResult(response.text)
+                val newEntries = parseConsolidatedStructuredResult(response.text)
                 if (newEntries.isNotEmpty()) {
                     entries.clear()
                     entries.addAll(newEntries)
@@ -138,6 +192,60 @@ class MemoryPool(private val context: Context, private val personaId: String = "
         return@withContext false
     }
 
+    private fun parseConsolidatedStructuredResult(text: String): List<MemoryEntry> {
+        val results = mutableListOf<MemoryEntry>()
+        try {
+            var cleaned = text.trim()
+                .replace(Regex("```(?:json)?\\s*"), "").replace("```", "").trim()
+
+            val bracketStart = cleaned.indexOf('[')
+            val bracketEnd = cleaned.lastIndexOf(']')
+            if (bracketStart >= 0 && bracketEnd > bracketStart) {
+                cleaned = cleaned.substring(bracketStart, bracketEnd + 1)
+            }
+
+            val arr = try { JSONArray(cleaned) } catch (_: Exception) {
+                return parseConsolidatedResult(text)
+            }
+
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i)
+                if (obj != null) {
+                    val content = obj.optString("content", "").trim()
+                    if (content.isNotBlank()) {
+                        results.add(MemoryEntry(
+                            content = content,
+                            category = "总结",
+                            sourceTurn = totalTurns,
+                            eventTime = obj.optString("eventTime", ""),
+                            place = obj.optString("place", ""),
+                            people = obj.optString("people", ""),
+                            event = obj.optString("event", ""),
+                            scene = obj.optString("scene", ""),
+                            details = obj.optString("details", ""),
+                            relationships = obj.optString("relationships", "")
+                        ))
+                    }
+                } else {
+                    val line = arr.optString(i, "").trim()
+                    if (line.isNotBlank()) {
+                        val cleanLine = line
+                            .removePrefix("-").removePrefix("•")
+                            .removePrefix("·").removePrefix("*").trim()
+                        if (cleanLine.isNotBlank()) {
+                            results.add(MemoryEntry(content = cleanLine, category = "总结", sourceTurn = totalTurns))
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "parseConsolidatedStructuredResult error: ${e.message}")
+            return parseConsolidatedResult(text)
+        }
+
+        return if (results.isEmpty()) parseConsolidatedResult(text) else results
+    }
+
     private fun parseConsolidatedResult(text: String): List<MemoryEntry> {
         val results = mutableListOf<MemoryEntry>()
         val lines = text.lines()
@@ -145,34 +253,28 @@ class MemoryPool(private val context: Context, private val personaId: String = "
             val trimmed = line.trim()
             if (trimmed.isBlank() || trimmed.startsWith("[记忆池")) continue
 
-            val content: String
-            val category: String
+            val cleanLine = trimmed
+                .removePrefix("-").removePrefix("•")
+                .removePrefix("·")
+                .removePrefix("*")
+                .trim()
+                .removePrefix("[").let { if (it.contains("]")) it.substringAfter("]") else it }
+                .trim()
 
-            val bracketMatch = Regex("^-\\s*\\[(.+?)\\]\\s*(.+)").find(trimmed)
-            if (bracketMatch != null) {
-                category = bracketMatch.groupValues[1].trim()
-                content = bracketMatch.groupValues[2].trim()
-            } else {
-                val cleanLine = trimmed.removePrefix("-").removePrefix("•").trim()
-                if (cleanLine.isBlank()) continue
-                category = "其他"
-                content = cleanLine
-            }
+            if (cleanLine.isBlank()) continue
 
-            if (content.isNotBlank()) {
-                results.add(MemoryEntry(
-                    content = content,
-                    category = category,
-                    sourceTurn = totalTurns
-                ))
-            }
+            results.add(MemoryEntry(
+                content = cleanLine,
+                category = "总结",
+                sourceTurn = totalTurns
+            ))
         }
         return results
     }
 
     private fun trimToLimit() {
         while (totalCharCount > MAX_CHARS && entries.size > 1) {
-            entries.removeAt(entries.lastIndex)
+            entries.removeAt(0)
             recalcCharCount()
         }
     }
@@ -191,10 +293,23 @@ class MemoryPool(private val context: Context, private val personaId: String = "
 
         val nick = userNickname.ifBlank { "用户" }
         val systemPrompt = buildString {
-            append("你是记忆管理助手。分析对话，提取值得记住的信息（场景、剧情、角色关系、用户喜好等）。")
-            append("\n只输出JSON数组，不需要更新时输出[]。")
-            append("\n分类：场景/剧情/喜好/习惯/事实/事件/计划/其他")
-            append("\n提到$nick 时用「$nick」称呼。")
+            append("你是记忆总结助手。分析对话，提取值得记住的信息。\n")
+            append("要求：\n")
+            append("- 每条记忆必须包含结构化字段\n")
+            append("- 关注：剧情进展、场景变化、角色关系、已发生的事件、用户喜好与习惯、重要的小事\n")
+            append("- 场景描述要具体（如：在森林里遇到受伤的小鹿而不是在某个地方遇到了什么）\n")
+            append("- 事件经过要完整（起因、经过、结果）\n")
+            append("- 小事如果有趣或有意义也要记（如：用户今天第一次做了某事）\n")
+            append("- 不要记录琐碎细节（如问候语、简单回应）\n")
+            append("- 提到$nick 时用「$nick」称呼\n")
+            append("- 只输出JSON数组，不需要更新时输出[]\n")
+            append("- 不要用Markdown代码块包裹\n")
+            append("\n每条记忆的JSON格式：\n")
+            append("{\"action\":\"add\",\"content\":\"简短总结\",\"eventTime\":\"事件发生的时间\",\"place\":\"地点\",\"people\":\"涉及的人物\",\"event\":\"发生了什么事\",\"scene\":\"场景描述\",\"details\":\"重要细节\",\"relationships\":\"关系变化\"}\n")
+            append("action可选: add(新增), update(更新旧记忆), delete(删除过时记忆)\n")
+            append("update需要额外字段: old_content_fragment(旧记忆片段)\n")
+            append("delete需要额外字段: old_content_fragment(要删除的记忆片段)\n")
+            append("结构化字段可以为空字符串，但必须存在\n")
         }
 
         val userContent = buildString {
@@ -205,9 +320,7 @@ class MemoryPool(private val context: Context, private val personaId: String = "
             appendLine("$nick: $userMsg")
             appendLine("AI: $aiMsg")
             appendLine()
-            appendLine("输出JSON数组（不要Markdown代码块）：")
-            appendLine("[{\"action\":\"add\",\"content\":\"...\",\"category\":\"场景\"}]")
-            appendLine("update: remove+add合并, delete: 删除")
+            appendLine("输出JSON数组：")
         }
 
         try {
@@ -252,8 +365,15 @@ class MemoryPool(private val context: Context, private val personaId: String = "
                         if (content.isNotBlank()) {
                             results.add(MemoryEntry(
                                 content = content,
-                                category = obj.optString("category", "其他"),
-                                sourceTurn = turnNumber
+                                category = "总结",
+                                sourceTurn = turnNumber,
+                                eventTime = obj.optString("eventTime", ""),
+                                place = obj.optString("place", ""),
+                                people = obj.optString("people", ""),
+                                event = obj.optString("event", ""),
+                                scene = obj.optString("scene", ""),
+                                details = obj.optString("details", ""),
+                                relationships = obj.optString("relationships", "")
                             ))
                         }
                     }
@@ -269,15 +389,29 @@ class MemoryPool(private val context: Context, private val personaId: String = "
                                 entries.removeAll { it.id == matched.id }
                                 results.add(matched.copy(
                                     content = newContent,
-                                    category = obj.optString("category", matched.category),
+                                    category = "总结",
                                     timestamp = System.currentTimeMillis(),
-                                    sourceTurn = turnNumber
+                                    sourceTurn = turnNumber,
+                                    eventTime = obj.optString("eventTime", matched.eventTime),
+                                    place = obj.optString("place", matched.place),
+                                    people = obj.optString("people", matched.people),
+                                    event = obj.optString("event", matched.event),
+                                    scene = obj.optString("scene", matched.scene),
+                                    details = obj.optString("details", matched.details),
+                                    relationships = obj.optString("relationships", matched.relationships)
                                 ))
                             } else {
                                 results.add(MemoryEntry(
                                     content = newContent,
-                                    category = obj.optString("category", "其他"),
-                                    sourceTurn = turnNumber
+                                    category = "总结",
+                                    sourceTurn = turnNumber,
+                                    eventTime = obj.optString("eventTime", ""),
+                                    place = obj.optString("place", ""),
+                                    people = obj.optString("people", ""),
+                                    event = obj.optString("event", ""),
+                                    scene = obj.optString("scene", ""),
+                                    details = obj.optString("details", ""),
+                                    relationships = obj.optString("relationships", "")
                                 ))
                             }
                         }
@@ -300,13 +434,7 @@ class MemoryPool(private val context: Context, private val personaId: String = "
         try {
             val arr = JSONArray()
             for (entry in entries) {
-                val obj = JSONObject()
-                obj.put("id", entry.id)
-                obj.put("content", entry.content)
-                obj.put("category", entry.category)
-                obj.put("timestamp", entry.timestamp)
-                obj.put("sourceTurn", entry.sourceTurn)
-                arr.put(obj)
+                arr.put(entry.toJson())
             }
             prefs.edit()
                 .putString("entries", arr.toString())
@@ -323,13 +451,7 @@ class MemoryPool(private val context: Context, private val personaId: String = "
             entries.clear()
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
-                entries.add(MemoryEntry(
-                    id = obj.optString("id", UUID.randomUUID().toString().take(8)),
-                    content = obj.getString("content"),
-                    category = obj.optString("category", "其他"),
-                    timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
-                    sourceTurn = obj.optInt("sourceTurn", 0)
-                ))
+                entries.add(MemoryEntry.fromJson(obj))
             }
             turnsSinceLastConsolidate = prefs.getInt("turns_since_consolidate", 0)
             totalTurns = prefs.getInt("total_turns", 0)
@@ -352,7 +474,6 @@ class MemoryPool(private val context: Context, private val personaId: String = "
     }
 
     fun getStats(): String {
-        val cats = entries.groupBy { it.category }.mapValues { it.value.size }
-        return "共${entries.size}条记忆 | ${totalCharCount}字 | ${cats.entries.joinToString { "${it.key}:${it.value}" }}"
+        return "共${entries.size}条记忆 | ${totalCharCount}字"
     }
 }

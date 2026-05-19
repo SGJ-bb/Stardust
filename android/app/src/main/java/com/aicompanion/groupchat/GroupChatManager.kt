@@ -13,7 +13,8 @@ data class GroupChat(
     val createdAt: Long = System.currentTimeMillis(),
     val lastMessageTime: Long = System.currentTimeMillis(),
     val lastMessagePreview: String = "",
-    val speakMode: String = "auto"
+    val speakMode: String = "auto",
+    val relationshipSetting: String = ""
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -22,6 +23,7 @@ data class GroupChat(
         put("lastMessageTime", lastMessageTime)
         put("lastMessagePreview", lastMessagePreview)
         put("speakMode", speakMode)
+        put("relationshipSetting", relationshipSetting)
         val arr = JSONArray()
         memberPersonaIds.forEach { arr.put(it) }
         put("memberPersonaIds", arr)
@@ -38,7 +40,8 @@ data class GroupChat(
             createdAt = obj.optLong("createdAt", System.currentTimeMillis()),
             lastMessageTime = obj.optLong("lastMessageTime", System.currentTimeMillis()),
             lastMessagePreview = obj.optString("lastMessagePreview", ""),
-            speakMode = obj.optString("speakMode", "auto")
+            speakMode = obj.optString("speakMode", "auto"),
+            relationshipSetting = obj.optString("relationshipSetting", "")
         )
     }
 }

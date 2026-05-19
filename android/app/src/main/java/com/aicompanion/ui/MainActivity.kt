@@ -33,6 +33,8 @@ import com.aicompanion.affection.AffectionManager
 import com.aicompanion.gamify.AchievementManager
 import com.aicompanion.interaction.ProactiveInteractionEngine
 import com.aicompanion.live2d.Live2DWebView
+import com.aicompanion.emotion.EmotionAnalyzer
+import com.aicompanion.emotion.EmotionParams
 import com.aicompanion.models.Action
 import com.aicompanion.models.ChatResponse
 import com.aicompanion.humanizer.Humanizer
@@ -46,6 +48,8 @@ import com.aicompanion.network.ApiClient
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.theme.ThemeManager
 import com.aicompanion.voice.VoiceManager
+import com.aicompanion.predict.ChatPredictor
+import android.widget.HorizontalScrollView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -97,9 +101,6 @@ class MainActivity : AppCompatActivity() {
     private var tvDaysLabel: TextView? = null
     private var progressAffection: ProgressBar? = null
     private var tvPetName: TextView? = null
-    private var tvStatus: TextView? = null
-    private var chipEmotion: com.google.android.material.chip.Chip? = null
-    private var chipAction: com.google.android.material.chip.Chip? = null
     private var ivAiAvatarSmall: ImageView? = null
 
     private var settingsManager: SettingsManager? = null
@@ -118,6 +119,11 @@ class MainActivity : AppCompatActivity() {
     private var personaRagManager: PersonaRagManager? = null
     private var favoriteManager: FavoriteManager? = null
     private var nicknameManager: NicknameManager? = null
+    private var chatBubblePopup: ChatBubblePopup? = null
+
+    private var scrollPredictions: HorizontalScrollView? = null
+    private var layoutPredictions: LinearLayout? = null
+    private var chatPredictor: ChatPredictor? = null
 
     private val messages = mutableListOf<ChatMessage>()
     private val messageScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -155,7 +161,10 @@ class MainActivity : AppCompatActivity() {
     private var longPressRunnable: Runnable? = null
 
     private val activePersonaId: String by lazy {
-        intent?.getStringExtra("persona_id") ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default") ?: "default"
+        val raw = intent?.getStringExtra("persona_id")
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default")
+            ?: "default"
+        if (raw.matches(Regex("^[a-zA-Z0-9_\\-]+$"))) raw else "default"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -217,6 +226,7 @@ class MainActivity : AppCompatActivity() {
             }
             initStep("FavoriteManager") { favoriteManager = FavoriteManager(this, activePersonaId) }
             initStep("NicknameManager") { nicknameManager = NicknameManager(this) }
+            initStep("ChatBubblePopup") { chatBubblePopup = ChatBubblePopup(this) }
             initStep("VoiceManager") { voiceManager = VoiceManager(this) }
             initStep("ProactiveEngine") { proactiveEngine = ProactiveInteractionEngine(settingsManager!!) }
             initStep("ApiClient") { rebuildApiClient() }
@@ -367,10 +377,9 @@ class MainActivity : AppCompatActivity() {
         tvDaysLabel = findViewById(R.id.tv_days_label)
         progressAffection = findViewById(R.id.progress_affection)
         tvPetName = findViewById(R.id.tv_pet_name)
-        tvStatus = findViewById(R.id.tv_status)
-        chipEmotion = findViewById(R.id.chip_emotion)
-        chipAction = findViewById(R.id.chip_action)
         ivAiAvatarSmall = findViewById(R.id.iv_ai_avatar_small)
+        scrollPredictions = findViewById(R.id.scroll_predictions)
+        layoutPredictions = findViewById(R.id.layout_predictions)
     }
 
     private fun ensureAppDirs() {
@@ -388,8 +397,11 @@ class MainActivity : AppCompatActivity() {
     private fun rebuildApiClient() {
         val sm = settingsManager ?: return
         if (sm.chatApiUrl.isNotBlank()) {
-            apiClient = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel)
+            apiClient = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel,
+                sm.llmTemperature, sm.llmTopP, sm.llmFrequencyPenalty, sm.llmPresencePenalty, sm.llmMaxTokens,
+                sm.apiProvider)
         }
+        chatPredictor = ChatPredictor(this, sm)
     }
 
     private fun initChatAdapter() {
@@ -847,6 +859,7 @@ class MainActivity : AppCompatActivity() {
         val text = etMessage?.text?.toString()?.trim() ?: ""
         if (text.isEmpty()) return
         etMessage?.text?.clear()
+        scrollPredictions?.visibility = View.GONE
 
         val quote = quotedMessage
         hideQuoteBar()
@@ -956,20 +969,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAiMomentTrigger() {
-        val affectionLevel = affectionManager?.affectionLevel ?: return
         val momentsMgr = com.aicompanion.moments.MomentsManager(this)
         momentsMgr.loadMoments()
-        if (momentsMgr.shouldAiPost(affectionLevel)) {
-            val apiClient = AppContainer.apiClient ?: return
-            val persona = getPersonaInfo()
-            messageScope.launch {
-                momentsMgr.generateAiMoment(
-                    apiClient,
-                    persona.first,
-                    persona.second,
-                    affectionLevel
-                )
-            }
+        val apiClient = AppContainer.apiClient ?: return
+
+        val pm = com.aicompanion.persona.PersonaManager(this)
+        pm.load()
+        val allPersonas = pm.getAllPersonas()
+        if (allPersonas.isEmpty()) return
+
+        val postingPersona = allPersonas.random()
+        val prefs = getSharedPreferences("persona_data_${postingPersona.id}", MODE_PRIVATE)
+        val am = com.aicompanion.affection.AffectionManager(this, postingPersona.id)
+        val affectionLevel = am.affectionLevel
+
+        if (!momentsMgr.shouldAiPost(affectionLevel)) return
+
+        val name = postingPersona.name
+        val prompt = buildString {
+            append("你是「$name」。")
+            postingPersona.personality.takeIf { it.isNotBlank() }?.let { append("\n性格：$it") }
+            postingPersona.speechStyle.takeIf { it.isNotBlank() }?.let { append("\n说话风格：$it") }
+            prefs.getString("persona_desc", "")?.takeIf { it.isNotBlank() }?.let { append("\n简介：$it") }
+        }
+
+        messageScope.launch {
+            momentsMgr.generateAiMoment(
+                apiClient,
+                name,
+                prompt,
+                affectionLevel,
+                postingPersona.id
+            )
         }
     }
 
@@ -1070,6 +1101,27 @@ class MainActivity : AppCompatActivity() {
                 val history = messages.takeLast(10).filter { it.text.length < 500 }.map { it.isUser to it.text }
                 val tools = actionMgr?.getToolDefinitions() ?: emptyList()
 
+                var emotionParams = EmotionParams()
+                if (sm.emotionAnalysisEnabled && client.chatApiUrl.isNotBlank()) {
+                    try {
+                        val analyzer = EmotionAnalyzer(client)
+                        emotionParams = withContext(Dispatchers.IO) {
+                            analyzer.analyzeEmotion(
+                                personaName = persona.first,
+                                personaPrompt = persona.second,
+                                userMessage = message,
+                                chatHistory = history,
+                                currentEmotion = currentUserMoodName
+                            )
+                        }
+                        com.aicompanion.util.AppLogger.d(TAG, "Emotion analysis: tempOffset=${emotionParams.temperatureOffset}, " +
+                            "pitchOffset=${emotionParams.ttsPitchOffset}, rateOffset=${emotionParams.ttsRateOffset}, " +
+                            "intensity=${emotionParams.emotionIntensity}")
+                    } catch (e: Exception) {
+                        com.aicompanion.util.AppLogger.w(TAG, "Emotion analysis failed, using defaults: ${e.message}")
+                    }
+                }
+
                 val userCall = getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
                     .getString("user_nickname", null)
                     ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
@@ -1086,6 +1138,9 @@ class MainActivity : AppCompatActivity() {
                     ""
                 }
 
+                val overrideTemp = if (sm.emotionAnalysisEnabled) emotionParams.applyToTemperature(sm.llmTemperature) else null
+                val overrideTopP = if (sm.emotionAnalysisEnabled) emotionParams.applyToTopP(sm.llmTopP) else null
+
                 val response = if (tools.isNotEmpty()) {
                     withContext(Dispatchers.IO) {
                         client.sendChatWithToolLoop(
@@ -1097,7 +1152,9 @@ class MainActivity : AppCompatActivity() {
                     withContext(Dispatchers.IO) {
                         client.sendChat(
                             sm.userId, message, persona.first, persona.second,
-                            currentUserMoodName, "idle", memories, "", false, systemContext, history
+                            currentUserMoodName, "idle", memories, "", false, systemContext, history,
+                            overrideTemperature = overrideTemp,
+                            overrideTopP = overrideTopP
                         )
                     }
                 }
@@ -1127,13 +1184,17 @@ class MainActivity : AppCompatActivity() {
                         if (sm.isTTSEnabled && response.audioUrl != null) {
                             voiceManager?.playSpeech(response.audioUrl, response.emotion)
                         } else if (sm.isTTSEnabled) {
-                            voiceManager?.speak(rawText, response.emotion)
+                            val pitchOffset = if (sm.emotionAnalysisEnabled) emotionParams.ttsPitchOffset else 0f
+                            val rateOffset = if (sm.emotionAnalysisEnabled) emotionParams.ttsRateOffset else 0f
+                            voiceManager?.speak(rawText, response.emotion, pitchOffset, rateOffset)
                         }
                         updatePetDisplay(response)
 
                         tryAttachVirtualWorldImage(message)
 
                         contextManager?.addTurn(message, rawText)
+
+                        triggerPredictions()
 
                         launch(Dispatchers.IO) {
                             try {
@@ -1172,6 +1233,62 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun triggerPredictions() {
+        val predictor = chatPredictor ?: return
+        val recent = messages.takeLast(10).map { msg ->
+            if (msg.isUser) "user" to msg.text else "ai" to msg.text
+        }
+        if (recent.isEmpty()) return
+        val personaId = intent.getStringExtra("persona_id")
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default")
+            ?: "default"
+        val identity = com.aicompanion.prompt.PromptBuilder.buildIdentity(this, personaId)
+        messageScope.launch {
+            val predictions = predictor.predictPrivateChat(
+                recentMessages = recent,
+                personaName = identity.name,
+                personaPersonality = identity.personality
+            )
+            withContext(Dispatchers.Main) {
+                showPredictions(predictions)
+            }
+        }
+    }
+
+    private fun showPredictions(predictions: List<String>) {
+        val container = layoutPredictions ?: return
+        val scrollView = scrollPredictions ?: return
+        container.removeAllViews()
+        if (predictions.isEmpty()) {
+            scrollView.visibility = View.GONE
+            return
+        }
+        val dp = resources.displayMetrics.density
+        for (text in predictions) {
+            val tv = TextView(this).apply {
+                this.text = text
+                setTextColor(0xFFe0e0f0.toInt())
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
+                setBackgroundResource(R.drawable.bg_prediction_chip)
+                setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    etMessage?.setText(text)
+                    etMessage?.setSelection(text.length)
+                    sendMessage()
+                }
+            }
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            lp.setMargins((4 * dp).toInt(), 0, (4 * dp).toInt(), (6 * dp).toInt())
+            container.addView(tv, lp)
+        }
+        scrollView.visibility = View.VISIBLE
+    }
+
     private fun addPetMessage(text: String, emotion: Emotion, action: Action) {
         val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val cleanText = text.replace(Regex("\\[\\[emotion:\\w+\\]\\]", RegexOption.IGNORE_CASE), "").trim()
@@ -1188,9 +1305,14 @@ class MainActivity : AppCompatActivity() {
             live2dView?.visibility = View.GONE
         }
 
+        val aiName = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            .getString("ai_name", "星尘") ?: "星尘"
+        val avatarPath = getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
+            .getString("persona_avatar_path", "") ?: ""
+
+        chatBubblePopup?.show(aiName, cleanText, avatarPath.ifBlank { null })
+
         if (!hasWindowFocus()) {
-            val aiName = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                .getString("ai_name", "星尘") ?: "星尘"
             systemMonitor?.showAiMessageNotification(aiName, cleanText)
         }
     }
@@ -1264,7 +1386,11 @@ class MainActivity : AppCompatActivity() {
                 append("\n\n[上下文]\n$ctxBlock")
             }
 
-            append("\n\n【规则】像真人聊天，简短自然。关心对方情绪。有强烈情绪时用send_sticker。可以反问和主动关心。保持角色不跳戏。末尾[[emotion:happy/sad/angry/surprised/neutral]]")
+            append("\n\n【规则】\n")
+            append("- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]\n")
+            append("- 用()描述你的动作、表情、状态、情绪，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)\n")
+            append("- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定\n")
+            append("- 有强烈情绪时用send_sticker。可以反问和主动关心。保持角色不跳戏。")
         }
         return Pair(identity.name, fullPrompt)
     }
@@ -1285,7 +1411,7 @@ class MainActivity : AppCompatActivity() {
 
         val poolEntries = contextManager?.memoryPool?.getAll() ?: emptyList()
         if (poolEntries.isNotEmpty()) {
-            val poolTexts = poolEntries.map { "[${it.category}] ${it.content}" }
+            val poolTexts = poolEntries.map { it.content }
             val embedder = com.aicompanion.rag.TfidfEmbedder()
             embedder.buildVocabulary(poolTexts)
             val queryVec = embedder.embedSingleSync(query)
@@ -1331,8 +1457,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updatePetDisplay(response: ChatResponse) {
-        chipEmotion?.text = response.emotion.name.lowercase()
-        chipAction?.text = response.action.name.lowercase()
     }
 
     private fun setLoading(loading: Boolean) {
@@ -1775,13 +1899,11 @@ class MainActivity : AppCompatActivity() {
         updateAffectionDisplay()
         checkAiMomentTrigger()
         addPetMessage("🎉 专注完成！你真棒！好感+3", Emotion.HAPPY, Action.TAIL_FLICK)
-        tvStatus?.text = "在线"
     }
 
     private fun cancelFocusTimer() {
         focusActive = false
         focusRunnable?.let { handler.removeCallbacks(it) }
-        tvStatus?.text = "在线"
         addPetMessage("专注取消了，没关系，下次继续~", Emotion.NEUTRAL, Action.IDLE)
     }
 
@@ -1821,8 +1943,15 @@ class MainActivity : AppCompatActivity() {
 
         when (sm.diaryTriggerMode) {
             com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50 -> {
-                if (messages.count { it.isUser } % 50 == 0 && messages.count { it.isUser } > 0) {
-                    autoTriggerDiary(dm, am)
+                val userCount = messages.count { it.isUser }
+                if (userCount > 0 && userCount % 50 == 0) {
+                    val lastTriggered = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                        .getInt("last_diary_trigger_count", 0)
+                    if (userCount != lastTriggered) {
+                        getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                            .putInt("last_diary_trigger_count", userCount).apply()
+                        autoTriggerDiary(dm, am)
+                    }
                 }
             }
             com.aicompanion.settings.DiaryTriggerMode.HOURLY,
@@ -1987,7 +2116,6 @@ class MainActivity : AppCompatActivity() {
         if (!focusActive) return
         val min = focusSecondsLeft / 60
         val sec = focusSecondsLeft % 60
-        tvStatus?.text = "🍅 %02d:%02d".format(min, sec)
     }
 
     private fun triggerProactiveChat() {
@@ -1996,12 +2124,16 @@ class MainActivity : AppCompatActivity() {
         val client = apiClient ?: return
         val sm = settingsManager ?: return
 
+        val chatHistory = messages.takeLast(10).map { msg ->
+            Pair(msg.isUser, msg.text)
+        }
+
         messageScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
                     if (sm.chatApiUrl.isNotBlank()) {
                         val memCtx = contextManager?.memoryPool?.getPoolBlock()
-                        client.generateNagContent(getPersonaInfo().first, getPersonaInfo().second, memoryContext = memCtx)
+                        client.generateNagContent(getPersonaInfo().first, getPersonaInfo().second, memoryContext = memCtx, chatHistory = chatHistory)
                     } else null
                 }
                 if (response != null && response.text.isNotBlank() && response.errorMessage == null) {
@@ -2083,6 +2215,10 @@ class MainActivity : AppCompatActivity() {
         val sm = settingsManager ?: return
         if (sm.chatApiUrl.isBlank()) return
 
+        val chatHistory = messages.takeLast(10).map { msg ->
+            Pair(msg.isUser, msg.text)
+        }
+
         messageScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
@@ -2090,7 +2226,8 @@ class MainActivity : AppCompatActivity() {
                     client.generateNagContent(
                         getPersonaInfo().first, getPersonaInfo().second,
                         systemAlert = "主人的手机电量只剩 $percentage% 了！请提醒主人及时充电，语气要关心和温柔。",
-                        memoryContext = memCtx
+                        memoryContext = memCtx,
+                        chatHistory = chatHistory
                     )
                 }
                 if (response != null && response.text.isNotBlank() && response.errorMessage == null) {

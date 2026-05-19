@@ -14,7 +14,7 @@ class CompanionApp : Application() {
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             Log.e("CompanionApp", "FATAL on ${thread.name}: ${throwable.javaClass.simpleName}: ${throwable.message}", throwable)
             try {
-                Toast.makeText(this, "⚠ 错误: ${throwable.javaClass.simpleName}: ${throwable.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "应用发生错误，请查看日志", Toast.LENGTH_LONG).show()
             } catch (_: Exception) {}
         }
     }

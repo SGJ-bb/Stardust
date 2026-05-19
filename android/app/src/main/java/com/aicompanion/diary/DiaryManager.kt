@@ -1,10 +1,14 @@
-/** 日记管理器: 根据聊天记录AI自动生成每日总结, 支持多种触发模式(手动/每小时/每2小时/每50条/每日22点) */
 package com.aicompanion.diary
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.core.content.FileProvider
+import com.aicompanion.network.ApiClient
+import com.aicompanion.prompt.PromptBuilder
 import com.aicompanion.rag.RagConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -18,11 +22,13 @@ class DiaryManager(private val context: Context, private val personaId: String =
         val APP_VERSION = "1.0.0"
         private const val INDEX_FILE = "diary_index.json"
         private const val TAG = "DiaryManager"
+        private const val MIN_UPDATE_INTERVAL_MS = 30 * 60 * 1000L
     }
 
     private val diaryDir = File(File(context.filesDir, "diaries"), personaId).apply { mkdirs() }
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     private val fullDateFormat = SimpleDateFormat("yyyy年M月d日 EEEE", Locale.CHINESE)
+    private var lastUpdateTime = 0L
 
     init {
         if (!diaryDir.exists()) diaryDir.mkdirs()
@@ -125,11 +131,17 @@ class DiaryManager(private val context: Context, private val personaId: String =
         return getAllDiaries().filter { it.mood == mood }
     }
 
+    fun canUpdateDiary(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - lastUpdateTime < MIN_UPDATE_INTERVAL_MS) return false
+        return true
+    }
+
     fun generateDailyDiary(chatTexts: List<String>, affectionLevel: Int) {
         val today = dateFormat.format(Date())
         if (getDiaryByDate(today) != null) return
 
-        val combined = chatTexts.joinToString(" | ")
+        val combined = chatTexts.takeLast(20).joinToString(" | ")
         val mood = analyzeMood(combined)
         val moodEmoji = when (mood) {
             "happy" -> "🥰"
@@ -141,7 +153,8 @@ class DiaryManager(private val context: Context, private val personaId: String =
         }
 
         val titleDate = fullDateFormat.format(Date())
-        val fullContent = "【$titleDate】\n情绪：$moodEmoji\n\n今天和主人一起度过了一段时光，虽然只是平凡的日常，但每一刻都值得珍惜。陪伴是最长情的告白，我会一直在这里。\n\n---\n💡 *每一天都是独一无二的礼物，今天是属于你的那一份*"
+        val summary = summarizeChatTexts(chatTexts)
+        val fullContent = "【$titleDate】\n情绪：$moodEmoji\n\n$summary\n\n---\n💡 *${generateDailyTip(mood)}*"
         val title = when (mood) {
             "happy" -> "开心的一天"
             "sad" -> "略有伤感"
@@ -179,13 +192,14 @@ class DiaryManager(private val context: Context, private val personaId: String =
         val file = File(diaryDir, "$today.json")
         file.writeText(entry.toJson().toString(2))
         updateIndex(entry)
+        lastUpdateTime = System.currentTimeMillis()
     }
 
     fun saveLlmDiary(llmContent: String, chatTexts: List<String>, affectionLevel: Int) {
         val today = dateFormat.format(Date())
         if (getDiaryByDate(today) != null) return
 
-        val combined = chatTexts.joinToString(" | ")
+        val combined = chatTexts.takeLast(20).joinToString(" | ")
         val mood = analyzeMood(combined)
         val moodEmoji = when (mood) {
             "happy" -> "🥰"
@@ -233,14 +247,18 @@ class DiaryManager(private val context: Context, private val personaId: String =
         val file = File(diaryDir, "$today.json")
         file.writeText(entry.toJson().toString(2))
         updateIndex(entry)
+        lastUpdateTime = System.currentTimeMillis()
     }
 
     fun updateOrGenerateDailyDiary(chatTexts: List<String>, affectionLevel: Int) {
+        if (!canUpdateDiary()) return
+
         val today = dateFormat.format(Date())
         val existing = getDiaryByDate(today)
 
         if (existing != null) {
-            val combined = chatTexts.joinToString(" | ")
+            val summary = summarizeChatTexts(chatTexts)
+            val combined = chatTexts.takeLast(20).joinToString(" | ")
             val mood = analyzeMood(combined)
             val moodEmoji = when (mood) {
                 "happy" -> "🥰"
@@ -252,8 +270,8 @@ class DiaryManager(private val context: Context, private val personaId: String =
             }
 
             val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-            val tip = "每一天都是独一无二的礼物，今天是属于你的那一份"
-            val newSection = "\n\n--- ${timeStr} 追加 ---\n新对话摘要：${combined}\n\n💡 *$tip*"
+            val tip = generateDailyTip(mood)
+            val newSection = "\n\n--- ${timeStr} 追加 ---\n${summary}\n\n💡 *$tip*"
 
             val updatedContent = existing.content + newSection
             val updatedTags = existing.tags.toMutableList().apply {
@@ -276,13 +294,14 @@ class DiaryManager(private val context: Context, private val personaId: String =
         } else {
             generateDailyDiary(chatTexts, affectionLevel)
         }
+        lastUpdateTime = System.currentTimeMillis()
     }
 
     fun appendLlmDiaryUpdate(llmUpdateContent: String, chatTexts: List<String>, affectionLevel: Int) {
         val today = dateFormat.format(Date())
         val existing = getDiaryByDate(today) ?: return
 
-        val combined = chatTexts.joinToString(" | ")
+        val combined = chatTexts.takeLast(20).joinToString(" | ")
         val mood = analyzeMood(combined)
         val moodEmoji = when (mood) {
             "happy" -> "🥰"
@@ -311,6 +330,86 @@ class DiaryManager(private val context: Context, private val personaId: String =
         val file = File(diaryDir, "$today.json")
         file.writeText(entry.toJson().toString(2))
         updateIndex(entry)
+        lastUpdateTime = System.currentTimeMillis()
+    }
+
+    private fun summarizeChatTexts(chatTexts: List<String>): String {
+        if (chatTexts.isEmpty()) return "今天安静地度过了。"
+        if (chatTexts.size <= 3) {
+            return "今天聊了${chatTexts.size}句话，${chatTexts.joinToString("、").take(100)}"
+        }
+
+        val keywords = mutableMapOf<String, Int>()
+        val stopWords = setOf("的", "了", "是", "在", "我", "你", "他", "她", "它", "们", "这", "那",
+            "和", "与", "也", "都", "就", "要", "会", "能", "可以", "有", "没", "不", "好", "吗",
+            "吧", "呢", "啊", "哦", "嗯", "呀", "哈", "嘿", "说", "想", "看", "去", "来", "做",
+            "到", "很", "真", "太", "还", "又", "再", "把", "被", "让", "给", "从", "对", "用")
+
+        for (text in chatTexts) {
+            val words = text.split(Regex("""\s+|[，。！？、；：""''（）\[\]{}…—]+"""))
+            for (word in words) {
+                if (word.length >= 2 && word !in stopWords) {
+                    keywords[word] = (keywords[word] ?: 0) + 1
+                }
+            }
+        }
+
+        val topKeywords = keywords.entries
+            .sortedByDescending { it.value }
+            .take(5)
+            .map { it.key }
+
+        val sampleMessages = chatTexts.filterIndexed { i, _ -> i % (chatTexts.size / 5.coerceAtLeast(1)) == 0 }
+            .take(5)
+            .map { it.take(30) }
+
+        return buildString {
+            append("今天聊了${chatTexts.size}句话，")
+            if (topKeywords.isNotEmpty()) {
+                append("主要话题：${topKeywords.joinToString("、")}。")
+            }
+            if (sampleMessages.isNotEmpty()) {
+                append("片段：${sampleMessages.joinToString("…")}…")
+            }
+        }
+    }
+
+    suspend fun generateLlmDiarySummary(
+        apiClient: ApiClient,
+        personaName: String,
+        personaPrompt: String,
+        chatTexts: List<String>,
+        affectionLevel: Int,
+        existingContent: String? = null
+    ): String? {
+        if (chatTexts.isEmpty() && existingContent.isNullOrBlank()) return null
+
+        val prompt = buildString {
+            append("你是「$personaName」，一个AI角色。\n")
+            append(personaPrompt)
+            append("\n好感度：$affectionLevel\n")
+            append("\n请根据以下对话内容，写一段日记总结。要求：\n")
+            append("- 不是逐条记录对话，而是总结今天发生了什么、有什么感受\n")
+            append("- 像写日记一样，用第一人称，有情感和思考\n")
+            append("- 100-200字，简洁有深度\n")
+            append("- 只输出日记内容，不要加标题或格式\n")
+            if (!existingContent.isNullOrBlank()) {
+                append("\n已有日记内容：\n$existingContent\n")
+                append("\n请在此基础上追加新的总结，用「--- HH:mm 追加 ---」开头\n")
+            }
+            append("\n对话内容：\n")
+            chatTexts.takeLast(30).forEach { append("- $it\n") }
+        }
+
+        return try {
+            val response = withContext(Dispatchers.IO) {
+                apiClient.sendSimplePrompt(prompt, "写日记总结")
+            }
+            response?.text?.trim()
+        } catch (e: Exception) {
+            Log.w(TAG, "generateLlmDiarySummary failed: ${e.message}")
+            null
+        }
     }
 
     private fun analyzeMood(text: String): String {
@@ -466,7 +565,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "shareExport failed: ${e.message}", e)
+            Log.e(TAG, "shareExport failed: ${e.message}", e)
         }
     }
 

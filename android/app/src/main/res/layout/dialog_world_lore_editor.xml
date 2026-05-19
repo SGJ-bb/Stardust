@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet"
+    android:overScrollMode="never">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:background="#3a3a5a" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📝 世界观设定"
+            android:textSize="20sp"
+            android:textColor="#e8e8f8"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:layout_marginBottom="16dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_auto_generate"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginBottom="8dp"
+            android:text="🪄 AI自动生成世界观"
+            android:textSize="13sp"
+            app:cornerRadius="22dp"
+            app:backgroundTint="#667eea"
+            android:textColor="@android:color/white" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <EditText
+                android:id="@+id/et_world_keywords"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:hint="关键词辅助（如：魔法学院、末日废土...）"
+                android:textSize="12sp"
+                android:textColor="#e0e0f0"
+                android:textColorHint="#556677"
+                android:inputType="text"
+                android:maxLines="1"
+                android:background="@drawable/bg_input_field"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:layout_marginEnd="8dp" />
+
+            <ProgressBar
+                android:id="@+id/progress_world_generate"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/section_background"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="16dp"
+                    android:background="@drawable/bg_section_indicator" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🌍 世界背景"
+                    android:textSize="13sp"
+                    android:textColor="#9c7cff"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/et_world_background"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="3"
+                android:maxLines="8"
+                android:hint="描述这个世界的整体设定：时代、地理、文明水平、种族..."
+                android:textSize="14sp"
+                android:textColor="#e0e0f0"
+                android:textColorHint="#556677"
+                android:gravity="top"
+                android:background="@drawable/bg_input_field"
+                android:padding="14dp"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/section_rules"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="16dp"
+                    android:background="@drawable/bg_section_indicator" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📜 世界规则"
+                    android:textSize="13sp"
+                    android:textColor="#9c7cff"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/et_world_rules"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="3"
+                android:maxLines="8"
+                android:hint="这个世界有什么特殊规则？魔法体系、科技限制、社会制度..."
+                android:textSize="14sp"
+                android:textColor="#e0e0f0"
+                android:textColorHint="#556677"
+                android:gravity="top"
+                android:background="@drawable/bg_input_field"
+                android:padding="14dp"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/section_relations"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="16dp"
+                    android:background="@drawable/bg_section_indicator" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👥 角色关系"
+                    android:textSize="13sp"
+                    android:textColor="#9c7cff"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/et_world_relations"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="3"
+                android:maxLines="8"
+                android:hint="角色之间的关系：敌对、盟友、师徒、恋人..."
+                android:textSize="14sp"
+                android:textColor="#e0e0f0"
+                android:textColorHint="#556677"
+                android:gravity="top"
+                android:background="@drawable/bg_input_field"
+                android:padding="14dp"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/section_scene"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="16dp"
+                    android:background="@drawable/bg_section_indicator" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎬 初始场景"
+                    android:textSize="13sp"
+                    android:textColor="#9c7cff"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/et_world_scene"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="3"
+                android:maxLines="8"
+                android:hint="故事开始时的场景：地点、时间、正在发生的事..."
+                android:textSize="14sp"
+                android:textColor="#e0e0f0"
+                android:textColorHint="#556677"
+                android:gravity="top"
+                android:background="@drawable/bg_input_field"
+                android:padding="14dp"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/section_style"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="16dp"
+                    android:background="@drawable/bg_section_indicator" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✍️ 叙事风格"
+                    android:textSize="13sp"
+                    android:textColor="#9c7cff"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/et_world_style"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="2"
+                android:maxLines="6"
+                android:hint="希望推演的风格：轻松日常、史诗冒险、黑暗悬疑、治愈温馨..."
+                android:textSize="14sp"
+                android:textColor="#e0e0f0"
+                android:textColorHint="#556677"
+                android:gravity="top"
+                android:background="@drawable/bg_input_field"
+                android:padding="14dp"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_save_lore"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="💾 保存世界观"
+            android:textSize="15sp"
+            app:cornerRadius="24dp"
+            app:backgroundTint="#667eea"
+            android:textColor="@android:color/white" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="24dp" />
+    </LinearLayout>
+</ScrollView>

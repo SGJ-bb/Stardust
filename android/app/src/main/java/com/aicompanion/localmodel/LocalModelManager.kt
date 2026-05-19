@@ -3,8 +3,12 @@ package com.aicompanion.localmodel
 import android.content.Context
 import android.graphics.Bitmap
 import com.aicompanion.util.AppLogger
+import com.google.android.gms.tasks.OnFailureListener
+import com.google.android.gms.tasks.OnSuccessListener
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -59,6 +63,16 @@ class LocalModelManager(private val context: Context) {
         TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
     }
 
+    private val latinRecognizer by lazy {
+        TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.Builder().build())
+    }
+
+    private var ocrModelChecked = false
+    private var ocrModelAvailable = false
+    private var useChineseOcr = true
+
+    fun isOcrModelAvailable(): Boolean = ocrModelAvailable || true
+
     private var loadedModelId: String? = null
     private var deviceProfile: DeviceProfile? = null
 
@@ -100,12 +114,26 @@ class LocalModelManager(private val context: Context) {
     }
 
     suspend fun analyzeScreen(bitmap: Bitmap): ScreenAnalysisResult = withContext(Dispatchers.Default) {
+        if (bitmap.isRecycled || bitmap.width <= 0 || bitmap.height <= 0) {
+            AppLogger.e(TAG, "analyzeScreen: invalid bitmap (recycled=${bitmap.isRecycled}, size=${bitmap.width}x${bitmap.height})")
+            return@withContext ScreenAnalysisResult()
+        }
+
+        AppLogger.d(TAG, "analyzeScreen: bitmap=${bitmap.width}x${bitmap.height}, ocrEnabled=$isOcrEnabled, sceneEnabled=$isSceneEnabled")
+
         var ocrText = ""
         var sceneClassification: List<ClassificationResult> = emptyList()
         var uiElements: List<ClassificationResult> = emptyList()
 
         if (isOcrEnabled) {
-            ocrText = performOcr(bitmap)
+            try {
+                ocrText = performOcr(bitmap)
+                AppLogger.d(TAG, "analyzeScreen: OCR result length=${ocrText.length}")
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "analyzeScreen: OCR exception: ${e.message}")
+            }
+        } else {
+            AppLogger.d(TAG, "analyzeScreen: OCR is disabled")
         }
 
         if (isSceneEnabled && tfliteRunner.isLoaded) {
@@ -129,22 +157,84 @@ class LocalModelManager(private val context: Context) {
     }
 
     suspend fun analyzeCurrentScreen(): ScreenAnalysisResult? {
-        val bitmap = screenCapture.captureScreen() ?: return null
+        if (!screenCapture.isCapturing) {
+            AppLogger.w(TAG, "analyzeCurrentScreen: screen capture not started")
+            return null
+        }
+        val bitmap = screenCapture.captureScreen()
+        if (bitmap == null) {
+            AppLogger.w(TAG, "analyzeCurrentScreen: captureScreen returned null")
+            return null
+        }
+        AppLogger.d(TAG, "analyzeCurrentScreen: captured bitmap ${bitmap.width}x${bitmap.height}")
         return analyzeScreen(bitmap)
     }
 
     suspend fun performOcr(bitmap: Bitmap): String = withContext(Dispatchers.Default) {
+        if (bitmap.isRecycled) {
+            AppLogger.e(TAG, "performOcr: bitmap is recycled")
+            return@withContext ""
+        }
+        if (bitmap.width <= 0 || bitmap.height <= 0) {
+            AppLogger.e(TAG, "performOcr: invalid bitmap size ${bitmap.width}x${bitmap.height}")
+            return@withContext ""
+        }
+
+        var lastError: String? = null
+        for (attempt in 1..2) {
+            try {
+                val result = performOcrInternal(bitmap)
+                if (result.isNotBlank()) return@withContext result
+                if (attempt == 1) {
+                    AppLogger.d(TAG, "performOcr: attempt $attempt returned empty, retrying...")
+                    kotlinx.coroutines.delay(300)
+                }
+            } catch (e: Exception) {
+                lastError = e.message
+                AppLogger.e(TAG, "performOcr attempt $attempt failed: ${e.javaClass.simpleName}: ${e.message}")
+                if (attempt < 2) {
+                    kotlinx.coroutines.delay(500)
+                }
+            }
+        }
+        if (lastError != null) {
+            AppLogger.e(TAG, "performOcr all attempts failed, last error: $lastError")
+        } else {
+            AppLogger.w(TAG, "performOcr: no text detected in image after 2 attempts")
+        }
+        ""
+    }
+
+    private suspend fun performOcrInternal(bitmap: Bitmap): String = withContext(Dispatchers.Default) {
         suspendCancellableCoroutine { continuation ->
             val image = InputImage.fromBitmap(bitmap, 0)
-            chineseRecognizer.process(image)
+            val recognizer = if (useChineseOcr) chineseRecognizer else latinRecognizer
+            recognizer.process(image)
                 .addOnSuccessListener { visionText ->
-                    val text = visionText.textBlocks.joinToString("\n") { block ->
+                    val blocks = visionText.textBlocks
+                    if (blocks.isEmpty()) {
+                        AppLogger.d(TAG, "OCR: no text blocks found (chinese=$useChineseOcr)")
+                        continuation.resume("")
+                        return@addOnSuccessListener
+                    }
+                    val text = blocks.joinToString("\n") { block ->
                         block.text
                     }
+                    AppLogger.d(TAG, "OCR: found ${blocks.size} text blocks, ${text.length} chars (chinese=$useChineseOcr)")
                     continuation.resume(text)
                 }
                 .addOnFailureListener { e ->
-                    AppLogger.e(TAG, "OCR failed: ${e.message}")
+                    val errorMsg = when {
+                        e.message?.contains("ML Kit") == true -> "ML Kit模型未就绪，请确保网络连接后重试"
+                        e.message?.contains("download") == true -> "OCR模型下载失败，请检查网络连接"
+                        e.message?.contains("buffer") == true -> "图像数据处理异常"
+                        else -> "OCR识别失败: ${e.javaClass.simpleName}: ${e.message}"
+                    }
+                    AppLogger.e(TAG, "OCR failure (chinese=$useChineseOcr): $errorMsg")
+                    if (useChineseOcr && (e.message?.contains("download") == true || e.message?.contains("ML Kit") == true || e.message?.contains("model") == true)) {
+                        useChineseOcr = false
+                        AppLogger.w(TAG, "Chinese OCR model unavailable, falling back to Latin OCR")
+                    }
                     continuation.resume("")
                 }
         }

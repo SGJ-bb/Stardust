@@ -53,4 +53,14 @@
             android:layout_marginStart="10dp" />
     </LinearLayout>
 
+    <ImageView
+        android:id="@+id/iv_moment_image_preview"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:layout_marginTop="10dp"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:background="@drawable/bg_edit_moment"
+        android:contentDescription="图片预览" />
+
 </LinearLayout>

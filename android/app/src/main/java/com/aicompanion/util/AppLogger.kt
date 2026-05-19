@@ -38,10 +38,18 @@ object AppLogger {
     }
 
     private fun add(line: String) {
+        val sanitized = sanitize(line)
         synchronized(logs) {
-            logs.add(line)
+            logs.add(sanitized)
             if (logs.size > MAX_LOGS) logs.removeAt(0)
         }
+    }
+
+    private fun sanitize(message: String): String {
+        return message
+            .replace(Regex("sk-[a-zA-Z0-9_-]{8,}"), "sk-***")
+            .replace(Regex("Bearer\\s+\\S+", RegexOption.IGNORE_CASE), "Bearer ***")
+            .replace(Regex("(key|api[_-]?key|token|secret|access[_-]?token)=[^&\\s]+", RegexOption.IGNORE_CASE), "$1=***")
     }
 
     fun getRecentLogs(count: Int = 150): String {

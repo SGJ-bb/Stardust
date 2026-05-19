@@ -1,14 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="400dp"
-    android:background="#1C2128"
-    android:padding="20dp">
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_bottom_sheet"
+    android:overScrollMode="never"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_dot_inactive" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -24,8 +34,8 @@
                 android:layout_weight="1"
                 android:text="😊 开心"
                 android:textSize="20sp"
-                android:textColor="#C9D1D9"
-                android:textStyle="bold" />
+                android:textColor="#e0e0f0"
+                android:fontFamily="sans-serif-medium" />
 
             <TextView
                 android:id="@+id/tv_detail_date"
@@ -40,7 +50,6 @@
             android:id="@+id/tv_detail_stats"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="💬 12条消息 · ❤️ 好感度50"
             android:textSize="12sp"
             android:textColor="#667788"
             android:layout_marginBottom="4dp" />
@@ -49,7 +58,6 @@
             android:id="@+id/tv_detail_tags"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🏷️ 标签1 · 标签2"
             android:textSize="12sp"
             android:textColor="#66BB6A"
             android:layout_marginBottom="12dp" />
@@ -64,10 +72,10 @@
             android:id="@+id/tv_detail_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="日记内容"
-            android:textSize="14sp"
-            android:textColor="#C9D1D9"
-            android:lineSpacingExtra="4dp" />
-    </LinearLayout>
+            android:textSize="15sp"
+            android:textColor="#d0d0e0"
+            android:lineSpacingExtra="6dp"
+            android:lineSpacingMultiplier="1.2" />
 
+    </LinearLayout>
 </ScrollView>

@@ -64,40 +64,8 @@ class MemoryPoolActivity : AppCompatActivity() {
             return
         }
 
-        val grouped = entries.groupBy { it.category }
-        val categoryOrder = listOf("场景", "剧情", "喜好", "习惯", "事实", "事件", "计划", "继承", "其他")
-
-        for (cat in categoryOrder) {
-            val group = grouped[cat] ?: continue
-            if (group.isEmpty()) continue
-
-            val catHeader = TextView(this).apply {
-                text = "▸ $cat (${group.size}条)"
-                textSize = 13f
-                setTextColor(0xFFc4b5fd.toInt())
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setPadding(0, 16, 0, 8)
-            }
-            container.addView(catHeader)
-
-            for (entry in group) {
-                addEntryView(entry)
-            }
-        }
-
-        val uncategorized = entries.filter { it.category !in categoryOrder }
-        if (uncategorized.isNotEmpty()) {
-            val otherHeader = TextView(this).apply {
-                text = "▸ 其他 (${uncategorized.size}条)"
-                textSize = 13f
-                setTextColor(0xFFc4b5fd.toInt())
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setPadding(0, 16, 0, 8)
-            }
-            container.addView(otherHeader)
-            for (entry in uncategorized) {
-                addEntryView(entry)
-            }
+        for (entry in entries) {
+            addEntryView(entry)
         }
     }
 
@@ -157,14 +125,7 @@ class MemoryPoolActivity : AppCompatActivity() {
     }
 
     private fun getCategoryColor(category: String): Int = when (category) {
-        "场景" -> 0xFF64ffda.toInt()
-        "剧情" -> 0xFF9c7cff.toInt()
-        "喜好" -> 0xFF7ec8a0.toInt()
-        "习惯" -> 0xFF7eb8e0.toInt()
-        "事实" -> 0xFFe0c070.toInt()
-        "事件" -> 0xFFe088a0.toInt()
-        "计划" -> 0xFFc0a0e0.toInt()
-        "继承" -> 0xFF90c0d0.toInt()
+        "总结" -> 0xFF9c7cff.toInt()
         else -> 0xFF808890.toInt()
     }
 

@@ -11,6 +11,7 @@ import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -21,13 +22,20 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.aicompanion.R
 import com.aicompanion.anim.AnimeUtils
+import com.aicompanion.network.ApiClient
 import com.aicompanion.persona.PersonaManager
+import com.aicompanion.prompt.PromptBuilder
+import com.aicompanion.settings.SettingsManager
 import com.aicompanion.virtualworld.*
 import com.google.android.material.switchmaterial.SwitchMaterial
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class VirtualWorldActivity : AppCompatActivity() {
 
@@ -52,6 +60,7 @@ class VirtualWorldActivity : AppCompatActivity() {
     private lateinit var scrollUploadedImages: android.widget.HorizontalScrollView
 
     private var isSimRunning = false
+    private var simJob: Job? = null
 
     companion object {
         private const val REQUEST_PICK_WORLD_IMAGE = 3001
@@ -126,7 +135,7 @@ class VirtualWorldActivity : AppCompatActivity() {
         val config = worldManager.config
 
         tvVirtualDay.text = "第${state.dayCount}天"
-        tvVirtualHour.text = String.format("%02d:00", state.hourOfDay)
+        tvVirtualHour.text = String.format("%02d:%02d", state.hourOfDay, state.minuteOfHour)
         tvTimeRatio.text = "${config.timeRatio}x"
         tvLocation.text = "📍 ${state.currentLocation}"
         tvWeather.text = getWeatherEmoji(state.currentWeather) + " " + state.currentWeather
@@ -243,6 +252,11 @@ class VirtualWorldActivity : AppCompatActivity() {
                 .setNegativeButton("取消", null)
                 .show()
         }
+
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_tick_index)?.setOnClickListener {
+            AnimeUtils.pulse(it)
+            showTickIndexDialog()
+        }
     }
 
     private fun startSimulation() {
@@ -286,12 +300,37 @@ class VirtualWorldActivity : AppCompatActivity() {
             worldManager.lastTickTime = System.currentTimeMillis()
         }
         updateSimStatus()
+        startAutoTickLoop()
         Toast.makeText(this, "虚拟世界推演已启动", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun startAutoTickLoop() {
+        simJob?.cancel()
+        simJob = lifecycleScope.launch {
+            while (isSimRunning) {
+                delay(10_000L)
+                if (!isSimRunning) break
+                if (!worldManager.shouldTick()) continue
+
+                val event = withContext(Dispatchers.IO) {
+                    worldManager.runSimulationTick()
+                }
+                if (event != null) {
+                    withContext(Dispatchers.Main) {
+                        loadState()
+                        loadStory()
+                    }
+                    publishEventToGroupChat(event)
+                }
+            }
+        }
     }
 
     private fun stopSimulation() {
         isSimRunning = false
         worldManager.isRunning = false
+        simJob?.cancel()
+        simJob = null
         updateSimStatus()
         Toast.makeText(this, "推演已暂停", Toast.LENGTH_SHORT).show()
     }
@@ -332,6 +371,7 @@ class VirtualWorldActivity : AppCompatActivity() {
             if (event != null) {
                 loadState()
                 loadStory()
+                publishEventToGroupChat(event)
             } else {
                 Toast.makeText(this@VirtualWorldActivity, "推演失败，请检查API配置", Toast.LENGTH_SHORT).show()
             }
@@ -340,68 +380,146 @@ class VirtualWorldActivity : AppCompatActivity() {
 
     private fun showWorldLoreEditor() {
         val config = worldManager.config
-        val scrollView = android.widget.ScrollView(this)
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(32, 20, 32, 20)
+        val view = LayoutInflater.from(this).inflate(R.layout.dialog_world_lore_editor, null)
+
+        val etBackground = view.findViewById<EditText>(R.id.et_world_background)
+        val etRules = view.findViewById<EditText>(R.id.et_world_rules)
+        val etRelations = view.findViewById<EditText>(R.id.et_world_relations)
+        val etScene = view.findViewById<EditText>(R.id.et_world_scene)
+        val etStyle = view.findViewById<EditText>(R.id.et_world_style)
+
+        etBackground.setText(config.worldBackground)
+        etRules.setText(config.worldRules)
+        etRelations.setText(config.worldRelations)
+        etScene.setText(config.worldScene)
+        etStyle.setText(config.worldStyle)
+
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        sheet.setContentView(view)
+        sheet.behavior.peekHeight = (resources.displayMetrics.heightPixels * 0.85).toInt()
+
+        val btnAutoGen = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_auto_generate)
+        val progressGen = view.findViewById<ProgressBar>(R.id.progress_world_generate)
+        btnAutoGen.setOnClickListener {
+            AnimeUtils.pulse(it)
+            val keywords = view.findViewById<EditText>(R.id.et_world_keywords).text.toString().trim()
+            btnAutoGen.isEnabled = false
+            btnAutoGen.text = "生成中..."
+            progressGen.visibility = View.VISIBLE
+            lifecycleScope.launch {
+                autoGenerateWorldLore(etBackground, etRules, etRelations, etScene, etStyle, keywords)
+                btnAutoGen.isEnabled = true
+                btnAutoGen.text = "🪄 AI自动生成世界观"
+                progressGen.visibility = View.GONE
+            }
         }
 
-        val fields = listOf(
-            Triple("🌍 世界背景", "描述这个世界的整体设定：时代、地理、文明水平、种族...", config.worldBackground),
-            Triple("📜 世界规则", "这个世界有什么特殊规则？魔法体系、科技限制、社会制度...", config.worldRules),
-            Triple("👥 角色关系", "角色之间的关系：敌对、盟友、师徒、恋人...", config.worldRelations),
-            Triple("🎬 初始场景", "故事开始时的场景：地点、时间、正在发生的事...", config.worldScene),
-            Triple("✍️ 叙事风格", "希望推演的风格：轻松日常、史诗冒险、黑暗悬疑、治愈温馨...", config.worldStyle)
-        )
-
-        val editors = mutableListOf<EditText>()
-        for ((label, hint, value) in fields) {
-            val tvLabel = TextView(this).apply {
-                text = label
-                setTextColor(0xFFc4b5fd.toInt())
-                textSize = 14f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-            }
-            container.addView(tvLabel)
-
-            val et = EditText(this).apply {
-                setText(value)
-                setPadding(20, 12, 20, 12)
-                setTextSize(13f)
-                setTextColor(0xFFe8e8f0.toInt())
-                setHintTextColor(0xFF556677.toInt())
-                this.hint = hint
-                setBackgroundColor(0xFF1a1a3e.toInt())
-                minLines = 2
-                maxLines = 8
-            }
-            editors.add(et)
-            container.addView(et)
-
-            val spacer = View(this).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 12)
-            }
-            container.addView(spacer)
+        view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_save_lore).setOnClickListener {
+            AnimeUtils.pulse(it)
+            val cfg = worldManager.config
+            worldManager.config = cfg.copy(
+                worldBackground = etBackground.text.toString().trim(),
+                worldRules = etRules.text.toString().trim(),
+                worldRelations = etRelations.text.toString().trim(),
+                worldScene = etScene.text.toString().trim(),
+                worldStyle = etStyle.text.toString().trim()
+            )
+            Toast.makeText(this, "世界观已保存", Toast.LENGTH_SHORT).show()
+            sheet.dismiss()
         }
 
-        scrollView.addView(container)
-
-        AlertDialog.Builder(this)
-            .setTitle("📝 世界观设定")
-            .setView(scrollView)
-            .setPositiveButton("保存") { _, _ ->
-                val cfg = worldManager.config
-                worldManager.config = cfg.copy(
-                    worldBackground = editors[0].text.toString().trim(),
-                    worldRules = editors[1].text.toString().trim(),
-                    worldRelations = editors[2].text.toString().trim(),
-                    worldScene = editors[3].text.toString().trim(),
-                    worldStyle = editors[4].text.toString().trim()
-                )
-                Toast.makeText(this, "世界观已保存", Toast.LENGTH_SHORT).show()
+        sheet.setOnShowListener {
+            val sections = listOf(
+                view.findViewById<View>(R.id.section_background),
+                view.findViewById<View>(R.id.section_rules),
+                view.findViewById<View>(R.id.section_relations),
+                view.findViewById<View>(R.id.section_scene),
+                view.findViewById<View>(R.id.section_style)
+            )
+            sections.forEachIndexed { i, section ->
+                AnimeUtils.slideInFromBottom(section, (i + 1) * 80L)
             }
-            .setNegativeButton("取消", null)
-            .show()
+        }
+
+        sheet.show()
+    }
+
+    private suspend fun autoGenerateWorldLore(
+        etBackground: EditText,
+        etRules: EditText,
+        etRelations: EditText,
+        etScene: EditText,
+        etStyle: EditText,
+        keywords: String = ""
+    ) {
+        val config = worldManager.config
+        val personaManager = PersonaManager(this)
+        personaManager.load()
+
+        val personaDescs = config.memberPersonaIds.mapNotNull { pid ->
+            val p = personaManager.getPersona(pid) ?: return@mapNotNull null
+            val identity = PromptBuilder.buildIdentity(this, pid)
+            val prefs = getSharedPreferences("persona_data_$pid", MODE_PRIVATE)
+            buildString {
+                append("「${identity.name}」性格${identity.personality}。${identity.speechStyle}。")
+                prefs.getString("persona_appearance", "")?.takeIf { it.isNotBlank() }?.let { append(" 外貌：$it。") }
+                prefs.getString("persona_preferences", "")?.takeIf { it.isNotBlank() }?.let { append(" 喜好：$it。") }
+                prefs.getString("world_setting", "")?.takeIf { it.isNotBlank() }?.let { append(" 世界观：$it。") }
+                prefs.getString("world_relationship", "")?.takeIf { it.isNotBlank() }?.let { append(" 关系：$it。") }
+            }
+        }.joinToString("\n")
+
+        val allPersonaDescs = if (personaDescs.isBlank()) {
+            personaManager.getAllPersonas().take(5).mapNotNull { p ->
+                val prefs = getSharedPreferences("persona_data_${p.id}", MODE_PRIVATE)
+                buildString {
+                    append("「${p.name}」性格${p.personality}。${p.speechStyle}。")
+                    prefs.getString("persona_appearance", "")?.takeIf { it.isNotBlank() }?.let { append(" 外貌：$it。") }
+                    prefs.getString("persona_preferences", "")?.takeIf { it.isNotBlank() }?.let { append(" 喜好：$it。") }
+                    prefs.getString("world_setting", "")?.takeIf { it.isNotBlank() }?.let { append(" 世界观：$it。") }
+                    prefs.getString("world_relationship", "")?.takeIf { it.isNotBlank() }?.let { append(" 关系：$it。") }
+                }.takeIf { it.isNotBlank() }
+            }.joinToString("\n")
+        } else {
+            personaDescs
+        }
+
+        val chatSummary = buildChatSummary()
+
+        if (allPersonaDescs.isBlank() && chatSummary.isBlank() && keywords.isBlank()) {
+            Toast.makeText(this, "请输入关键词或添加角色", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val sm = SettingsManager(this)
+        val client = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel,
+            sm.llmTemperature, sm.llmTopP, sm.llmFrequencyPenalty, sm.llmPresencePenalty, sm.llmMaxTokens,
+            sm.apiProvider)
+        val prompt = PromptBuilder.buildAutoWorldLorePrompt(allPersonaDescs, chatSummary, keywords)
+
+        try {
+            val response = withContext(Dispatchers.IO) { client.sendSimplePrompt(prompt, "生成世界观") }
+            if (response != null && response.text.isNotBlank()) {
+                var text = response.text.trim()
+                text = text.replace(Regex("```(?:json)?\\s*"), "").replace("```", "").trim()
+                val bracketStart = text.indexOf('{')
+                val bracketEnd = text.lastIndexOf('}')
+                if (bracketStart >= 0 && bracketEnd > bracketStart) {
+                    text = text.substring(bracketStart, bracketEnd + 1)
+                }
+                val json = org.json.JSONObject(text as String)
+                etBackground.setText(json.optString("worldBackground", ""))
+                etRules.setText(json.optString("worldRules", ""))
+                etRelations.setText(json.optString("worldRelations", ""))
+                etScene.setText(json.optString("worldScene", ""))
+                etStyle.setText(json.optString("worldStyle", ""))
+                Toast.makeText(this, "世界观已自动生成", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "生成失败，请检查API配置", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "生成失败：${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showPersonaSelector() {
@@ -425,6 +543,48 @@ class VirtualWorldActivity : AppCompatActivity() {
                 worldManager.config = config.copy(memberPersonaIds = selectedIds)
             }
             .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showTickIndexDialog() {
+        val indices = worldManager.getTickIndexList()
+        if (indices.isEmpty()) {
+            Toast.makeText(this, "暂无推演记录", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val items = indices.reversed().map { idx ->
+            "第${idx.tickIndex}轮 | 第${idx.virtualDay}天 ${String.format("%02d:%02d", idx.virtualHour, idx.virtualMinute)} | ${idx.summary.ifBlank { idx.eventType }}"
+        }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle("📋 推演索引（共${indices.size}轮）")
+            .setItems(items) { _, which ->
+                val reversedIndices = indices.reversed()
+                val selectedIdx = reversedIndices[which]
+                val events = worldManager.getEventsByTickIndex(selectedIdx.tickIndex)
+                if (events.isNotEmpty()) {
+                    val detail = events.joinToString("\n\n") { ev ->
+                        "[第${ev.virtualDay}天 ${String.format("%02d:%02d", ev.virtualHour, ev.virtualMinute)}] ${ev.speakerName}：${ev.content}"
+                    }
+                    val scrollView = android.widget.ScrollView(this)
+                    val tv = TextView(this).apply {
+                        text = detail
+                        textSize = 13f
+                        setTextColor(0xFFe0e0f0.toInt())
+                        setPadding(40, 32, 40, 32)
+                    }
+                    scrollView.addView(tv)
+                    com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                        .setTitle("第${selectedIdx.tickIndex}轮推演详情")
+                        .setView(scrollView)
+                        .setPositiveButton("关闭", null)
+                        .show()
+                } else {
+                    Toast.makeText(this, "该轮无事件记录", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("关闭", null)
             .show()
     }
 
@@ -498,6 +658,46 @@ class VirtualWorldActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun publishEventToGroupChat(event: StoryEvent) {
+        val worldId = worldManager.currentWorldId
+        if (worldId.isBlank()) return
+
+        val gcManager = com.aicompanion.groupchat.GroupChatManager(this)
+        gcManager.load()
+        if (gcManager.getGroup(worldId) == null) return
+
+        val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(java.util.Date())
+        val senderId = worldManager.config.memberPersonaIds.firstOrNull { pid ->
+            personaManager.getPersona(pid)?.name == event.speakerName
+        } ?: "narrator"
+
+        val displayText = buildString {
+            append("[第${event.virtualDay}天${String.format("%02d", event.virtualHour)}:00] ")
+            append(event.content)
+        }
+
+        val msg = com.aicompanion.groupchat.GroupMessage(
+            senderPersonaId = senderId,
+            senderName = event.speakerName,
+            text = displayText,
+            time = time,
+            isUser = false,
+            emotion = "neutral"
+        )
+        gcManager.addMessage(worldId, msg)
+    }
+
+    private fun buildChatSummary(): String {
+        val worldId = worldManager.currentWorldId
+        if (worldId.isBlank()) return ""
+        val gcManager = com.aicompanion.groupchat.GroupChatManager(this)
+        gcManager.load()
+        val msgs = gcManager.getMessages(worldId)
+        return msgs.takeLast(20).map { msg ->
+            if (msg.isUser) "用户：${msg.text}" else "${msg.senderName}：${msg.text}"
+        }.joinToString("\n")
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_PICK_WORLD_IMAGE && resultCode == RESULT_OK && data != null) {
@@ -519,6 +719,12 @@ class VirtualWorldActivity : AppCompatActivity() {
         loadStory()
     }
 
+    override fun onDestroy() {
+        simJob?.cancel()
+        simJob = null
+        super.onDestroy()
+    }
+
     inner class StoryEventAdapter : RecyclerView.Adapter<StoryEventAdapter.VH>() {
 
         private var events = listOf<StoryEvent>()
@@ -538,7 +744,7 @@ class VirtualWorldActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val event = events[position]
-            holder.tvTime.text = "第${event.virtualDay}天 ${String.format("%02d", event.virtualHour)}:00"
+            holder.tvTime.text = "第${event.virtualDay}天 ${String.format("%02d:%02d", event.virtualHour, event.virtualMinute)}"
             holder.tvSpeaker.text = event.speakerName
             holder.tvContent.text = event.content
 

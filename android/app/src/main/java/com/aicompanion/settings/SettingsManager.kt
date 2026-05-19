@@ -29,7 +29,7 @@ class SettingsManager(context: Context) {
             )
         } catch (e: Exception) {
             Log.w("SettingsManager", "Failed to create EncryptedSharedPreferences, falling back to regular prefs", e)
-            context.getSharedPreferences("companion_secure_prefs", Context.MODE_PRIVATE)
+            context.getSharedPreferences("companion_prefs_fallback", Context.MODE_PRIVATE)
         }
     }
 
@@ -102,6 +102,45 @@ class SettingsManager(context: Context) {
     var ttsModel: String
         get() = prefs.getString("tts_model", "tts-1") ?: "tts-1"
         set(value) { prefs.edit().putString("tts_model", value).apply() }
+
+    var llmTemperature: Float
+        get() = prefs.getFloat("llm_temperature", 1.05f)
+        set(value) { prefs.edit().putFloat("llm_temperature", value.coerceIn(0f, 2f)).apply() }
+
+    var llmTopP: Float
+        get() = prefs.getFloat("llm_top_p", 0.92f)
+        set(value) { prefs.edit().putFloat("llm_top_p", value.coerceIn(0f, 1f)).apply() }
+
+    var llmFrequencyPenalty: Float
+        get() = prefs.getFloat("llm_frequency_penalty", 0.35f)
+        set(value) { prefs.edit().putFloat("llm_frequency_penalty", value.coerceIn(-2f, 2f)).apply() }
+
+    var llmPresencePenalty: Float
+        get() = prefs.getFloat("llm_presence_penalty", 0.5f)
+        set(value) { prefs.edit().putFloat("llm_presence_penalty", value.coerceIn(-2f, 2f)).apply() }
+
+    var llmMaxTokens: Int
+        get() = prefs.getInt("llm_max_tokens", 500)
+        set(value) {
+            val limit = ProviderProfile.getMaxTokensLimit(apiProvider)
+            prefs.edit().putInt("llm_max_tokens", value.coerceIn(50, limit)).apply()
+        }
+
+    fun getEffectiveMaxTokensLimit(): Int = ProviderProfile.getMaxTokensLimit(apiProvider)
+
+    fun getCurrentProfile(): ProviderProfile = ProviderProfile.getProfile(apiProvider)
+
+    var ttsPitch: Float
+        get() = prefs.getFloat("tts_pitch", 1.0f)
+        set(value) { prefs.edit().putFloat("tts_pitch", value.coerceIn(0.5f, 2.0f)).apply() }
+
+    var ttsRate: Float
+        get() = prefs.getFloat("tts_rate", 1.0f)
+        set(value) { prefs.edit().putFloat("tts_rate", value.coerceIn(0.5f, 2.0f)).apply() }
+
+    var emotionAnalysisEnabled: Boolean
+        get() = prefs.getBoolean("emotion_analysis_enabled", false)
+        set(value) { prefs.edit().putBoolean("emotion_analysis_enabled", value).apply() }
 
     var searchProvider: String
         get() = prefs.getString("search_provider", "duckduckgo") ?: "duckduckgo"

@@ -99,7 +99,8 @@ class MomentsManager(private val context: Context) {
         apiClient: ApiClient?,
         personaName: String,
         personaPrompt: String,
-        affectionLevel: Int
+        affectionLevel: Int,
+        personaId: String = ""
     ): Moment? {
         if (apiClient == null) return null
         return try {
@@ -122,6 +123,7 @@ class MomentsManager(private val context: Context) {
             val moment = Moment(
                 id = UUID.randomUUID().toString(),
                 author = "ai",
+                authorPersonaId = personaId.ifBlank { null },
                 content = content.trim(),
                 createdAt = System.currentTimeMillis()
             )
@@ -143,11 +145,11 @@ class MomentsManager(private val context: Context) {
         if (apiClient == null) return null
         return try {
             val systemPrompt = buildString {
-                append("你是「$personaName」，一个可爱的AI桌宠。\n")
+                append("你是「$personaName」。\n")
                 append(personaPrompt)
                 append("\n你发了一条动态：「$momentContent」\n")
-                append("主人评论了：「$commentContent」\n")
-                append("请回复主人的评论，1-2句话，语气自然可爱。\n")
+                append("用户评论了：「$commentContent」\n")
+                append("请回复评论，1-2句话，语气自然。\n")
                 append("只输出回复内容，不要加引号或其他格式。\n")
             }
             val response = withContext(Dispatchers.IO) {
@@ -156,6 +158,32 @@ class MomentsManager(private val context: Context) {
             response?.text?.trim()
         } catch (e: Exception) {
             AppLogger.e(TAG, "generateAiReply failed: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun generateAiCommentOnUserMoment(
+        apiClient: ApiClient?,
+        personaName: String,
+        personaPrompt: String,
+        momentContent: String
+    ): String? {
+        if (apiClient == null) return null
+        return try {
+            val systemPrompt = buildString {
+                append("你是「$personaName」。\n")
+                append(personaPrompt)
+                append("\n用户发了一条动态：「$momentContent」\n")
+                append("请评论用户的动态，1-2句话，语气自然。\n")
+                append("可以回应、吐槽、关心、开玩笑等，像朋友评论朋友圈一样。\n")
+                append("只输出评论内容，不要加引号或其他格式。\n")
+            }
+            val response = withContext(Dispatchers.IO) {
+                apiClient.sendSimplePrompt(systemPrompt, "评论动态")
+            }
+            response?.text?.trim()
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "generateAiCommentOnUserMoment failed: ${e.message}")
             null
         }
     }

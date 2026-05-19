@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:background="?attr/selectableItemBackground">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_member_avatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="#1e1e44"
+        app:strokeWidth="1.5dp"
+        app:strokeColor="#339c7cff">
+
+        <ImageView
+            android:id="@+id/iv_member_avatar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_avatar_default_ai" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:id="@+id/tv_member_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="15sp"
+        android:textColor="#d0d0e8"
+        android:layout_marginStart="12dp"
+        android:fontFamily="sans-serif-medium" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_checkbox"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        app:cardCornerRadius="6dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="#2a2a4a"
+        app:strokeWidth="1dp"
+        app:strokeColor="#3a3a5a">
+
+        <ImageView
+            android:id="@+id/iv_check"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@android:drawable/ic_menu_agenda"
+            android:padding="4dp"
+            android:visibility="gone"
+            app:tint="@android:color/white" />
+    </com.google.android.material.card.MaterialCardView>
+</LinearLayout>

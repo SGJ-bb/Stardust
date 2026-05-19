@@ -20,6 +20,8 @@ class PersonaEditorActivity : Activity() {
     private var etWorldRelationship: EditText? = null
     private var etWorldRules: EditText? = null
     private var etUserNickname: EditText? = null
+    private var etUserIdentity: EditText? = null
+    private var etUserAbilities: EditText? = null
     private var tvDiscoveredLabel: TextView? = null
     private var containerDiscovered: LinearLayout? = null
     private var nicknameManager: NicknameManager? = null
@@ -67,6 +69,8 @@ class PersonaEditorActivity : Activity() {
         etWorldRelationship = findViewById(R.id.et_world_relationship)
         etWorldRules = findViewById(R.id.et_world_rules)
         etUserNickname = findViewById(R.id.et_user_nickname)
+        etUserIdentity = findViewById(R.id.et_user_identity)
+        etUserAbilities = findViewById(R.id.et_user_abilities)
         tvDiscoveredLabel = findViewById(R.id.tv_discovered_label)
         containerDiscovered = findViewById(R.id.container_discovered_nicknames)
     }
@@ -93,6 +97,8 @@ class PersonaEditorActivity : Activity() {
             etWorldRelationship?.setText(prefs.getString("world_relationship", defaultPersona["world_relationship"]))
             etWorldRules?.setText(prefs.getString("world_rules", defaultPersona["world_rules"]))
             etUserNickname?.setText(prefs.getString("user_nickname", ""))
+            etUserIdentity?.setText(prefs.getString("user_identity", ""))
+            etUserAbilities?.setText(prefs.getString("user_abilities", ""))
         } else {
             val prefs = getPersonaPrefs()
             etPersonaName?.setText(prefs.getString("persona_name", defaultPersona["persona_name"]))
@@ -107,6 +113,8 @@ class PersonaEditorActivity : Activity() {
             etWorldRelationship?.setText(prefs.getString("world_relationship", defaultPersona["world_relationship"]))
             etWorldRules?.setText(prefs.getString("world_rules", defaultPersona["world_rules"]))
             etUserNickname?.setText(prefs.getString("user_nickname", ""))
+            etUserIdentity?.setText(prefs.getString("user_identity", ""))
+            etUserAbilities?.setText(prefs.getString("user_abilities", ""))
         }
     }
 
@@ -141,6 +149,8 @@ class PersonaEditorActivity : Activity() {
         val worldRelationship = etWorldRelationship?.text?.toString()?.trim() ?: ""
         val worldRules = etWorldRules?.text?.toString()?.trim() ?: ""
         val nickname = etUserNickname?.text?.toString()?.trim() ?: ""
+        val userIdentity = etUserIdentity?.text?.toString()?.trim() ?: ""
+        val userAbilities = etUserAbilities?.text?.toString()?.trim() ?: ""
         val greeting = etPersonaGreeting?.text?.toString()?.trim() ?: ""
 
         val prefs = getPersonaPrefs()
@@ -157,6 +167,8 @@ class PersonaEditorActivity : Activity() {
             putString("world_relationship", worldRelationship)
             putString("world_rules", worldRules)
             putString("user_nickname", nickname)
+            putString("user_identity", userIdentity)
+            putString("user_abilities", userAbilities)
             apply()
         }
 
@@ -174,6 +186,8 @@ class PersonaEditorActivity : Activity() {
             if (worldRelationship.isNotBlank()) append("\n你和用户的关系：$worldRelationship")
             if (worldRules.isNotBlank()) append("\n规则：$worldRules")
             if (nickname.isNotBlank()) append("\n你称呼用户为「$nickname」。")
+            if (userIdentity.isNotBlank()) append("\n用户身份：$userIdentity")
+            if (userAbilities.isNotBlank()) append("\n用户能力/特征：$userAbilities")
         }
 
         val pm = com.aicompanion.persona.PersonaManager(this)

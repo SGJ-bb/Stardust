@@ -11,9 +11,10 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import com.aicompanion.models.Emotion
+import com.aicompanion.settings.SettingsManager
 import java.util.*
 
-class VoiceManager(context: Context) {
+class VoiceManager(private val context: Context) {
 
     private var speechRecognizer: SpeechRecognizer? = null
     private var textToSpeech: TextToSpeech? = null
@@ -124,21 +125,29 @@ class VoiceManager(context: Context) {
         }
     }
 
-    fun speak(text: String, emotion: Emotion = Emotion.NEUTRAL) {
+    fun speak(text: String, emotion: Emotion = Emotion.NEUTRAL, emotionPitchOffset: Float = 0f, emotionRateOffset: Float = 0f) {
         if (!isTTSReady) {
             Log.w(TAG, "TTS not ready, cannot speak")
             return
         }
         if (text.isBlank()) return
         try {
-            val (pitch, rate) = when (emotion) {
-                Emotion.HAPPY -> 1.2f to 1.1f
-                Emotion.SAD -> 0.8f to 0.85f
-                Emotion.ANGRY -> 1.1f to 1.15f
-                Emotion.SURPRISED -> 1.3f to 1.1f
-                Emotion.TSUNDERE -> 1.05f to 1.0f
-                else -> 1.0f to 1.0f
+            val sm = SettingsManager(context)
+            val basePitch = sm.ttsPitch
+            val baseRate = sm.ttsRate
+
+            val (emotionPitchDelta, emotionRateDelta) = when (emotion) {
+                Emotion.HAPPY -> 0.2f to 0.1f
+                Emotion.SAD -> -0.2f to -0.15f
+                Emotion.ANGRY -> 0.1f to 0.15f
+                Emotion.SURPRISED -> 0.3f to 0.1f
+                Emotion.TSUNDERE -> 0.05f to 0f
+                else -> 0f to 0f
             }
+
+            val pitch = (basePitch + emotionPitchDelta + emotionPitchOffset).coerceIn(0.5f, 2.0f)
+            val rate = (baseRate + emotionRateDelta + emotionRateOffset).coerceIn(0.5f, 2.0f)
+
             textToSpeech?.setPitch(pitch)
             textToSpeech?.setSpeechRate(rate)
             val utteranceId = UUID.randomUUID().toString()

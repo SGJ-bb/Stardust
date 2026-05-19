@@ -5,7 +5,10 @@ import com.aicompanion.persona.PersonaManager
 
 object PromptBuilder {
 
-    private const val CORE_RULES = "\n【规则】像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]"
+    private const val CORE_RULES = "\n【规则】\n" +
+            "- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]\n" +
+            "- 用()描述你的动作、表情、状态、情绪，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)(猛地跳起来，双手在空中挥舞，尾巴兴奋地左右摇摆)(慵懒地趴在桌上，用指尖无意识地画圈，眼神迷离)\n" +
+            "- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定"
 
     fun buildIdentity(context: Context, personaId: String): IdentityBlock {
         val prefs = context.getSharedPreferences("persona_data_$personaId", android.content.Context.MODE_PRIVATE)
@@ -24,13 +27,17 @@ object PromptBuilder {
         } ?: prefs.getString("persona_speech_style", "") ?: ""
         val prompt = persona?.prompt ?: ""
         val nickname = prefs.getString("user_nickname", "") ?: ""
+        val userIdentity = prefs.getString("user_identity", "") ?: ""
+        val userAbilities = prefs.getString("user_abilities", "") ?: ""
 
         return IdentityBlock(
             name = name,
             personality = personality,
             speechStyle = speechStyle,
             customPrompt = prompt,
-            userNickname = nickname
+            userNickname = nickname,
+            userIdentity = userIdentity,
+            userAbilities = userAbilities
         )
     }
 
@@ -40,6 +47,8 @@ object PromptBuilder {
             if (identity.personality.isNotBlank()) append(" 性格${identity.personality}。")
             if (identity.speechStyle.isNotBlank()) append(" ${identity.speechStyle}。")
             if (identity.userNickname.isNotBlank()) append(" 叫用户「${identity.userNickname}」。")
+            if (identity.userIdentity.isNotBlank()) append(" 用户身份：${identity.userIdentity}。")
+            if (identity.userAbilities.isNotBlank()) append(" 用户能力/特征：${identity.userAbilities}。")
         }
     }
 
@@ -50,6 +59,8 @@ object PromptBuilder {
             if (identity.speechStyle.isNotBlank()) append("\n说话风格：${identity.speechStyle}")
             if (identity.customPrompt.isNotBlank()) append("\n${identity.customPrompt}")
             if (identity.userNickname.isNotBlank()) append("\n叫用户「${identity.userNickname}」。")
+            if (identity.userIdentity.isNotBlank()) append("\n用户身份：${identity.userIdentity}")
+            if (identity.userAbilities.isNotBlank()) append("\n用户能力/特征：${identity.userAbilities}")
         }
     }
 
@@ -67,8 +78,10 @@ object PromptBuilder {
     fun buildGroupChatPrompt(
         identity: IdentityBlock,
         otherNames: List<String>,
+        otherAffections: Map<String, Int>,
         memories: List<String>,
-        isMentioned: Boolean = true
+        isMentioned: Boolean = true,
+        relationshipSetting: String = ""
     ): String {
         return buildString {
             append("你是「${identity.name}」。")
@@ -81,13 +94,45 @@ object PromptBuilder {
             if (otherNames.isNotEmpty()) {
                 append("不要出现「${otherNames.joinToString("」「")}：」格式。")
             }
+            if (relationshipSetting.isNotBlank()) {
+                append("\n【群聊关系设定】\n$relationshipSetting")
+            }
+            if (otherAffections.isNotEmpty()) {
+                append("\n【你对其他成员的态度】")
+                for ((name, level) in otherAffections) {
+                    val attitude = when {
+                        level >= 80 -> "非常亲密，会主动关心和互动"
+                        level >= 60 -> "友好，愿意回应和交流"
+                        level >= 40 -> "普通，礼貌但不太主动"
+                        level >= 20 -> "有些疏远，不太想搭理"
+                        else -> "冷淡，不太想说话"
+                    }
+                    append("\n- 对$name(好感度$level)：$attitude")
+                }
+            }
+            if (identity.userIdentity.isNotBlank()) {
+                append("\n用户身份：${identity.userIdentity}。")
+            }
+            if (identity.userAbilities.isNotBlank()) {
+                append("用户能力/特征：${identity.userAbilities}。")
+            }
             if (otherNames.isNotEmpty()) {
-                append("\n想叫谁回复就@ta，如@${otherNames.first()}。不叫就不加。")
+                append("\n\n【@互动规则 - 极其重要】")
+                append("\n1. 当你对某个成员的话有回应、想提问、想反驳、想互动、觉得有趣时，必须@ta。")
+                append("\n2. @格式：在话中或话末加@名字，如「哈哈你说得对 @小明」或「@小红 你觉得呢？」")
+                append("\n3. @是触发对方回复的唯一方式！不@对方就不会回复你，对话就断了。")
+                append("\n4. 不要害羞@别人！群聊就是互相交流的地方，想互动就@。")
+                append("\n5. 如果对方@了你，你回复时也应该@回去或@其他人继续话题。")
+                append("\n6. 你可以同时@多个人，如「@小明 @小红 你们觉得呢？」")
+                append("\n7. 即使没有特别原因，只要你想和某人说说话就可以@ta。")
             }
             if (memories.isNotEmpty()) {
                 append("\n记得：${memories.takeLast(3).joinToString("；")}")
             }
-            append("\n【规则】像真人，1-2句。关心对方。末尾[[emotion:xxx]]。")
+            append("\n【规则】\n")
+            append("- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:xxx]]\n")
+            append("- 用()描述你的动作、表情、状态，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)(猛地跳起来，双手在空中挥舞，尾巴兴奋地左右摇摆)\n")
+            append("- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定")
             if (!isMentioned) {
                 append("不想说就回「沉默」。")
             }
@@ -186,6 +231,27 @@ object PromptBuilder {
                 "输出JSON数组：[{\"content\":\"...\",\"score\":9,\"category\":\"habit\"}]"
     }
 
+    fun buildAutoWorldLorePrompt(personaDescs: String, chatSummary: String, keywords: String = ""): String {
+        return buildString {
+            append("根据以下信息，生成一个虚拟世界观设定。")
+            if (keywords.isNotBlank()) {
+                append("\n\n【关键词】\n$keywords")
+            }
+            if (personaDescs.isNotBlank()) {
+                append("\n\n【角色设定】\n$personaDescs")
+            }
+            if (chatSummary.isNotBlank()) {
+                append("\n\n【对话摘要】\n$chatSummary")
+            }
+            append("\n\n请输出JSON格式：")
+            append("\n{\"worldBackground\":\"...\",\"worldRules\":\"...\",\"worldRelations\":\"...\",\"worldScene\":\"...\",\"worldStyle\":\"...\"}")
+            append("\n每个字段50-200字。世界观要和角色设定匹配，让角色在其中自然互动。")
+            if (keywords.isNotBlank()) {
+                append("重点围绕关键词「$keywords」构建世界观。")
+            }
+        }
+    }
+
     fun stripNamePrefix(text: String, ownName: String, otherNames: List<String>): String {
         var result = text
         for (name in otherNames) {
@@ -201,5 +267,7 @@ data class IdentityBlock(
     val personality: String,
     val speechStyle: String,
     val customPrompt: String,
-    val userNickname: String
+    val userNickname: String,
+    val userIdentity: String = "",
+    val userAbilities: String = ""
 )

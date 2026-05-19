@@ -8,14 +8,16 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.aicompanion.R
 import com.aicompanion.localmodel.*
-import com.aicompanion.localmodel.ScreenCaptureManager.Companion.REQUEST_CODE_SCREEN_CAPTURE
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class LocalModelActivity : AppCompatActivity() {
 
@@ -33,6 +35,31 @@ class LocalModelActivity : AppCompatActivity() {
     private lateinit var tvCaptureStatus: TextView
     private lateinit var btnRequestCapture: MaterialButton
     private lateinit var btnTestCapture: MaterialButton
+
+    private val screenCaptureLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            val resultCode = result.resultCode
+            val data = result.data!!
+            lifecycleScope.launch {
+                val success = withContext(Dispatchers.IO) {
+                    modelManager.getScreenCaptureManager().startCapture(resultCode, data)
+                }
+                withContext(Dispatchers.Main) {
+                    updateCaptureStatus()
+                    if (success) {
+                        showSnackbar("截屏权限已开启")
+                    } else {
+                        showSnackbar("截屏权限开启失败，请重试")
+                    }
+                }
+            }
+        } else {
+            showSnackbar("截屏权限被拒绝，请在系统弹窗中点击「立即开始」")
+            updateCaptureStatus()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,11 +141,11 @@ class LocalModelActivity : AppCompatActivity() {
             val captureManager = modelManager.getScreenCaptureManager()
             val intent = captureManager.getScreenCaptureIntent()
             if (intent != null) {
-                startActivityForResult(intent, REQUEST_CODE_SCREEN_CAPTURE)
+                screenCaptureLauncher.launch(intent)
             } else {
                 val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? android.media.projection.MediaProjectionManager
                 if (mpm != null) {
-                    startActivityForResult(mpm.createScreenCaptureIntent(), REQUEST_CODE_SCREEN_CAPTURE)
+                    screenCaptureLauncher.launch(mpm.createScreenCaptureIntent())
                 } else {
                     showSnackbar("无法获取截屏服务，请检查系统版本")
                 }
@@ -130,19 +157,49 @@ class LocalModelActivity : AppCompatActivity() {
 
     private fun testCapture() {
         lifecycleScope.launch {
-            val bitmap = modelManager.getScreenCaptureManager().captureScreen()
+            var bitmap: android.graphics.Bitmap? = null
+            try {
+                bitmap = withContext(Dispatchers.IO) {
+                    val mgr = modelManager.getScreenCaptureManager()
+                    if (!mgr.isCapturing) {
+                        return@withContext null
+                    }
+                    var attempt = 0
+                    var bmp: android.graphics.Bitmap? = null
+                    while (bmp == null && attempt < 8) {
+                        bmp = mgr.captureScreen()
+                        if (bmp == null) {
+                            kotlinx.coroutines.delay(500)
+                            attempt++
+                        }
+                    }
+                    if (bmp == null) {
+                        com.aicompanion.util.AppLogger.e("LocalModelActivity", "testCapture: failed after $attempt attempts")
+                    } else {
+                        com.aicompanion.util.AppLogger.d("LocalModelActivity", "testCapture: got bitmap ${bmp.width}x${bmp.height}")
+                    }
+                    bmp
+                }
+            } catch (e: Exception) {
+                showSnackbar("截图异常: ${e.message}")
+                return@launch
+            }
+
             if (bitmap != null) {
                 val result = modelManager.analyzeScreen(bitmap)
                 val ocr = result.ocrText
                 val msg = if (ocr.isNotBlank()) {
-                    "截图成功！OCR识别到: ${ocr.take(100)}"
+                    "截图成功！OCR识别到 ${ocr.length} 字: ${ocr.take(100)}"
                 } else {
-                    "截图成功！但未识别到文字"
+                    val sceneInfo = if (result.sceneClassification.isNotEmpty()) {
+                        " 场景: ${result.sceneClassification.first().label}"
+                    } else ""
+                    "截图成功但未识别到文字${sceneInfo}。可能原因：1)当前屏幕无文字 2)ML Kit中文模型未下载(需网络) 3)图片分辨率过低"
                 }
                 showSnackbar(msg)
                 bitmap.recycle()
             } else {
-                showSnackbar("截图失败，请确认截屏权限已开启")
+                showSnackbar("截图失败，虚拟显示器可能还在初始化，请稍后再试")
             }
         }
     }
@@ -152,19 +209,6 @@ class LocalModelActivity : AppCompatActivity() {
         tvCaptureStatus.text = if (isCapturing) "✅ 截屏权限已开启" else "❌ 未开启截屏权限"
         btnTestCapture.visibility = if (isCapturing) View.VISIBLE else View.GONE
         btnRequestCapture.text = if (isCapturing) "重新请求权限" else "请求截屏权限"
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_CODE_SCREEN_CAPTURE && resultCode == RESULT_OK && data != null) {
-            val success = modelManager.getScreenCaptureManager().startCapture(resultCode, data)
-            updateCaptureStatus()
-            if (success) {
-                showSnackbar("截屏权限已开启")
-            } else {
-                showSnackbar("截屏权限开启失败")
-            }
-        }
     }
 
     private fun renderModelList() {

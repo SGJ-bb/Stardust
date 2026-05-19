@@ -65,7 +65,9 @@ object AppContainer {
     fun rebuildApiClient() {
         val sm = _settingsManager ?: return
         if (sm.chatApiUrl.isNotBlank()) {
-            _apiClient = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel)
+            _apiClient = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel,
+                sm.llmTemperature, sm.llmTopP, sm.llmFrequencyPenalty, sm.llmPresencePenalty, sm.llmMaxTokens,
+                sm.apiProvider)
         }
     }
 

@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0a0a1a">
+    android:background="@drawable/bg_gradient">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -12,11 +12,11 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="60dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="#cc0a0a1a"
-            android:elevation="6dp"
+            android:elevation="8dp"
             android:paddingStart="4dp"
             android:paddingEnd="12dp">
 
@@ -27,37 +27,71 @@
                 android:src="@android:drawable/ic_menu_revert"
                 android:padding="10dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="#c4b5fd"
                 android:contentDescription="返回" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="👥 群聊"
+                android:text="群聊空间"
                 android:textSize="20sp"
                 android:textColor="@android:color/white"
                 android:fontFamily="sans-serif-medium"
-                android:gravity="center" />
+                android:gravity="center"
+                android:letterSpacing="0.05" />
+
+            <View
+                android:layout_width="44dp"
+                android:layout_height="44dp" />
         </LinearLayout>
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_groups"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:padding="10dp" />
+            android:layout_weight="1">
 
-        <TextView
-            android:id="@+id/tv_empty_hint"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:text="还没有群聊\n点击右下角 + 创建一个群聊吧"
-            android:textSize="14sp"
-            android:textColor="#556677"
-            android:gravity="center"
-            android:visibility="gone" />
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_groups"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:padding="12dp"
+                android:paddingBottom="80dp" />
+
+            <LinearLayout
+                android:id="@+id/tv_empty_hint"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💬"
+                    android:textSize="56sp"
+                    android:alpha="0.5" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="还没有群聊"
+                    android:textSize="18sp"
+                    android:textColor="#8899bb"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginTop="16dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="点击右下角按钮创建一个群聊吧"
+                    android:textSize="13sp"
+                    android:textColor="#556677"
+                    android:layout_marginTop="8dp" />
+            </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -69,7 +103,8 @@
         android:src="@android:drawable/ic_menu_add"
         app:tint="@android:color/white"
         app:backgroundTint="#667eea"
-        app:elevation="8dp"
+        app:elevation="12dp"
         app:borderWidth="0dp"
+        app:pressedTranslationZ="14dp"
         android:contentDescription="创建群聊" />
 </FrameLayout>
