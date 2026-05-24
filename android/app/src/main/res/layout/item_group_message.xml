@@ -13,7 +13,7 @@
         android:layout_width="36dp"
         android:layout_height="36dp"
         android:layout_marginEnd="6dp"
-        android:layout_gravity="bottom"
+        android:layout_gravity="top|start"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -24,7 +24,7 @@
             android:layout_gravity="center"
             app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#1a1a3e"
+            app:cardBackgroundColor="@android:color/transparent"
             app:strokeWidth="1dp"
             app:strokeColor="#667eea">
 

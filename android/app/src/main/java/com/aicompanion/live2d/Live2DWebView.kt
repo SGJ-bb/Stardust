@@ -16,6 +16,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.aicompanion.models.Action
 import com.aicompanion.models.Emotion
+import com.aicompanion.util.AppLogger
 import fi.iki.elonen.NanoHTTPD
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -23,6 +24,7 @@ import java.net.URLDecoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Collections
+import kotlinx.coroutines.*
 
 class Live2DWebView @JvmOverloads constructor(
     context: Context,
@@ -47,6 +49,7 @@ class Live2DWebView @JvmOverloads constructor(
     private val dateFormat = SimpleDateFormat("HH:mm:ss.SSS")
     private val maxTextureSize by lazy { detectMaxTextureSize() }
     private val textureCache = Collections.synchronizedMap(mutableMapOf<String, File>())
+    private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private fun detectMaxTextureSize(): Int {
         return try {
@@ -159,7 +162,7 @@ class Live2DWebView @JvmOverloads constructor(
                                     addHeader("Access-Control-Allow-Origin", "*")
                                 }
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) { AppLogger.e("Live2D", "serve: ${e.message}") }
                     }
                 }
             }
@@ -206,7 +209,7 @@ class Live2DWebView @JvmOverloads constructor(
     fun cleanup() {
         try {
             localServer?.stop()
-        } catch (_: Exception) {}
+        } catch (e: Exception) { AppLogger.e("Live2D", "cleanup: ${e.message}") }
         localServer = null
         serverPort = 0
     }
@@ -287,7 +290,7 @@ class Live2DWebView @JvmOverloads constructor(
                             textureCache[requestedPath] = found
                             return found
                         }
-                    } catch (e: Exception) {}
+                    } catch (e: Exception) { AppLogger.e("Live2D", "resolveResourcePath: ${e.message}") }
 
                     return null
                 }
@@ -457,125 +460,135 @@ class Live2DWebView @JvmOverloads constructor(
 
     fun loadLive2DModelFromPath(modelJsonAbsolutePath: String) {
         if (isDestroyed) return
-        try {
-            addLog("Loading model: $modelJsonAbsolutePath")
-            val modelFile = File(modelJsonAbsolutePath)
-            if (!modelFile.exists()) {
-                addLog("ERROR: File not found: $modelJsonAbsolutePath")
-                onModelLoaded?.invoke(false)
-                return
-            }
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                addLog("Loading model: $modelJsonAbsolutePath")
+                val modelFile = File(modelJsonAbsolutePath)
+                if (!modelFile.exists()) {
+                    addLog("ERROR: File not found: $modelJsonAbsolutePath")
+                    withContext(Dispatchers.Main) { onModelLoaded?.invoke(false) }
+                    return@launch
+                }
 
-            val srcDir = modelFile.parentFile ?: return
-            val cacheDirName = srcDir.name
-            val localDir = File(modelCacheDir, cacheDirName)
-            if (localDir.exists()) {
-                localDir.deleteRecursively()
-            }
-            localDir.mkdirs()
+                val srcDir = modelFile.parentFile ?: return@launch
+                val cacheDirName = srcDir.name
+                val localDir = File(modelCacheDir, cacheDirName)
+                if (localDir.exists()) {
+                    localDir.deleteRecursively()
+                }
+                localDir.mkdirs()
 
-            addLog("Copying model to cache: ${localDir.absolutePath}")
-            var copyCount = 0
-            var skipCount = 0
-            srcDir.walkTopDown().filter { it.isFile }.forEach { srcFile ->
-                try {
-                    val relPath = srcFile.absolutePath.substring(srcDir.absolutePath.length).trimStart('/', '\\')
-                    if (shouldSkipFile(relPath, srcFile.name)) {
-                        skipCount++
-                        addLog("SKIP: $relPath")
-                        return@forEach
+                addLog("Copying model to cache: ${localDir.absolutePath}")
+                var copyCount = 0
+                var skipCount = 0
+                srcDir.walkTopDown().filter { it.isFile }.forEach { srcFile ->
+                    try {
+                        val relPath = srcFile.absolutePath.substring(srcDir.absolutePath.length).trimStart('/', '\\')
+                        if (shouldSkipFile(relPath, srcFile.name)) {
+                            skipCount++
+                            addLog("SKIP: $relPath")
+                            return@forEach
+                        }
+                        val dstFile = File(localDir, relPath)
+                        dstFile.parentFile?.mkdirs()
+                        srcFile.inputStream().use { input ->
+                            dstFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        copyCount++
+                        if (srcFile.name.endsWith(".png") || srcFile.name.endsWith(".moc3") || srcFile.name.endsWith(".json")) {
+                            addLog("COPY: $relPath (${srcFile.length()} bytes)")
+                        }
+                    } catch (e: Exception) {
+                        addLog("Copy warn: ${srcFile.name} - ${e.message}")
                     }
-                    val dstFile = File(localDir, relPath)
-                    dstFile.parentFile?.mkdirs()
-                    srcFile.inputStream().use { input ->
-                        dstFile.outputStream().use { output ->
-                            input.copyTo(output)
+                }
+                addLog("Copy done: $copyCount files copied, $skipCount skipped")
+
+                val cacheFiles = localDir.walkTopDown().filter { it.isFile }.toList()
+                addLog("Cache validation: ${cacheFiles.size} files in cache dir ${localDir.name}")
+                val modelJsonInCache = cacheFiles.find { it.name.endsWith(".model3.json") || it.name.endsWith(".model.json") }
+                if (modelJsonInCache == null) {
+                    addLog("ERROR: No model JSON found in cache after copy!")
+                    withContext(Dispatchers.Main) { onModelLoaded?.invoke(false) }
+                    return@launch
+                }
+                val mocInCache = cacheFiles.find { it.name.endsWith(".moc3") || it.name.endsWith(".moc") }
+                if (mocInCache == null) {
+                    addLog("WARN: No .moc3/.moc file found in cache")
+                }
+                val texturesInCache = cacheFiles.filter { it.extension.lowercase() in listOf("png", "jpg", "jpeg") }
+                addLog("Cache contents: modelJson=${modelJsonInCache.name}, moc=${mocInCache?.name ?: "NONE"}, textures=${texturesInCache.size}")
+
+                val preCompressTextures = localDir.walkTopDown().filter { it.isFile && it.extension.lowercase() in listOf("png", "jpg", "jpeg") }.toList()
+                addLog("Pre-compress: ${preCompressTextures.size} texture files")
+                preCompressTextures.forEach { addLog("  SRC TEX: ${it.relativeTo(localDir).path.replace("\\", "/")} ${it.length()}B") }
+
+                checkAndCompressTextures(localDir)
+
+                val postCompressTextures = localDir.walkTopDown().filter { it.isFile && it.extension.lowercase() in listOf("png", "jpg", "jpeg") }.toList()
+                addLog("Post-compress: ${postCompressTextures.size} texture files remain")
+                postCompressTextures.forEach { addLog("  TEX: ${it.relativeTo(localDir).path.replace("\\", "/")} ${it.length()}B") }
+
+                val cachedModelJson = findModelJsonRecursive(localDir)
+                if (cachedModelJson == null) {
+                    addLog("ERROR: model3.json not found in cache after copy")
+                    withContext(Dispatchers.Main) { onModelLoaded?.invoke(false) }
+                    return@launch
+                }
+
+                val modelDir = cachedModelJson.parentFile ?: return@launch
+                modelBasePath = modelDir.absolutePath
+                textureCache.clear()
+
+                validateAndFixModel(cachedModelJson, modelDir)
+
+                verifyAndRepairCache(cachedModelJson, modelDir, srcDir)
+
+                withContext(Dispatchers.Main) {
+                    if (!isDestroyed) {
+                        val html = buildLive2DHtml(cachedModelJson.name)
+                        val htmlFile = File(modelDir, "view.html")
+                        htmlFile.writeText(html, Charsets.UTF_8)
+
+                        ensureServerRunning()
+                        if (serverPort > 0) {
+                            addLog("Loading HTML: http://127.0.0.1:$serverPort/view.html")
+                            post {
+                                if (!isDestroyed) {
+                                    loadUrl("about:blank")
+                                    postDelayed({
+                                        if (!isDestroyed) {
+                                            loadUrl("http://127.0.0.1:$serverPort/view.html")
+                                        }
+                                    }, 150)
+                                }
+                            }
+                        } else {
+                            addLog("Fallback: Loading HTML: file://${htmlFile.absolutePath}")
+                            post {
+                                if (!isDestroyed) {
+                                    loadUrl("about:blank")
+                                    postDelayed({
+                                        if (!isDestroyed) {
+                                            loadUrl("file://" + htmlFile.absolutePath)
+                                        }
+                                    }, 150)
+                                }
+                            }
                         }
                     }
-                    copyCount++
-                    if (srcFile.name.endsWith(".png") || srcFile.name.endsWith(".moc3") || srcFile.name.endsWith(".json")) {
-                        addLog("COPY: $relPath (${srcFile.length()} bytes)")
-                    }
-                } catch (e: Exception) {
-                    addLog("Copy warn: ${srcFile.name} - ${e.message}")
                 }
-            }
-            addLog("Copy done: $copyCount files copied, $skipCount skipped")
-
-            // Validate cache integrity
-            val cacheFiles = localDir.walkTopDown().filter { it.isFile }.toList()
-            addLog("Cache validation: ${cacheFiles.size} files in cache dir ${localDir.name}")
-            val modelJsonInCache = cacheFiles.find { it.name.endsWith(".model3.json") || it.name.endsWith(".model.json") }
-            if (modelJsonInCache == null) {
-                addLog("ERROR: No model JSON found in cache after copy!")
-                onModelLoaded?.invoke(false)
-                return
-            }
-            val mocInCache = cacheFiles.find { it.name.endsWith(".moc3") || it.name.endsWith(".moc") }
-            if (mocInCache == null) {
-                addLog("WARN: No .moc3/.moc file found in cache")
-            }
-            val texturesInCache = cacheFiles.filter { it.extension.lowercase() in listOf("png", "jpg", "jpeg") }
-            addLog("Cache contents: modelJson=${modelJsonInCache.name}, moc=${mocInCache?.name ?: "NONE"}, textures=${texturesInCache.size}")
-
-            val preCompressTextures = localDir.walkTopDown().filter { it.isFile && it.extension.lowercase() in listOf("png", "jpg", "jpeg") }.toList()
-            addLog("Pre-compress: ${preCompressTextures.size} texture files")
-            preCompressTextures.forEach { addLog("  SRC TEX: ${it.relativeTo(localDir).path.replace("\\", "/")} ${it.length()}B") }
-
-            checkAndCompressTextures(localDir)
-
-            val postCompressTextures = localDir.walkTopDown().filter { it.isFile && it.extension.lowercase() in listOf("png", "jpg", "jpeg") }.toList()
-            addLog("Post-compress: ${postCompressTextures.size} texture files remain")
-            postCompressTextures.forEach { addLog("  TEX: ${it.relativeTo(localDir).path.replace("\\", "/")} ${it.length()}B") }
-
-            val cachedModelJson = findModelJsonRecursive(localDir)
-            if (cachedModelJson == null) {
-                addLog("ERROR: model3.json not found in cache after copy")
-                onModelLoaded?.invoke(false)
-                return
-            }
-
-            val modelDir = cachedModelJson.parentFile ?: return
-            modelBasePath = modelDir.absolutePath
-            textureCache.clear()
-
-            validateAndFixModel(cachedModelJson, modelDir)
-
-            verifyAndRepairCache(cachedModelJson, modelDir, srcDir)
-
-            val html = buildLive2DHtml(cachedModelJson.name)
-            val htmlFile = File(modelDir, "view.html")
-            htmlFile.writeText(html, Charsets.UTF_8)
-
-            ensureServerRunning()
-            if (serverPort > 0) {
-                addLog("Loading HTML: http://127.0.0.1:$serverPort/view.html")
-                post {
+            } catch (e: Exception) {
+                e.printStackTrace()
+                addLog("Exception: ${e.message}")
+                withContext(Dispatchers.Main) {
                     if (!isDestroyed) {
-                        loadUrl("about:blank")
-                        postDelayed({
-                            if (!isDestroyed) {
-                                loadUrl("http://127.0.0.1:$serverPort/view.html")
-                            }
-                        }, 150)
-                    }
-                }
-            } else {
-                addLog("Fallback: Loading HTML: file://${htmlFile.absolutePath}")
-                post {
-                    if (!isDestroyed) {
-                        loadUrl("about:blank")
-                        postDelayed({
-                            if (!isDestroyed) {
-                                loadUrl("file://" + htmlFile.absolutePath)
-                            }
-                        }, 150)
+                        onModelLoaded?.invoke(false)
                     }
                 }
             }
-        } catch (e: Exception) {
-            addLog("Exception: ${e.message}")
-            onModelLoaded?.invoke(false)
         }
     }
 
@@ -1250,8 +1263,6 @@ class Live2DWebView @JvmOverloads constructor(
                         BitmapFactory.decodeFile(file.absolutePath, decodeOpts)
                     } catch (e: OutOfMemoryError) {
                         addLog("OOM decoding ${file.name}, retrying...")
-                        System.gc()
-                        Thread.sleep(300)
                         try {
                             decodeOpts.inSampleSize = inSampleSize * 2
                             BitmapFactory.decodeFile(file.absolutePath, decodeOpts)
@@ -1298,7 +1309,7 @@ class Live2DWebView @JvmOverloads constructor(
                             val verifyOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                             BitmapFactory.decodeFile(tempFile.absolutePath, verifyOpts)
                             validOutput = verifyOpts.outWidth > 0 && verifyOpts.outHeight > 0
-                        } catch (_: Throwable) {}
+                        } catch (e: Throwable) { AppLogger.e("Live2D", "checkAndCompressTextures: ${e.message}") }
 
                         if (validOutput) {
                             try {
@@ -1327,11 +1338,8 @@ class Live2DWebView @JvmOverloads constructor(
                     }
 
                     if (tempFile.exists()) {
-                        try { tempFile.delete() } catch (_: Exception) {}
+                        try { tempFile.delete() } catch (e: Exception) { AppLogger.e("Live2D", "checkAndCompressTextures: ${e.message}") }
                     }
-
-                    System.gc()
-                    Thread.sleep(200)
 
                 } catch (e: Throwable) {
                     addLog("Texture error ${file.name}: ${e.message}, restoring from backup")
@@ -1342,7 +1350,7 @@ class Live2DWebView @JvmOverloads constructor(
             try {
                 backupDir.deleteRecursively()
                 addLog("Backup directory cleaned up")
-            } catch (_: Exception) {}
+            } catch (e: Exception) { AppLogger.e("Live2D", "checkAndCompressTextures: ${e.message}") }
 
             addLog("Texture preprocessing done")
         } catch (e: Throwable) {
@@ -1438,7 +1446,7 @@ class Live2DWebView @JvmOverloads constructor(
         post {
             try {
                 evaluateJavascript("window.tapModel && window.tapModel($x, $y)", null)
-            } catch (e: Exception) {}
+            } catch (e: Exception) { AppLogger.e("Live2D", "tapModel: ${e.message}") }
         }
     }
 
@@ -1446,21 +1454,21 @@ class Live2DWebView @JvmOverloads constructor(
         if (isDestroyed) return
         try {
             evaluateJavascript("window.setLive2DEmotion && window.setLive2DEmotion('${emotion.name.lowercase()}')", null)
-        } catch (e: Exception) {}
+        } catch (e: Exception) { AppLogger.e("Live2D", "setEmotion: ${e.message}") }
     }
 
     fun setAction(action: Action) {
         if (isDestroyed) return
         try {
             evaluateJavascript("window.triggerLive2DAction && window.triggerLive2DAction('${action.name.lowercase()}')", null)
-        } catch (e: Exception) {}
+        } catch (e: Exception) { AppLogger.e("Live2D", "setAction: ${e.message}") }
     }
 
     fun setAdjustMode(enabled: Boolean) {
         post {
             try {
                 evaluateJavascript("window.setAdjustMode && window.setAdjustMode($enabled)", null)
-            } catch (e: Exception) {}
+            } catch (e: Exception) { AppLogger.e("Live2D", "setAdjustMode: ${e.message}") }
         }
     }
 
@@ -1787,6 +1795,7 @@ class Live2DWebView @JvmOverloads constructor(
 
     override fun destroy() {
         isDestroyed = true
+        coroutineScope.cancel()
         logLines.clear()
         textureCache.clear()
         onModelLoaded = null
@@ -1794,8 +1803,8 @@ class Live2DWebView @JvmOverloads constructor(
         onActionTrigger = null
         try {
             stopLoading()
-            post { try { loadUrl("about:blank") } catch (_: Exception) {} }
-        } catch (e: Exception) {}
+            post { try { loadUrl("about:blank") } catch (e: Exception) { AppLogger.e("Live2D", "destroy: ${e.message}") } }
+        } catch (e: Exception) { AppLogger.e("Live2D", "destroy: ${e.message}") }
         super.destroy()
     }
 
@@ -1806,7 +1815,7 @@ class Live2DWebView @JvmOverloads constructor(
                     super.reload()
                 }
             }
-        } catch (_: Exception) { }
+        } catch (e: Exception) { AppLogger.e("Live2D", "reloadView: ${e.message}") }
     }
 
     inner class Live2DBridge {
@@ -1826,13 +1835,13 @@ class Live2DWebView @JvmOverloads constructor(
         @JavascriptInterface
         fun onEmotionChanged(emotion: String) {
             if (isDestroyed) return
-            post { try { onEmotionChange?.invoke(Emotion.valueOf(emotion.uppercase())) } catch (e: Exception) {} }
+            post { try { onEmotionChange?.invoke(Emotion.valueOf(emotion.uppercase())) } catch (e: Exception) { AppLogger.e("Live2D", "onEmotionChanged: ${e.message}") } }
         }
 
         @JavascriptInterface
         fun onActionTriggered(action: String) {
             if (isDestroyed) return
-            post { try { onActionTrigger?.invoke(Action.valueOf(action.uppercase())) } catch (e: Exception) {} }
+            post { try { onActionTrigger?.invoke(Action.valueOf(action.uppercase())) } catch (e: Exception) { AppLogger.e("Live2D", "onActionTriggered: ${e.message}") } }
         }
     }
 }

@@ -3,9 +3,16 @@ package com.aicompanion.theme
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorFilter
 import android.graphics.NinePatch
+import android.graphics.Paint
+import android.graphics.PixelFormat
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.NinePatchDrawable
 import android.view.View
@@ -64,6 +71,8 @@ object BubbleSkinManager {
     private const val KEY_IMAGE_BUBBLE = "active_image_bubble"
     private const val KEY_AI_IMAGE_FRAME = "active_ai_image_frame"
     private const val KEY_USER_IMAGE_FRAME = "active_user_image_frame"
+
+    private val drawableCache = mutableMapOf<String, GradientDrawable>()
 
     val builtinSkins = listOf(
         BubbleSkin(
@@ -258,6 +267,12 @@ object BubbleSkinManager {
                 val overlayIv = bubble.findViewWithTag<ImageView>("bubble_bg_overlay")
                 overlayIv?.visibility = View.GONE
             }
+            val cacheKey = if (isUser) "user_${skin.id}" else "ai_${skin.id}"
+            val cached = drawableCache[cacheKey]
+            if (cached != null) {
+                bubble.background = cached
+                return
+            }
             val drawable = if (isUser) {
                 if (skin.userGradientColors != null && skin.userGradientColors.size >= 2) {
                     GradientDrawable(GradientDrawable.Orientation.TL_BR, skin.userGradientColors).apply {
@@ -282,6 +297,7 @@ object BubbleSkinManager {
             if (!isUser && skin.aiStrokeWidth > 0 && skin.aiStrokeColor != Color.TRANSPARENT) {
                 (drawable as? GradientDrawable)?.setStroke(skin.aiStrokeWidth.toInt(), skin.aiStrokeColor)
             }
+            drawableCache[cacheKey] = drawable
             bubble.background = drawable
         } catch (e: Exception) {
             AppLogger.e(TAG, "applyBubbleSkin failed: ${e.message}")
@@ -291,35 +307,114 @@ object BubbleSkinManager {
     fun applyImageBubbleSkin(bubble: View, context: Context, imageSkin: ImageBubbleSkin) {
         try {
             val bmp = loadBitmapFromAsset(context, imageSkin.assetFile) ?: return
-            val is9Patch = bmp.ninePatchChunk != null
-            if (is9Patch) {
-                val overlayIv = (bubble as? FrameLayout)?.findViewWithTag<ImageView>("bubble_bg_overlay")
-                overlayIv?.visibility = View.GONE
-                val ninePatchDrawable = NinePatchDrawable(context.resources, bmp, bmp.ninePatchChunk, null, null)
-                bubble.background = ninePatchDrawable
-            } else {
-                bubble.setBackgroundResource(0)
-                if (bubble is FrameLayout) {
-                    var overlayIv = bubble.findViewWithTag<ImageView>("bubble_bg_overlay")
-                    if (overlayIv == null) {
-                        overlayIv = ImageView(context).apply {
-                            tag = "bubble_bg_overlay"
-                            layoutParams = FrameLayout.LayoutParams(
-                                FrameLayout.LayoutParams.MATCH_PARENT,
-                                FrameLayout.LayoutParams.MATCH_PARENT
-                            )
-                            scaleType = ImageView.ScaleType.FIT_XY
-                        }
-                        bubble.addView(overlayIv, 0)
-                    }
-                    overlayIv.setImageBitmap(bmp)
-                    overlayIv.visibility = View.VISIBLE
-                } else {
-                    bubble.background = BitmapDrawable(context.resources, bmp)
+
+            if (bubble is FrameLayout) {
+                val oldOverlay = bubble.findViewWithTag<ImageView>("bubble_overlay")
+                if (oldOverlay != null) {
+                    bubble.removeView(oldOverlay)
                 }
+                val oldBgOverlay = bubble.findViewWithTag<ImageView>("bubble_bg_overlay")
+                if (oldBgOverlay != null) {
+                    bubble.removeView(oldBgOverlay)
+                }
+                bubble.clipChildren = false
+                bubble.clipToPadding = false
+            }
+
+            val chunk = bmp.ninePatchChunk
+            if (chunk != null && NinePatch.isNinePatchChunk(chunk)) {
+                val ninePatch = NinePatchDrawable(context.resources, bmp, chunk, Rect(), null)
+                bubble.background = ninePatch
+            } else {
+                val drawable = createStretchableDrawable(bmp)
+                bubble.background = drawable
             }
         } catch (e: Exception) {
             AppLogger.e(TAG, "applyImageBubbleSkin failed: ${e.message}")
+        }
+    }
+
+    fun createStretchableDrawable(bitmap: Bitmap): Drawable {
+        return object : Drawable() {
+            private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                isFilterBitmap = true
+            }
+
+            override fun draw(canvas: Canvas) {
+                val bounds = bounds
+                val bw = bitmap.width
+                val bh = bitmap.height
+
+                val cornerW = bw / 3
+                val cornerH = bh / 3
+
+                val left = bounds.left
+                val top = bounds.top
+                val right = bounds.right
+                val bottom = bounds.bottom
+
+                val centerW = right - left - 2 * cornerW
+                val centerH = bottom - top - 2 * cornerH
+
+                canvas.drawBitmap(bitmap,
+                    Rect(0, 0, cornerW, cornerH),
+                    Rect(left, top, left + cornerW, top + cornerH),
+                    paint)
+
+                if (centerW > 0) {
+                    canvas.drawBitmap(bitmap,
+                        Rect(cornerW, 0, bw - cornerW, cornerH),
+                        Rect(left + cornerW, top, right - cornerW, top + cornerH),
+                        paint)
+                }
+
+                canvas.drawBitmap(bitmap,
+                    Rect(bw - cornerW, 0, bw, cornerH),
+                    Rect(right - cornerW, top, right, top + cornerH),
+                    paint)
+
+                if (centerH > 0) {
+                    canvas.drawBitmap(bitmap,
+                        Rect(0, cornerH, cornerW, bh - cornerH),
+                        Rect(left, top + cornerH, left + cornerW, bottom - cornerH),
+                        paint)
+                }
+
+                if (centerW > 0 && centerH > 0) {
+                    canvas.drawBitmap(bitmap,
+                        Rect(cornerW, cornerH, bw - cornerW, bh - cornerH),
+                        Rect(left + cornerW, top + cornerH, right - cornerW, bottom - cornerH),
+                        paint)
+                }
+
+                if (centerH > 0) {
+                    canvas.drawBitmap(bitmap,
+                        Rect(bw - cornerW, cornerH, bw, bh - cornerH),
+                        Rect(right - cornerW, top + cornerH, right, bottom - cornerH),
+                        paint)
+                }
+
+                canvas.drawBitmap(bitmap,
+                    Rect(0, bh - cornerH, cornerW, bh),
+                    Rect(left, bottom - cornerH, left + cornerW, bottom),
+                    paint)
+
+                if (centerW > 0) {
+                    canvas.drawBitmap(bitmap,
+                        Rect(cornerW, bh - cornerH, bw - cornerW, bh),
+                        Rect(left + cornerW, bottom - cornerH, right - cornerW, bottom),
+                        paint)
+                }
+
+                canvas.drawBitmap(bitmap,
+                    Rect(bw - cornerW, bh - cornerH, bw, bh),
+                    Rect(right - cornerW, bottom - cornerH, right, bottom),
+                    paint)
+            }
+
+            override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+            override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter }
+            override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
         }
     }
 
@@ -328,8 +423,25 @@ object BubbleSkinManager {
             cardView.radius = frame.cornerRadius
             cardView.strokeColor = frame.strokeColor
             cardView.strokeWidth = frame.strokeWidth.toInt()
+            cardView.setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
         } catch (e: Exception) {
             AppLogger.e(TAG, "applyAvatarFrame failed: ${e.message}")
+        }
+    }
+
+    fun applyAvatarFrameToImageView(imageView: android.widget.ImageView, frame: AvatarFrame) {
+        try {
+            val d = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.TRANSPARENT)
+                if (frame.strokeWidth > 0 && frame.strokeColor != Color.TRANSPARENT) {
+                    setStroke(frame.strokeWidth.toInt(), frame.strokeColor)
+                }
+            }
+            imageView.background = d
+            imageView.clipToOutline = true
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "applyAvatarFrameToImageView failed: ${e.message}")
         }
     }
 
@@ -339,24 +451,45 @@ object BubbleSkinManager {
             frameLayout.clipToPadding = false
             var overlayIv = frameLayout.findViewWithTag<ImageView>("frame_overlay")
             if (overlayIv == null) {
+                val size = frameLayout.layoutParams.width
+                val overlaySize = (size * 1.25f).toInt()
                 overlayIv = ImageView(context).apply {
                     tag = "frame_overlay"
-                    layoutParams = FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                    )
-                    scaleType = ImageView.ScaleType.FIT_XY
+                    layoutParams = FrameLayout.LayoutParams(overlaySize, overlaySize).apply {
+                        gravity = android.view.Gravity.CENTER
+                    }
+                    scaleType = ImageView.ScaleType.FIT_CENTER
                 }
                 frameLayout.addView(overlayIv)
             }
             val bmp = loadBitmapFromAsset(context, imageFrame.assetFile)
             if (bmp != null) {
-                overlayIv.setImageBitmap(bmp)
+                val maskedBmp = maskAvatarFrameCenter(bmp, bmp.width / 2f * 0.65f)
+                overlayIv.setImageBitmap(maskedBmp)
                 overlayIv.visibility = View.VISIBLE
             }
         } catch (e: Exception) {
             AppLogger.e(TAG, "applyImageAvatarFrame failed: ${e.message}")
         }
+    }
+
+    fun maskAvatarFrameCenter(src: Bitmap, radius: Float): Bitmap {
+        val w = src.width
+        val h = src.height
+        val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(result)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        canvas.drawBitmap(src, 0f, 0f, paint)
+        val clearPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        clearPaint.xfermode = PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR)
+        canvas.drawCircle(w / 2f, h / 2f, radius, clearPaint)
+        val cornerRadius = w * 0.12f
+        val cornerPath = android.graphics.Path()
+        cornerPath.addRoundRect(android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()), cornerRadius, cornerRadius, android.graphics.Path.Direction.CW)
+        val cornerMaskPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        cornerMaskPaint.xfermode = PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN)
+        canvas.drawPath(cornerPath, cornerMaskPaint)
+        return result
     }
 
     fun clearImageAvatarFrame(frameLayout: FrameLayout) {

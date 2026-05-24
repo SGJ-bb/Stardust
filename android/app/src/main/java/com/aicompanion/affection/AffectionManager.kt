@@ -4,6 +4,7 @@ package com.aicompanion.affection
 import android.content.Context
 import android.content.SharedPreferences
 import com.aicompanion.models.Emotion
+import com.aicompanion.util.AppLogger
 
 data class DailyStats(
     val messagesToday: Int = 0,
@@ -79,8 +80,39 @@ class AffectionManager(private val context: Context, private val personaId: Stri
         val current = affectionLevel
         val newValue = (current + amount).coerceIn(0, 100)
         affectionLevel = newValue
+        AppLogger.w("Affection", "addAffection: +$amount -> $newValue")
 
         prefs.edit().putString("last_affection_change", "$reason: $current -> $newValue").apply()
+    }
+
+    fun shouldTriggerPersonalityEvolution(): Boolean {
+        val personaPrefs = context.getSharedPreferences("persona_data_$personaId", Context.MODE_PRIVATE)
+        val enabled = personaPrefs.getBoolean("personality_evolution_enabled", true)
+        if (!enabled) return false
+
+        val lastEvolution = personaPrefs.getInt("last_evolution_affection", 50)
+        val current = affectionLevel
+        if (current >= lastEvolution + 5) {
+            personaPrefs.edit().putInt("last_evolution_affection", current).apply()
+            AppLogger.i("Affection", "personalityEvolution triggered: affection=$current")
+            return true
+        }
+        return false
+    }
+
+    fun shouldTriggerPersonalitySummary(): Boolean {
+        val globalPrefs = context.getSharedPreferences("companion_settings", Context.MODE_PRIVATE)
+        val userDef = globalPrefs.getString("user_personality_def", "") ?: ""
+        if (userDef.isNotBlank()) return false
+
+        val lastSummary = globalPrefs.getInt("last_personality_summary_affection", 0)
+        val current = affectionLevel
+        if (current >= lastSummary + 10) {
+            globalPrefs.edit().putInt("last_personality_summary_affection", current).apply()
+            AppLogger.i("Affection", "personalitySummary triggered: affection=$current")
+            return true
+        }
+        return false
     }
 
     fun decreaseAffection(amount: Int, reason: String = "") {
@@ -90,6 +122,7 @@ class AffectionManager(private val context: Context, private val personaId: Stri
         }
         val newValue = (current - amount).coerceIn(0, 100)
         affectionLevel = newValue
+        AppLogger.w("Affection", "decreaseAffection: -$amount -> $newValue")
 
         prefs.edit().putString("last_affection_change", "$reason: $current -> $newValue").apply()
     }
@@ -97,6 +130,7 @@ class AffectionManager(private val context: Context, private val personaId: Stri
     fun evaluateUserBehavior(message: String, emotion: Emotion, isOffensive: Boolean = false) {
         if (isOffensive) {
             decreaseAffection(2, "用户说了冒犯的话")
+            AppLogger.w("Affection", "evaluateBehavior: offensive, emotion=$emotion")
             return
         }
 
@@ -119,6 +153,7 @@ class AffectionManager(private val context: Context, private val personaId: Stri
         if (negativeWords.any { lowerMsg.contains(it) }) {
             decreaseAffection(2, "用户说了不好的话")
         }
+        AppLogger.w("Affection", "evaluateBehavior: emotion=$emotion, affection=$affectionLevel")
     }
 
     fun getAffectionTitle(): String {

@@ -163,13 +163,7 @@ object DataMigrationManager {
                 AppLogger.d(TAG, "Migrated chat_api_key to encrypted storage")
             }
         } catch (e: Exception) {
-            android.util.Log.w(TAG, "EncryptedSharedPreferences unavailable, falling back to plaintext storage for API key", e)
-            val securePrefs = context.getSharedPreferences("companion_prefs_fallback", Context.MODE_PRIVATE)
-            if (securePrefs.getString("chat_api_key", null) == null) {
-                securePrefs.edit().putString("chat_api_key", plainApiKey).apply()
-                settingsPrefs.edit().remove("chat_api_key").apply()
-                AppLogger.d(TAG, "Migrated chat_api_key to fallback storage")
-            }
+            AppLogger.e(TAG, "EncryptedSharedPreferences unavailable, keeping key in settings prefs: ${e.message}")
         }
     }
 

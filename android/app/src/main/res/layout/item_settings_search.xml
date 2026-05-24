@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="  联网搜索配置"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#8899dd"
+        android:letterSpacing="0.05"
+        android:layout_marginBottom="10dp" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_settings_card">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="联网搜索"
+                    android:textSize="15sp"
+                    android:textColor="#d0d0e0" />
+
+                <Switch
+                    android:id="@+id/switch_search_enabled"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:trackTint="#667eea"
+                    android:thumbTint="#c4b5fd" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="搜索引擎"
+                android:textSize="13sp"
+                android:textColor="#8899bb"
+                android:layout_marginBottom="4dp" />
+
+            <Spinner
+                android:id="@+id/spinner_search_provider"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_input_field"
+                android:popupBackground="#1a1a30"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_search_api_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="搜索 API 地址"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxStrokeColor="#667eea"
+                app:hintTextColor="#667eea"
+                android:layout_marginBottom="10dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_search_api_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:textColorHint="#667788" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_search_api_key"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="搜索 API 密钥"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxStrokeColor="#667eea"
+                app:hintTextColor="#667eea"
+                android:layout_marginBottom="10dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_search_api_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:textColorHint="#667788"
+                    android:inputType="textPassword" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_search_engine_id"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="搜索引擎 ID"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxStrokeColor="#667eea"
+                app:hintTextColor="#667eea">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_search_engine_id"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:textColorHint="#667788" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+</LinearLayout>

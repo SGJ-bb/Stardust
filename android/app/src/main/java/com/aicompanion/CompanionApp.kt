@@ -9,10 +9,12 @@ import com.aicompanion.AppContainer
 class CompanionApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        com.aicompanion.util.AppLogger.init(this)
         AppContainer.initialize(this)
         com.aicompanion.migration.DataMigrationManager.migrateIfNeeded(this)
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            Log.e("CompanionApp", "FATAL on ${thread.name}: ${throwable.javaClass.simpleName}: ${throwable.message}", throwable)
+            com.aicompanion.util.AppLogger.e("CompanionApp", "FATAL on ${thread.name}: ${throwable.javaClass.simpleName}: ${throwable.message}", throwable)
+            com.aicompanion.util.AppLogger.flush()
             try {
                 Toast.makeText(this, "应用发生错误，请查看日志", Toast.LENGTH_LONG).show()
             } catch (_: Exception) {}

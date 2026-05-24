@@ -49,11 +49,12 @@ class MemoryPoolActivity : AppCompatActivity() {
         container.removeViews(1, container.childCount - 1)
 
         val entries = contextManager.memoryPool.getAll()
+        val details = contextManager.memoryPool.getAllDetails()
         tvStats.text = contextManager.getSessionStats()
 
-        if (entries.isEmpty()) {
+        if (entries.isEmpty() && details.isEmpty()) {
             val emptyView = TextView(this).apply {
-                text = "记忆池为空\n\n开始聊天后，AI会自动提取并记录场景、剧情和关键信息\n每10轮对话会自动整理，不超过1000字"
+                text = "记忆池为空\n\n开始聊天后，AI会自动提取并记录场景、剧情和关键信息\n每2轮对话提取记忆，每10轮对话压缩整理"
                 textSize = 14f
                 setTextColor(0xFF667788.toInt())
                 gravity = android.view.Gravity.CENTER
@@ -64,8 +65,30 @@ class MemoryPoolActivity : AppCompatActivity() {
             return
         }
 
-        for (entry in entries) {
-            addEntryView(entry)
+        if (entries.isNotEmpty()) {
+            val sectionTitle = TextView(this).apply {
+                text = "📝 总结记忆"
+                textSize = 15f
+                setTextColor(0xFFc4b5fd.toInt())
+                setPadding(0, 8, 0, 8)
+            }
+            container.addView(sectionTitle)
+            for (entry in entries) {
+                addEntryView(entry)
+            }
+        }
+
+        if (details.isNotEmpty()) {
+            val detailTitle = TextView(this).apply {
+                text = "🔍 细节记忆"
+                textSize = 15f
+                setTextColor(0xFF7dd3fc.toInt())
+                setPadding(0, 16, 0, 8)
+            }
+            container.addView(detailTitle)
+            for (entry in details) {
+                addEntryView(entry)
+            }
         }
     }
 
@@ -105,7 +128,11 @@ class MemoryPoolActivity : AppCompatActivity() {
             setTextColor(0xFFff6666.toInt())
             setPadding(16, 0, 0, 0)
             setOnClickListener {
-                contextManager.memoryPool.delete(entry.id)
+                if (entry.category == "细节") {
+                    contextManager.memoryPool.deleteDetailEntry(entry.id)
+                } else {
+                    contextManager.memoryPool.delete(entry.id)
+                }
                 refreshList()
             }
         }
@@ -126,12 +153,14 @@ class MemoryPoolActivity : AppCompatActivity() {
 
     private fun getCategoryColor(category: String): Int = when (category) {
         "总结" -> 0xFF9c7cff.toInt()
+        "细节" -> 0xFF7dd3fc.toInt()
+        "继承" -> 0xFFfbbf24.toInt()
         else -> 0xFF808890.toInt()
     }
 
     override fun onResume() {
         super.onResume()
-        contextManager.memoryPool.saveToStorage()
+        contextManager.memoryPool.loadFromStorage()
         refreshList()
     }
 }

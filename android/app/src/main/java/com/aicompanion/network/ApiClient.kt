@@ -25,13 +25,14 @@ class ApiClient(
 ) {
     companion object {
         private const val TAG = "ApiClient"
+        val sharedClient = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .build()
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = sharedClient
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
@@ -44,7 +45,6 @@ class ApiClient(
         action: String,
         memories: List<String>,
         appCategory: String,
-        isOfflineMode: Boolean,
         systemContext: String = "",
         chatHistory: List<Pair<Boolean, String>> = emptyList(),
         tools: List<ToolDefinition> = emptyList(),
@@ -56,25 +56,13 @@ class ApiClient(
         overrideMaxTokens: Int? = null
     ): ChatResponse? {
         val useModel = modelName ?: "gpt-4o-mini"
-
-        val emotionMap = mapOf(
-            "happy" to "开心", "sad" to "伤心", "angry" to "生气",
-            "surprised" to "惊讶", "tsundere" to "傲娇", "neutral" to "平静",
-            "开心" to "开心", "难过" to "伤心", "生气" to "生气", "疲惫" to "疲惫",
-            "兴奋" to "兴奋", "幸福" to "幸福", "焦虑" to "焦虑", "平静" to "平静"
-        )
-        val emotionCn = emotionMap[emotion.lowercase()] ?: "平静"
+        com.aicompanion.util.AppLogger.d(TAG, "sendChat: model=$useModel, url=${chatApiUrl.take(30)}, history=${chatHistory.size}条")
 
         val systemPrompt = buildString {
             append(personaPrompt)
-            append("\n情绪：$emotionCn。动作：$action。")
             if (memories.isNotEmpty()) {
                 append("\n记得：${memories.takeLast(3).joinToString("；")}")
             }
-            append("\n【规则】\n")
-            append("- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]\n")
-            append("- 用()描述你的动作、表情、状态、情绪，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)\n")
-            append("- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定")
         }
 
         val messagesArray = JSONArray()
@@ -117,7 +105,8 @@ class ApiClient(
             val msgObj = if (content.startsWith("{") && (role == "assistant" || role == "tool")) {
                 try {
                     JSONObject(content)
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    com.aicompanion.util.AppLogger.w(TAG, "消息JSON解析失败，使用fallback: ${e.message}")
                     JSONObject().apply {
                         put("role", role)
                         put("content", content)
@@ -247,7 +236,7 @@ class ApiClient(
 
         var response = sendChat(
             userId, message, personaName, personaPrompt,
-            emotion, action, memories, "", false,
+            emotion, action, memories, "",
             systemContext, currentHistory, tools, allExtraMessages
         )
 
@@ -255,7 +244,12 @@ class ApiClient(
             if (response == null) return null
 
             val toolCalls = response.toolCalls
-            if (toolCalls.isEmpty()) return response
+            if (toolCalls.isEmpty()) {
+                if (response.text.isBlank()) {
+                    AppLogger.w(TAG, "sendChatWithToolLoop: tool loop完成但最终回复为空")
+                }
+                return response
+            }
 
             val reasoningContent = response.reasoningContent
 
@@ -296,7 +290,7 @@ class ApiClient(
             AppLogger.d(TAG, "Tool loop iteration $iteration: ${toolCalls.size} tools executed")
             response = sendChat(
                 userId, message, personaName, personaPrompt,
-                emotion, action, memories, "", false,
+                emotion, action, memories, "",
                 systemContext, currentHistory, tools, allExtraMessages
             )
 
@@ -352,8 +346,9 @@ class ApiClient(
         val emotionRegex = Regex("""\[\[emotion:(\w+)\]\]""", RegexOption.IGNORE_CASE)
         val match = emotionRegex.find(text)
         val emotion = if (match != null) {
-            try { Emotion.valueOf(match.groupValues[1].uppercase()) }
-            catch (_: Exception) { Emotion.HAPPY }
+            val emotionStr = match.groupValues[1]
+            try { Emotion.valueOf(emotionStr.uppercase()) }
+            catch (e: Exception) { com.aicompanion.util.AppLogger.w(TAG, "情绪解析失败'$emotionStr'，默认HAPPY: ${e.message}"); Emotion.HAPPY }
         } else {
             Emotion.HAPPY
         }
@@ -502,6 +497,7 @@ class ApiClient(
                     listener(false, msg)
                 }
             } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e(TAG, "流式聊天连接错误: ${e.message}", e)
                 val msg = when {
                     e.message?.contains("Unable to resolve host") == true -> "无法解析域名，请检查网络和API地址"
                     e.message?.contains("timeout") == true -> "连接超时，请检查网络和API地址"
@@ -565,7 +561,7 @@ class ApiClient(
                 parseOpenAIResponse(bodyStr)
             }
         } catch (e: Exception) {
-            AppLogger.d(TAG, "sendProactiveChat error: ${e.message}")
+            AppLogger.e(TAG, "sendProactiveChat失败: ${e.message}", e)
             null
         }
     }
@@ -662,6 +658,137 @@ class ApiClient(
     suspend fun deleteAllMemories(userId: String): Boolean = true
 
     suspend fun getDailyCard(userId: String): DailyCardData? = null
+
+    fun evolvePersonality(
+        personaName: String,
+        currentPersonality: String,
+        currentSpeechStyle: String,
+        affectionLevel: Int,
+        recentChatSummary: String,
+        worldSetting: String
+    ): String? {
+        val useModel = modelName ?: "gpt-4o-mini"
+
+        val systemPrompt = buildString {
+            append("你是一个角色性格进化系统。根据角色的经历和互动，让角色性格自然成长变化。\n")
+            append("角色名：$personaName\n")
+            append("当前好感度：$affectionLevel/100\n")
+            if (worldSetting.isNotBlank()) append("世界观：$worldSetting\n")
+            append("\n请根据以下信息，重写角色的性格描述和说话风格。\n")
+            append("要求：\n")
+            append("- 性格变化要自然渐进，不是突变\n")
+            append("- 保留角色核心特质，但根据互动经历增加新的性格维度\n")
+            append("- 好感度越高，角色越亲近、越真实、越愿意展露内心\n")
+            append("- 只输出JSON格式：{\"personality\":\"新性格描述\",\"speech_style\":\"新说话风格\"}\n")
+            append("- 不要输出其他任何内容\n")
+        }
+
+        val userPrompt = buildString {
+            append("当前性格：$currentPersonality\n")
+            append("当前说话风格：$currentSpeechStyle\n")
+            append("近期互动摘要：$recentChatSummary\n")
+        }
+
+        val messagesArray = JSONArray()
+        messagesArray.put(JSONObject().apply {
+            put("role", "system")
+            put("content", systemPrompt)
+        })
+        messagesArray.put(JSONObject().apply {
+            put("role", "user")
+            put("content", userPrompt)
+        })
+
+        val requestBody = JSONObject().apply {
+            put("model", useModel)
+            put("messages", messagesArray)
+            put("temperature", 0.7)
+            put("max_tokens", 500)
+        }
+
+        return try {
+            if (chatApiUrl.isBlank()) return null
+            val body = requestBody.toString().toRequestBody(jsonMediaType)
+            val requestBuilder = Request.Builder()
+                .url(chatApiUrl)
+                .post(body)
+                .header("Content-Type", "application/json")
+            if (!apiKey.isNullOrEmpty()) {
+                requestBuilder.header("Authorization", "Bearer $apiKey")
+            }
+            val response = client.newCall(requestBuilder.build()).execute()
+            val responseBody = response.body?.string() ?: return null
+            val json = JSONObject(responseBody as String)
+            val choices = json.optJSONArray("choices")
+            if (choices != null && choices.length() > 0) {
+                choices.getJSONObject(0).getJSONObject("message").optString("content", "").trim()
+            } else null
+        } catch (e: Exception) {
+            Log.w(TAG, "evolvePersonality failed: ${e.message}")
+            null
+        }
+    }
+
+    fun summarizeUserPersonality(
+        personaName: String,
+        recentChatSummary: String,
+        currentSummary: String,
+        affectionLevel: Int
+    ): String? {
+        val useModel = modelName ?: "gpt-4o-mini"
+
+        val systemPrompt = buildString {
+            append("你是一个用户性格分析系统。根据与用户的对话记录，总结用户的性格特征。\n")
+            append("AI角色名：$personaName\n")
+            append("当前好感度：$affectionLevel/100\n")
+            if (currentSummary.isNotBlank()) append("当前性格总结：$currentSummary\n")
+            append("\n请根据对话记录，总结用户的性格特征。\n")
+            append("要求：\n")
+            append("- 总结要客观准确，基于对话中的实际表现\n")
+            append("- 包含沟通风格、情感倾向、兴趣偏好、社交特点等维度\n")
+            append("- 50-150字，简洁有力\n")
+            append("- 只输出纯文本，不要JSON格式，不要多余解释\n")
+        }
+
+        val messagesArray = JSONArray()
+        messagesArray.put(JSONObject().apply {
+            put("role", "system")
+            put("content", systemPrompt)
+        })
+        messagesArray.put(JSONObject().apply {
+            put("role", "user")
+            put("content", "近期对话：\n$recentChatSummary")
+        })
+
+        val requestBody = JSONObject().apply {
+            put("model", useModel)
+            put("messages", messagesArray)
+            put("temperature", 0.5)
+            put("max_tokens", 300)
+        }
+
+        return try {
+            if (chatApiUrl.isBlank()) return null
+            val body = requestBody.toString().toRequestBody(jsonMediaType)
+            val requestBuilder = Request.Builder()
+                .url(chatApiUrl)
+                .post(body)
+                .header("Content-Type", "application/json")
+            if (!apiKey.isNullOrEmpty()) {
+                requestBuilder.header("Authorization", "Bearer $apiKey")
+            }
+            val response = client.newCall(requestBuilder.build()).execute()
+            val responseBody = response.body?.string() ?: return null
+            val json = JSONObject(responseBody as String)
+            val choices = json.optJSONArray("choices")
+            if (choices != null && choices.length() > 0) {
+                choices.getJSONObject(0).getJSONObject("message").optString("content", "").trim()
+            } else null
+        } catch (e: Exception) {
+            Log.w(TAG, "summarizeUserPersonality failed: ${e.message}")
+            null
+        }
+    }
 
     fun generateDiaryContent(
         chatTexts: List<String>,
@@ -955,7 +1082,7 @@ class ApiClient(
                 vec
             }
         } catch (e: Exception) {
-            null
+            AppLogger.e(TAG, "Embedding解析失败: ${e.message}", e); null
         }
     }
 

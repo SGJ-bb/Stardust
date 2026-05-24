@@ -290,22 +290,24 @@ class MomentsActivity : AppCompatActivity() {
     private fun triggerAiReplyToUserMoment(moment: Moment) {
         val apiClient = AppContainer.apiClient ?: return
         val persona = getPersonaInfo()
+        val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            .getString("active_persona_id", "default") ?: "default"
         lifecycleScope.launch {
             val reply = momentsManager.generateAiCommentOnUserMoment(
                 apiClient,
                 persona.first,
                 persona.second,
-                moment.content
+                moment.content,
+                activeId
             )
             if (reply != null) {
-                val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                    .getString("active_persona_id", "default") ?: "default"
                 momentsManager.addComment(moment.id, Comment(
                     id = java.util.UUID.randomUUID().toString(),
                     author = "ai",
                     authorPersonaId = activeId,
                     content = reply
                 ))
+                momentsManager.saveInteractionToGlobalMemory(activeId, "用户发动态：${moment.content.take(30)}", reply)
                 refreshMoments()
             }
         }
@@ -473,6 +475,8 @@ class MomentsActivity : AppCompatActivity() {
         } else {
             getPersonaInfo()
         }
+        val activeId = authorId ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
+            .getString("active_persona_id", "default") ?: "default"
         lifecycleScope.launch {
             val reply = if (moment.author == "ai") {
                 momentsManager.generateAiReply(
@@ -480,24 +484,26 @@ class MomentsActivity : AppCompatActivity() {
                     persona.first,
                     persona.second,
                     moment.content,
-                    commentText
+                    commentText,
+                    activeId
                 )
             } else {
                 momentsManager.generateAiCommentOnUserMoment(
                     apiClient,
                     persona.first,
                     persona.second,
-                    "${moment.content}\n\n用户评论了：「$commentText」"
+                    "${moment.content}\n\n用户评论了：「$commentText」",
+                    activeId
                 )
             }
             if (reply != null) {
                 momentsManager.addComment(moment.id, Comment(
                     id = java.util.UUID.randomUUID().toString(),
                     author = "ai",
-                    authorPersonaId = authorId ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
-                        .getString("active_persona_id", "default") ?: "default",
+                    authorPersonaId = activeId,
                     content = reply
                 ))
+                momentsManager.saveInteractionToGlobalMemory(activeId, "评论动态：$commentText", reply)
                 refreshMoments()
             }
         }

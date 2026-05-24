@@ -173,6 +173,26 @@ class ProfileActivity : AppCompatActivity() {
         loadMoments()
         loadFavorites()
         loadStats()
+        loadUserPersonality()
+    }
+
+    private fun loadUserPersonality() {
+        val tvLabel = findViewById<TextView>(R.id.tv_user_personality_label)
+        val tvContent = findViewById<TextView>(R.id.tv_user_personality_content)
+        val tvSource = findViewById<TextView>(R.id.tv_user_personality_source)
+
+        val sm = com.aicompanion.settings.SettingsManager(this)
+        val userDef = sm.userPersonalityDef
+        val aiSummary = sm.getAiSummarizedPersonality(personaId)
+
+        val effectivePersonality = userDef.ifBlank { aiSummary }
+        if (effectivePersonality.isBlank()) {
+            tvContent?.text = "暂无性格描述，AI将在对话中逐渐了解你..."
+            tvSource?.text = ""
+        } else {
+            tvContent?.text = effectivePersonality
+            tvSource?.text = if (userDef.isNotBlank()) "✍️ 你定义的" else "🤖 AI总结的"
+        }
     }
 
     private fun loadStats() {

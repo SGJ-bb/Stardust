@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import com.aicompanion.models.DailyCardData
 import com.aicompanion.models.MemoryFact
 import com.aicompanion.network.ApiClient
+import com.aicompanion.util.AppLogger
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -35,7 +36,7 @@ class MemoryManager(private val context: Context, private val personaId: String 
                 ))
             }
             localMemories = list.sortedByDescending { it.timestamp }.toMutableList()
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MemoryManager", "loadLocalCache: ${e.message}") }
     }
 
     private fun saveLocalCache() {
@@ -51,7 +52,7 @@ class MemoryManager(private val context: Context, private val personaId: String 
                 arr.put(obj)
             }
             localPrefs.edit().putString("memories_json", arr.toString()).apply()
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MemoryManager", "saveLocalCache: ${e.message}") }
     }
 
     fun getLocalMemories(): List<MemoryFact> = localMemories.toList()

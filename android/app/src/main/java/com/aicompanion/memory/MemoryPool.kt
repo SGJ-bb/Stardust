@@ -21,7 +21,8 @@ data class MemoryEntry(
     val event: String = "",
     val scene: String = "",
     val details: String = "",
-    val relationships: String = ""
+    val relationships: String = "",
+    val isGlobal: Boolean = false
 ) {
     fun toStructuredText(): String {
         val parts = mutableListOf<String>()
@@ -48,6 +49,7 @@ data class MemoryEntry(
         put("scene", scene)
         put("details", details)
         put("relationships", relationships)
+        put("isGlobal", isGlobal)
     }
 
     companion object {
@@ -63,7 +65,8 @@ data class MemoryEntry(
             event = obj.optString("event", ""),
             scene = obj.optString("scene", ""),
             details = obj.optString("details", ""),
-            relationships = obj.optString("relationships", "")
+            relationships = obj.optString("relationships", ""),
+            isGlobal = obj.optBoolean("isGlobal", false)
         )
     }
 }
@@ -81,6 +84,7 @@ class MemoryPool(
     }
 
     private val entries = mutableListOf<MemoryEntry>()
+    private val detailEntries = mutableListOf<MemoryEntry>()
     private var turnsSinceLastConsolidate = 0
     private var totalTurns = 0
     private var totalCharCount = 0
@@ -141,24 +145,70 @@ class MemoryPool(
         return sb.toString().trimEnd()
     }
 
+    fun getDetailBlock(): String {
+        if (detailEntries.isEmpty()) return ""
+        val sb = StringBuilder()
+        sb.appendLine("[细节记忆 - 事实与状态]")
+        for (entry in detailEntries) {
+            val structured = entry.toStructuredText()
+            if (structured != entry.content && entry.event.isNotBlank()) {
+                sb.appendLine("- $structured")
+            } else {
+                sb.appendLine("- ${entry.content}")
+            }
+        }
+        return sb.toString().trimEnd()
+    }
+
+    fun addDetailEntry(entry: MemoryEntry) {
+        val existingIdx = detailEntries.indexOfFirst {
+            it.content.contains(entry.content.take(20), ignoreCase = true) ||
+            entry.content.contains(it.content.take(20), ignoreCase = true)
+        }
+        if (existingIdx >= 0) {
+            detailEntries[existingIdx] = entry
+        } else {
+            detailEntries.add(entry)
+        }
+        recalcCharCount()
+        saveToStorage()
+    }
+
+    fun deleteDetailEntry(id: String) {
+        detailEntries.removeAll { it.id == id }
+        recalcCharCount()
+        saveToStorage()
+    }
+
+    fun getAllDetails(): List<MemoryEntry> = detailEntries.toList()
+
     fun getPoolCharCount(): Int = totalCharCount
 
     suspend fun consolidate(client: ApiClient): Boolean = withContext(Dispatchers.IO) {
-        if (entries.isEmpty()) {
+        if (entries.isEmpty() && detailEntries.isEmpty()) {
             turnsSinceLastConsolidate = 0
             return@withContext false
         }
 
-        AppLogger.d(TAG, "consolidate: starting with ${entries.size} entries, $totalCharCount chars")
+        AppLogger.d(TAG, "consolidate: starting with ${entries.size} entries, ${detailEntries.size} details, $totalCharCount chars")
 
-        val fullPool = getPoolBlock()
+        val fullPool = buildString {
+            appendLine(getPoolBlock())
+            if (detailEntries.isNotEmpty()) {
+                appendLine()
+                appendLine(getDetailBlock())
+            }
+        }
+
         val systemPrompt = buildString {
             append("你是一个记忆总结助手。请将以下记忆池内容重新整理总结。\n")
             append("要求：\n")
-            append("- 简短精炼，但保留所有重要细节\n")
-            append("- 保留：剧情进展、场景变化、角色关系、已发生的事件、用户喜好、重要的小事\n")
+            append("- 简短精炼，但必须保留所有重要细节和具体内容\n")
+            append("- 保留：具体事件、事实信息、用户观点与态度、场景描述、角色关系、用户喜好、对话中的关键细节\n")
             append("- 场景描述要具体，事件经过要完整\n")
             append("- 合并重复内容，删除过时信息\n")
+            append("- 将细节记忆中仍然重要的事实合并到总结记忆中\n")
+            append("- 不要丢失任何具体的事实、数据、观点或描述\n")
             append("- 每条记忆必须包含结构化字段，按以下JSON格式输出：\n")
             append("  {\"content\":\"总结内容\",\"eventTime\":\"时间\",\"place\":\"地点\",\"people\":\"人物\",\"event\":\"事件\",\"scene\":\"场景\",\"details\":\"细节\",\"relationships\":\"关系变化\"}\n")
             append("- 字段可以为空字符串，但必须存在\n")
@@ -173,6 +223,7 @@ class MemoryPool(
                 if (newEntries.isNotEmpty()) {
                     entries.clear()
                     entries.addAll(newEntries)
+                    detailEntries.clear()
                     recalcCharCount()
                     saveToStorage()
                     AppLogger.d(TAG, "consolidate: done, ${entries.size} entries, $totalCharCount chars")
@@ -204,8 +255,8 @@ class MemoryPool(
                 cleaned = cleaned.substring(bracketStart, bracketEnd + 1)
             }
 
-            val arr = try { JSONArray(cleaned) } catch (_: Exception) {
-                return parseConsolidatedResult(text)
+            val arr = try { JSONArray(cleaned) } catch (e: Exception) {
+                AppLogger.w(TAG, "记忆整合JSON数组解析失败，尝试文本解析: ${e.message}"); return parseConsolidatedResult(text)
             }
 
             for (i in 0 until arr.length()) {
@@ -281,12 +332,11 @@ class MemoryPool(
 
     suspend fun evaluateTurn(
         client: ApiClient,
-        userMsg: String,
-        aiMsg: String,
+        turnsText: String,
         turnNumber: Int,
         userNickname: String = "用户"
     ): List<MemoryEntry> = withContext(Dispatchers.IO) {
-        if (userMsg.isBlank() || aiMsg.isBlank()) return@withContext emptyList()
+        if (turnsText.isBlank()) return@withContext emptyList()
 
         val poolBlock = if (entries.isEmpty()) "（空）" else getPoolBlock()
         AppLogger.d(TAG, "evaluateTurn #$turnNumber: pool=${entries.size} entries")
@@ -296,11 +346,13 @@ class MemoryPool(
             append("你是记忆总结助手。分析对话，提取值得记住的信息。\n")
             append("要求：\n")
             append("- 每条记忆必须包含结构化字段\n")
-            append("- 关注：剧情进展、场景变化、角色关系、已发生的事件、用户喜好与习惯、重要的小事\n")
+            append("- 必须记录对话中提到的所有具体内容：事实、数据、观点、描述、事件、决定、承诺等\n")
+            append("- 不要过滤掉对话的具体内容，用户说的具体话、具体描述、具体信息都要记\n")
+            append("- 只跳过纯寒暄（如「你好」「嗯」「好的」这类无实质内容的回应）\n")
+            append("- 关注：对话中涉及的具体事件、事实信息、用户观点与态度、场景描述、角色关系、用户喜好\n")
             append("- 场景描述要具体（如：在森林里遇到受伤的小鹿而不是在某个地方遇到了什么）\n")
             append("- 事件经过要完整（起因、经过、结果）\n")
-            append("- 小事如果有趣或有意义也要记（如：用户今天第一次做了某事）\n")
-            append("- 不要记录琐碎细节（如问候语、简单回应）\n")
+            append("- 用户表达的观点、感受、偏好都要记录，即使看起来不重要\n")
             append("- 提到$nick 时用「$nick」称呼\n")
             append("- 只输出JSON数组，不需要更新时输出[]\n")
             append("- 不要用Markdown代码块包裹\n")
@@ -310,15 +362,20 @@ class MemoryPool(
             append("update需要额外字段: old_content_fragment(旧记忆片段)\n")
             append("delete需要额外字段: old_content_fragment(要删除的记忆片段)\n")
             append("结构化字段可以为空字符串，但必须存在\n")
+            append("\n额外规则：对话中任何具体的、事实性的内容（如具体描述、数据、物品、位置、状态、颜色、数量、时间点、承诺、决定等容易遗忘的细节），请额外输出一条action为\"detail\"的记忆：\n")
+            append("{\"action\":\"detail\",\"content\":\"具体细节描述\",\"details\":\"细节内容\",\"place\":\"位置\",\"event\":\"相关事件\"}\n")
+            append("detail类型的记忆会单独保存，确保不会遗忘。宁可多记也不要遗漏。\n")
+            append("\n重要：对于跨场景有价值的信息（如用户的喜好、习惯、事实信息、重要决定、关系变化等），请在记忆的JSON中添加 \"global\":true 字段。场景特定的事件（如'在群里讨论了游戏'）不需要标记global。示例：\n")
+            append("{\"action\":\"add\",\"content\":\"用户喜欢吃苹果\",\"category\":\"喜好\",\"global\":true,...}\n")
+            append("{\"action\":\"add\",\"content\":\"群里聊了3小时游戏\",\"category\":\"事件\",\"global\":false,...}\n")
         }
 
         val userContent = buildString {
             appendLine("[当前记忆池]")
             appendLine(poolBlock)
             appendLine()
-            appendLine("[第${turnNumber}轮对话]")
-            appendLine("$nick: $userMsg")
-            appendLine("AI: $aiMsg")
+            appendLine("[近期对话]")
+            appendLine(turnsText)
             appendLine()
             appendLine("输出JSON数组：")
         }
@@ -326,14 +383,17 @@ class MemoryPool(
         try {
             val response = client.sendSimplePrompt(systemPrompt, userContent)
             if (response != null && response.text.isNotBlank()) {
+                AppLogger.d(TAG, "evaluateTurn #$turnNumber: API returned ${response.text.length} chars")
                 val result = parseEvaluationResult(response.text, turnNumber)
                 AppLogger.d(TAG, "evaluateTurn #$turnNumber result: ${result.size} new entries")
                 result
             } else {
+                val reason = if (response == null) "response is null" else "response text is blank"
+                AppLogger.w(TAG, "evaluateTurn #$turnNumber: API call returned no usable result ($reason)")
                 emptyList()
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "evaluateTurn #$turnNumber failed: ${e.message}")
+            AppLogger.e(TAG, "evaluateTurn #$turnNumber failed: ${e.javaClass.simpleName}: ${e.message}")
             emptyList()
         }
     }
@@ -352,7 +412,7 @@ class MemoryPool(
 
             if (cleaned == "[]") return emptyList()
 
-            val arr = try { JSONArray(cleaned) } catch (_: Exception) { return emptyList() }
+            val arr = try { JSONArray(cleaned) } catch (e: Exception) { AppLogger.e(TAG, "记忆评估结果解析失败: ${e.message}", e); return emptyList() }
             if (arr.length() == 0) return emptyList()
 
             for (i in 0 until arr.length()) {
@@ -373,7 +433,8 @@ class MemoryPool(
                                 event = obj.optString("event", ""),
                                 scene = obj.optString("scene", ""),
                                 details = obj.optString("details", ""),
-                                relationships = obj.optString("relationships", "")
+                                relationships = obj.optString("relationships", ""),
+                                isGlobal = obj.optBoolean("global", false)
                             ))
                         }
                     }
@@ -398,7 +459,8 @@ class MemoryPool(
                                     event = obj.optString("event", matched.event),
                                     scene = obj.optString("scene", matched.scene),
                                     details = obj.optString("details", matched.details),
-                                    relationships = obj.optString("relationships", matched.relationships)
+                                    relationships = obj.optString("relationships", matched.relationships),
+                                    isGlobal = obj.optBoolean("global", matched.isGlobal)
                                 ))
                             } else {
                                 results.add(MemoryEntry(
@@ -411,7 +473,8 @@ class MemoryPool(
                                     event = obj.optString("event", ""),
                                     scene = obj.optString("scene", ""),
                                     details = obj.optString("details", ""),
-                                    relationships = obj.optString("relationships", "")
+                                    relationships = obj.optString("relationships", ""),
+                                    isGlobal = obj.optBoolean("global", false)
                                 ))
                             }
                         }
@@ -420,6 +483,24 @@ class MemoryPool(
                         val oldFragment = obj.optString("old_content_fragment", "").trim()
                         if (oldFragment.isNotBlank()) {
                             entries.removeAll { it.content.contains(oldFragment, ignoreCase = true) }
+                        }
+                    }
+                    "detail" -> {
+                        val content = obj.optString("content", "").trim()
+                        if (content.isNotBlank()) {
+                            results.add(MemoryEntry(
+                                content = content,
+                                category = "细节",
+                                sourceTurn = turnNumber,
+                                eventTime = obj.optString("eventTime", ""),
+                                place = obj.optString("place", ""),
+                                people = obj.optString("people", ""),
+                                event = obj.optString("event", ""),
+                                scene = obj.optString("scene", ""),
+                                details = obj.optString("details", ""),
+                                relationships = obj.optString("relationships", ""),
+                                isGlobal = obj.optBoolean("global", false)
+                            ))
                         }
                     }
                 }
@@ -436,15 +517,20 @@ class MemoryPool(
             for (entry in entries) {
                 arr.put(entry.toJson())
             }
+            val detailArr = JSONArray()
+            for (entry in detailEntries) {
+                detailArr.put(entry.toJson())
+            }
             prefs.edit()
                 .putString("entries", arr.toString())
+                .putString("detail_entries", detailArr.toString())
                 .putInt("turns_since_consolidate", turnsSinceLastConsolidate)
                 .putInt("total_turns", totalTurns)
                 .apply()
-        } catch (_: Exception) {}
+        } catch (e: Exception) { AppLogger.e(TAG, "记忆保存失败！数据可能丢失: ${e.message}", e) }
     }
 
-    private fun loadFromStorage() {
+    fun loadFromStorage() {
         try {
             val json = prefs.getString("entries", null) ?: return
             val arr = JSONArray(json)
@@ -455,18 +541,28 @@ class MemoryPool(
             }
             turnsSinceLastConsolidate = prefs.getInt("turns_since_consolidate", 0)
             totalTurns = prefs.getInt("total_turns", 0)
+            val detailJson = prefs.getString("detail_entries", null)
+            if (detailJson != null) {
+                val detailArr = JSONArray(detailJson)
+                detailEntries.clear()
+                for (i in 0 until detailArr.length()) {
+                    val obj = detailArr.getJSONObject(i)
+                    detailEntries.add(MemoryEntry.fromJson(obj))
+                }
+            }
             recalcCharCount()
-        } catch (_: Exception) {
-            entries.clear()
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "记忆加载失败，已清空: ${e.message}", e); entries.clear()
         }
     }
 
     private fun recalcCharCount() {
-        totalCharCount = entries.sumOf { it.content.length }
+        totalCharCount = entries.sumOf { it.content.length } + detailEntries.sumOf { it.content.length }
     }
 
     fun clear() {
         entries.clear()
+        detailEntries.clear()
         totalCharCount = 0
         turnsSinceLastConsolidate = 0
         totalTurns = 0

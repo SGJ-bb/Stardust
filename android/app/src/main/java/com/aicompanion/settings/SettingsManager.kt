@@ -15,6 +15,8 @@ class SettingsManager(context: Context) {
         Context.MODE_PRIVATE
     )
 
+    private var securePrefsAvailable = true
+
     private val securePrefs: SharedPreferences by lazy {
         try {
             val masterKey = MasterKey.Builder(context)
@@ -28,10 +30,13 @@ class SettingsManager(context: Context) {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            Log.w("SettingsManager", "Failed to create EncryptedSharedPreferences, falling back to regular prefs", e)
-            context.getSharedPreferences("companion_prefs_fallback", Context.MODE_PRIVATE)
+            securePrefsAvailable = false
+            com.aicompanion.util.AppLogger.e("SettingsManager", "EncryptedSharedPreferences unavailable: ${e.message}")
+            context.getSharedPreferences("companion_secure_fallback", Context.MODE_PRIVATE)
         }
     }
+
+    fun isSecureStorageAvailable(): Boolean = securePrefsAvailable
 
     var screenRecognitionEnabled: Boolean
         get() = prefs.getBoolean("screen_recognition", false)
@@ -46,6 +51,10 @@ class SettingsManager(context: Context) {
             prefs.edit().putBoolean("voice_recognition", value).apply()
             onVoiceRecognitionChanged?.invoke(value)
         }
+
+    var asrMode: String
+        get() = prefs.getString("asr_mode", com.aicompanion.voice.LocalAsrManager.MODE_CLOUD) ?: com.aicompanion.voice.LocalAsrManager.MODE_CLOUD
+        set(value) { prefs.edit().putString("asr_mode", value).apply() }
 
     var offlineModeEnabled: Boolean
         get() = prefs.getBoolean("offline_mode", false)
@@ -62,6 +71,10 @@ class SettingsManager(context: Context) {
     var ttsEnabled: Boolean
         get() = isTTSEnabled
         set(value) { isTTSEnabled = value }
+
+    var ttsEngineMode: String
+        get() = prefs.getString("tts_engine_mode", com.aicompanion.voice.TtsManager.ENGINE_EDGE) ?: com.aicompanion.voice.TtsManager.ENGINE_EDGE
+        set(value) { prefs.edit().putString("tts_engine_mode", value).apply() }
 
     var offlineMode: Boolean
         get() = offlineModeEnabled
@@ -95,6 +108,14 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("asr_api_url", "") ?: ""
         set(value) { prefs.edit().putString("asr_api_url", value).apply() }
 
+    var asrModel: String
+        get() = prefs.getString("asr_model", "whisper-1") ?: "whisper-1"
+        set(value) { prefs.edit().putString("asr_model", value).apply() }
+
+    var useLocalOcr: Boolean
+        get() = prefs.getBoolean("use_local_ocr", true)
+        set(value) { prefs.edit().putBoolean("use_local_ocr", value).apply() }
+
     var ttsApiUrl: String
         get() = prefs.getString("tts_api_url", "") ?: ""
         set(value) { prefs.edit().putString("tts_api_url", value).apply() }
@@ -102,6 +123,47 @@ class SettingsManager(context: Context) {
     var ttsModel: String
         get() = prefs.getString("tts_model", "tts-1") ?: "tts-1"
         set(value) { prefs.edit().putString("tts_model", value).apply() }
+
+    var ttsVoice: String
+        get() = prefs.getString("tts_voice", "alloy") ?: "alloy"
+        set(value) { prefs.edit().putString("tts_voice", value).apply() }
+
+    var userPersonalityDef: String
+        get() = prefs.getString("user_personality_def", "") ?: ""
+        set(value) { prefs.edit().putString("user_personality_def", value).apply() }
+
+    var aiSummarizedPersonality: String
+        get() = prefs.getString("ai_summarized_personality", "") ?: ""
+        set(value) { prefs.edit().putString("ai_summarized_personality", value).apply() }
+
+    fun getAiSummarizedPersonality(personaId: String): String {
+        if (personaId == "default") return aiSummarizedPersonality
+        return prefs.getString("ai_summarized_personality_$personaId", "") ?: ""
+    }
+
+    fun setAiSummarizedPersonality(personaId: String, value: String) {
+        if (personaId == "default") {
+            aiSummarizedPersonality = value
+        } else {
+            prefs.edit().putString("ai_summarized_personality_$personaId", value).apply()
+        }
+    }
+
+    var lastPersonalitySummaryAffection: Int
+        get() = prefs.getInt("last_personality_summary_affection", 0)
+        set(value) { prefs.edit().putInt("last_personality_summary_affection", value).apply() }
+
+    var screenApiKey: String
+        get() = securePrefs.getString("screen_api_key", "") ?: ""
+        set(value) { securePrefs.edit().putString("screen_api_key", value).apply() }
+
+    var asrApiKey: String
+        get() = securePrefs.getString("asr_api_key", "") ?: ""
+        set(value) { securePrefs.edit().putString("asr_api_key", value).apply() }
+
+    var ttsApiKey: String
+        get() = securePrefs.getString("tts_api_key", "") ?: ""
+        set(value) { securePrefs.edit().putString("tts_api_key", value).apply() }
 
     var llmTemperature: Float
         get() = prefs.getFloat("llm_temperature", 1.05f)
@@ -126,6 +188,10 @@ class SettingsManager(context: Context) {
             prefs.edit().putInt("llm_max_tokens", value.coerceIn(50, limit)).apply()
         }
 
+    var contextTurns: Int
+        get() = prefs.getInt("context_turns", 10)
+        set(value) { prefs.edit().putInt("context_turns", value.coerceIn(5, 50)).apply() }
+
     fun getEffectiveMaxTokensLimit(): Int = ProviderProfile.getMaxTokensLimit(apiProvider)
 
     fun getCurrentProfile(): ProviderProfile = ProviderProfile.getProfile(apiProvider)
@@ -141,6 +207,10 @@ class SettingsManager(context: Context) {
     var emotionAnalysisEnabled: Boolean
         get() = prefs.getBoolean("emotion_analysis_enabled", false)
         set(value) { prefs.edit().putBoolean("emotion_analysis_enabled", value).apply() }
+
+    var llmEmotionAnalysisEnabled: Boolean
+        get() = emotionAnalysisEnabled || prefs.getBoolean("llm_emotion_analysis_enabled", true)
+        set(value) { prefs.edit().putBoolean("llm_emotion_analysis_enabled", value).apply() }
 
     var searchProvider: String
         get() = prefs.getString("search_provider", "duckduckgo") ?: "duckduckgo"
@@ -182,11 +252,15 @@ class SettingsManager(context: Context) {
     // 日记触发模式
     var diaryTriggerMode: DiaryTriggerMode
         get() {
-            val value = prefs.getString("diary_trigger_mode", "messages_50") ?: "messages_50"
+            val value = prefs.getString("diary_trigger_mode", "daily_10pm") ?: "daily_10pm"
             return try {
-                DiaryTriggerMode.valueOf(value.uppercase())
+                when (value.uppercase()) {
+                    "TURNS_75" -> DiaryTriggerMode.MSG_50
+                    "DAILY_10PM_AND_TURNS_75" -> DiaryTriggerMode.DAILY_10PM
+                    else -> DiaryTriggerMode.valueOf(value.uppercase())
+                }
             } catch (e: Exception) {
-                DiaryTriggerMode.MESSAGES_50
+                DiaryTriggerMode.DAILY_10PM
             }
         }
         set(value) {
@@ -338,11 +412,11 @@ enum class LanguageStyle {
 }
 
 enum class DiaryTriggerMode {
-    MANUAL,       // 仅手动
-    MESSAGES_50,  // 每50条消息
-    HOURLY,       // 每小时
-    TWO_HOURS,    // 每2小时
-    DAILY_10PM    // 每晚10点
+    MANUAL,
+    MSG_50,
+    HOURLY,
+    EVERY_2H,
+    DAILY_10PM
 }
 
 data class ScheduledWake(

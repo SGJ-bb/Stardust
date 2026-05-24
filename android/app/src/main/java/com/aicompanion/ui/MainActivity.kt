@@ -57,6 +57,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.lifecycle.lifecycleScope
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -76,7 +77,9 @@ data class ChatMessage(
     var isPartial: Boolean = false,
     var isFavorited: Boolean = false,
     var reactionEmoji: String = "",
-    val stickerPath: String? = null
+    val stickerPath: String? = null,
+    var audioPath: String? = null,
+    var audioUrl: String? = null
 )
 
 class MainActivity : AppCompatActivity() {
@@ -93,6 +96,8 @@ class MainActivity : AppCompatActivity() {
     private var etMessage: EditText? = null
     private var btnSend: ImageButton? = null
     private var btnVoice: ImageButton? = null
+    private var isVoiceRecording = false
+    private var voiceWaveformOverlay: View? = null
     private var btnSettings: ImageButton? = null
     private var btnStickerChat: ImageButton? = null
     private var btnImageUpload: ImageButton? = null
@@ -110,6 +115,7 @@ class MainActivity : AppCompatActivity() {
     private var apiClient: ApiClient? = null
     private var chatAdapter: ChatAdapter? = null
     private var voiceManager: VoiceManager? = null
+    private var ttsManager: com.aicompanion.voice.TtsManager? = null
     private var proactiveEngine: ProactiveInteractionEngine? = null
     private var momentsManager: com.aicompanion.memory.MemorableMomentsManager? = null
     private var systemMonitor: com.aicompanion.services.SystemMonitor? = null
@@ -120,6 +126,9 @@ class MainActivity : AppCompatActivity() {
     private var favoriteManager: FavoriteManager? = null
     private var nicknameManager: NicknameManager? = null
     private var chatBubblePopup: ChatBubblePopup? = null
+    private var cachedAiName: String? = null
+    private var cachedAiAvatarPath: String? = null
+    private var emotionAnalyzer: com.aicompanion.emotion.EmotionAnalyzer? = null
 
     private var scrollPredictions: HorizontalScrollView? = null
     private var layoutPredictions: LinearLayout? = null
@@ -127,6 +136,8 @@ class MainActivity : AppCompatActivity() {
 
     private val messages = mutableListOf<ChatMessage>()
     private val messageScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val memoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val chatStorage by lazy { com.aicompanion.storage.ChatHistoryStorage(this) }
     private val handler = Handler(Looper.getMainLooper())
     private var isInForeground = false
     private var quotedMessage: ChatMessage? = null
@@ -144,6 +155,7 @@ class MainActivity : AppCompatActivity() {
     private var focusRunnable: Runnable? = null
     private var proactiveRunnable: Runnable? = null
     private var virtualWorldRunnable: Runnable? = null
+    private var diaryRunnable: Runnable? = null
 
     private var currentUserMood = ""
     private var currentUserMoodName = ""
@@ -204,6 +216,9 @@ class MainActivity : AppCompatActivity() {
                 AppContainer.setSearchMemoryCallback { query, topK ->
                     searchMemory(query, topK)
                 }
+                AppContainer.setSearchDiaryCallback { query, topK ->
+                    searchDiary(query, topK)
+                }
                 AppContainer.setStickerCallback { stickerPath ->
                     runOnUiThread {
                         addStickerMessage("ai", stickerPath)
@@ -228,12 +243,13 @@ class MainActivity : AppCompatActivity() {
             initStep("NicknameManager") { nicknameManager = NicknameManager(this) }
             initStep("ChatBubblePopup") { chatBubblePopup = ChatBubblePopup(this) }
             initStep("VoiceManager") { voiceManager = VoiceManager(this) }
+            initStep("TtsManager") { ttsManager = com.aicompanion.voice.TtsManager(this) }
             initStep("ProactiveEngine") { proactiveEngine = ProactiveInteractionEngine(settingsManager!!) }
             initStep("ApiClient") { rebuildApiClient() }
             initStep("PersonaCompress") { initPersonaCompression() }
             initStep("ChatAdapter") { initChatAdapter() }
             initStep("LoadAvatar") { loadAiAvatar() }
-            initStep("Live2DSettings") { if (settingsManager?.live2dEnabled == true) loadLive2DSettings() else hideLive2DView() }
+            initStep("Live2DSettings") { if (settingsManager?.live2dEnabled == true) { loadLive2DSettings() } else { hideLive2DView() } }
             initStep("Live2DModel") { if (settingsManager?.live2dEnabled == true) loadLive2DModel() }
             initStep("ClickListeners") { setupClickListeners() }
             initStep("ApplyTheme") { applyTheme() }
@@ -245,7 +261,13 @@ class MainActivity : AppCompatActivity() {
             initStep("VirtualWorld") { scheduleVirtualWorldTick() }
             initStep("DiaryTimer") { scheduleDiaryTimer() }
             initStep("BatteryOptimization") { requestBatteryOptimization() }
-            initStep("EntranceAnim") { animateEntrance() }
+            initStep("EntranceAnim") { }
+
+            messageScope.launch(Dispatchers.IO) {
+                try {
+                    com.aicompanion.prompt.PromptBuilder.buildIdentity(this@MainActivity, activePersonaId)
+                } catch (e: Exception) { com.aicompanion.util.AppLogger.e(TAG, "buildIdentity预热失败: ${e.message}", e) }
+            }
         } catch (e: Exception) {
             fatal("onCreate", e)
         }
@@ -267,7 +289,7 @@ class MainActivity : AppCompatActivity() {
                         data = android.net.Uri.parse("package:$packageName")
                     }
                     startActivity(intent)
-                } catch (_: Exception) {}
+                } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "requestBatteryOptimization: ${e.message}") }
             }
         }
     }
@@ -350,17 +372,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun animateEntrance() {
-        val toolbar = findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)
-        val inputBar = findViewById<LinearLayout>(R.id.layout_input)
-        toolbar?.let {
-            com.aicompanion.anim.AnimeUtils.slideInFromBottom(it, delay = 100, duration = 500)
-        }
-        inputBar?.let {
-            com.aicompanion.anim.AnimeUtils.slideInFromBottom(it, delay = 200, duration = 500)
-        }
-        ivAiAvatarSmall?.let {
-            com.aicompanion.anim.AnimeUtils.bounceIn(it, delay = 300)
-        }
     }
 
     private fun initViews() {
@@ -373,6 +384,19 @@ class MainActivity : AppCompatActivity() {
         btnStickerChat = findViewById(R.id.btn_sticker_chat)
     btnImageUpload = findViewById(R.id.btn_image_upload)
     btnMore = findViewById(R.id.btn_more)
+
+        findViewById<View>(R.id.btn_phone_call)?.setOnClickListener {
+            try {
+                val intent = Intent(this, com.aicompanion.ui.PhoneCallActivity::class.java)
+                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_PERSONA_ID, activePersonaId)
+                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_PERSONA_NAME, cachedAiName ?: "星尘")
+                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_SCOPE, "persona")
+                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_SCOPE_ID, activePersonaId)
+                startActivity(intent)
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e(TAG, "phoneCall: ${e.message}")
+            }
+        }
         tvWeather = findViewById(R.id.tv_weather)
         tvDaysLabel = findViewById(R.id.tv_days_label)
         progressAffection = findViewById(R.id.progress_affection)
@@ -406,6 +430,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun initChatAdapter() {
         chatAdapter = ChatAdapter(messages)
+        chatAdapter?.cacheSkinSettings(this)
 
         val personaId = intent.getStringExtra("persona_id")
         if (!personaId.isNullOrEmpty()) {
@@ -420,6 +445,12 @@ class MainActivity : AppCompatActivity() {
         recyclerChat?.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = chatAdapter
+            itemAnimator = null
+            setItemViewCacheSize(4)
+            setHasFixedSize(true)
+            isNestedScrollingEnabled = true
+            recycledViewPool.setMaxRecycledViews(0, 8)
+            recycledViewPool.setMaxRecycledViews(1, 8)
         }
 
         chatAdapter?.onFeedback = { position, isLike ->
@@ -485,6 +516,15 @@ class MainActivity : AppCompatActivity() {
                 saveChatHistory()
             }
         }
+
+        chatAdapter?.ttsManager = ttsManager
+        chatAdapter?.onPlayVoice = { msg ->
+            if (ttsManager?.isPlaying == true) {
+                ttsManager?.stopPlayback()
+            } else {
+                ttsManager?.playAudio(msg.audioPath, msg.audioUrl)
+            }
+        }
     }
 
     private fun loadLive2DSettings() {
@@ -498,12 +538,9 @@ class MainActivity : AppCompatActivity() {
         live2dView?.visibility = View.GONE
     }
 
-    private fun showLive2DView() {
-        live2dView?.visibility = View.VISIBLE
-    }
-
     private fun loadLive2DModel() {
         val webView = live2dView ?: return
+        webView.visibility = View.VISIBLE
 
         webView.setOnModelInfo { width, height, baseScale ->
             modelNaturalW = width
@@ -559,7 +596,7 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "loadLive2DModel failed: ${e.message}", e)
-            try { webView.loadLive2DModelFromAssets("vtuber/PurpleBird/PurpleBird.model3.json") } catch (_: Exception) {}
+            try { webView.loadLive2DModelFromAssets("vtuber/PurpleBird/PurpleBird.model3.json") } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "loadLive2DModel: ${e.message}") }
         }
     }
 
@@ -648,7 +685,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        btnSend?.setOnClickListener { com.aicompanion.anim.AnimeUtils.pulse(it); sendMessage() }
+        btnSend?.setOnClickListener { sendMessage() }
 
         etMessage?.setOnKeyListener { _, keyCode, event ->
             if (keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_UP) {
@@ -657,42 +694,29 @@ class MainActivity : AppCompatActivity() {
             } else false
         }
 
-        btnVoice?.setOnLongClickListener {
-            try {
-                voiceManager?.startListening { text ->
-                    if (isDestroyed) return@startListening
-                    runOnUiThread { etMessage?.setText(text); sendMessage() }
-                }
-            } catch (_: Exception) {}
-            true
-        }
-
-        btnVoice?.setOnTouchListener { _, event ->
-            when (event.action) {
-                android.view.MotionEvent.ACTION_UP -> { try { voiceManager?.stopListening() } catch (_: Exception) {} ; true }
-                else -> false
+        btnVoice?.setOnClickListener {
+            if (isVoiceRecording) {
+                stopVoiceRecording()
+            } else {
+                startVoiceRecording()
             }
         }
 
         btnSettings?.setOnClickListener {
-            com.aicompanion.anim.AnimeUtils.pulse(it)
             try { startActivity(Intent(this, SettingsActivity::class.java)) } catch (e: Exception) {
                 Toast.makeText(this, "无法打开设置", Toast.LENGTH_SHORT).show()
             }
         }
 
         findViewById<View>(R.id.btn_moments)?.setOnClickListener {
-            com.aicompanion.anim.AnimeUtils.pulse(it)
             startActivity(Intent(this, com.aicompanion.moments.MomentsActivity::class.java))
         }
 
         findViewById<View>(R.id.btn_diary)?.setOnClickListener {
-            com.aicompanion.anim.AnimeUtils.pulse(it)
             startActivity(Intent(this, com.aicompanion.ui.DiaryActivity::class.java))
         }
 
         btnStickerChat?.let { btn ->
-            com.aicompanion.anim.AnimeUtils.setupTouchScale(btn)
             btn.setOnClickListener {
                 try {
                     startActivityForResult(
@@ -711,16 +735,14 @@ class MainActivity : AppCompatActivity() {
             startActivityForResult(intent, REQUEST_IMAGE_UPLOAD)
         }
         btnMore?.let { btn ->
-            com.aicompanion.anim.AnimeUtils.setupTouchScale(btn)
             btn.setOnClickListener { showFeaturePanel() }
         }
         ivAiAvatarSmall?.setOnClickListener {
-            com.aicompanion.anim.AnimeUtils.pulse(it)
             try {
                 val intent = Intent(this, ProfileActivity::class.java)
                 intent.putExtra("persona_id", activePersonaId)
                 startActivity(intent)
-            } catch (_: Exception) {}
+            } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "setupClickListeners: ${e.message}") }
         }
 
         chatAdapter?.onFeedback = { position, isLike ->
@@ -769,7 +791,7 @@ class MainActivity : AppCompatActivity() {
                 FeatureItem(R.drawable.ic_write, "AI写日记", 9),
                 FeatureItem(R.drawable.ic_focus, "专注计时", 3),
                 FeatureItem(R.drawable.ic_model, "切换皮套", 4),
-                FeatureItem(R.drawable.ic_background, "更换背景", 5),
+                FeatureItem(R.drawable.ic_background, "换壁纸", 5),
                 FeatureItem(R.drawable.ic_log, "运行日志", 6),
                 FeatureItem(R.drawable.ic_help, "操作教程", 7),
                 FeatureItem(R.drawable.ic_robot, "手机自动化", 8),
@@ -777,6 +799,7 @@ class MainActivity : AppCompatActivity() {
                 FeatureItem(R.drawable.ic_refresh, "新会话", 11),
                 FeatureItem(R.drawable.ic_emoji, "表情包", 12),
                 FeatureItem(android.R.drawable.ic_menu_gallery, "皮肤商店", 13),
+                FeatureItem(R.drawable.ic_log, "聊天记录", 14),
                 FeatureItem(android.R.drawable.ic_menu_delete, "清空记录", 99)
             )
 
@@ -809,10 +832,10 @@ class MainActivity : AppCompatActivity() {
                         bottomSheet.dismiss()
                         when (feature.index) {
                             0 -> performCheckIn()
-                            1 -> try { startActivity(Intent(this@MainActivity, AchievementActivity::class.java)) } catch (_: Exception) {}
-                            2 -> try { startActivity(Intent(this@MainActivity, DiaryActivity::class.java)) } catch (_: Exception) {}
+                            1 -> try { startActivity(Intent(this@MainActivity, AchievementActivity::class.java)) } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "showFeaturePanel: ${e.message}") }
+                            2 -> try { startActivity(Intent(this@MainActivity, DiaryActivity::class.java)) } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "showFeaturePanel: ${e.message}") }
                             3 -> if (focusActive) cancelFocusTimer() else startFocusTimer()
-                            4 -> try { startActivity(Intent(this@MainActivity, ModelManagerActivity::class.java)) } catch (_: Exception) {}
+                            4 -> try { startActivity(Intent(this@MainActivity, ModelManagerActivity::class.java)) } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "showFeaturePanel: ${e.message}") }
                             5 -> pickBackgroundImage()
                             6 -> showLogViewer()
                             7 -> showTutorial()
@@ -822,17 +845,25 @@ class MainActivity : AppCompatActivity() {
                                 val intent = Intent(this@MainActivity, MemoryPoolActivity::class.java)
                                 intent.putExtra("persona_id", activePersonaId)
                                 startActivity(intent)
-                            } catch (_: Exception) {}
+                            } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "showFeaturePanel: ${e.message}") }
                             11 -> showNewSessionDialog()
                             12 -> startActivity(Intent(this@MainActivity, com.aicompanion.sticker.StickerActivity::class.java))
                             13 -> startActivity(Intent(this@MainActivity, com.aicompanion.ui.SkinShopActivity::class.java))
+                            14 -> try {
+                                val intent = Intent(this@MainActivity, com.aicompanion.ui.ChatHistoryActivity::class.java)
+                                intent.putExtra("scope", "persona")
+                                intent.putExtra("scopeId", activePersonaId)
+                                intent.putExtra("scopeName", cachedAiName ?: "星尘")
+                                startActivity(intent)
+                            } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "showFeaturePanel: ${e.message}") }
                             99 -> {
                                 android.app.AlertDialog.Builder(this@MainActivity)
                                     .setTitle("清空聊天记录")
                                     .setMessage("确定要清空所有聊天记录吗？此操作不可撤销。")
                                     .setPositiveButton("清空") { _, _ ->
+                                        val oldSize = messages.size
                                         messages.clear()
-                                        chatAdapter?.notifyDataSetChanged()
+                                        chatAdapter?.notifyItemRangeRemoved(0, oldSize)
                                         saveChatHistory()
                                         Toast.makeText(this@MainActivity, "聊天记录已清空", Toast.LENGTH_SHORT).show()
                                     }
@@ -855,9 +886,156 @@ class MainActivity : AppCompatActivity() {
         bottomSheet.show()
     }
 
+    private fun startVoiceRecording() {
+        isVoiceRecording = true
+        btnVoice?.alpha = 0.5f
+        btnVoice?.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF4CAF50.toInt())
+        showVoiceWaveformOverlay()
+
+        try {
+            val asrManager = com.aicompanion.voice.LocalAsrManager(this)
+            asrManager.setListener(object : com.aicompanion.voice.AsrListener {
+                override fun onPartialResult(text: String) {
+                    runOnUiThread { etMessage?.setHint("识别中: $text") }
+                }
+                override fun onFinalResult(text: String) {
+                    runOnUiThread {
+                        stopVoiceRecording()
+                        if (text.isNotBlank()) {
+                            etMessage?.setText(text)
+                            etMessage?.setHint("输入消息...")
+                            sendMessage()
+                        } else {
+                            android.widget.Toast.makeText(this@MainActivity, "未识别到语音内容", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    asrManager.cleanup()
+                }
+                override fun onError(error: String) {
+                    runOnUiThread {
+                        stopVoiceRecording()
+                        etMessage?.setHint("输入消息...")
+                        android.widget.Toast.makeText(this@MainActivity, "语音识别: $error", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    asrManager.cleanup()
+                }
+                override fun onReady() {
+                    runOnUiThread { etMessage?.setHint("正在聆听...") }
+                }
+                override fun onEndOfSpeech() {
+                    runOnUiThread { etMessage?.setHint("识别中...") }
+                }
+            })
+            asrManager.startListening()
+        } catch (e: Exception) {
+            stopVoiceRecording()
+            com.aicompanion.util.AppLogger.e(TAG, "语音识别启动失败: ${e.message}", e)
+        }
+    }
+
+    private fun stopVoiceRecording() {
+        isVoiceRecording = false
+        btnVoice?.alpha = 1.0f
+        btnVoice?.backgroundTintList = null
+        hideVoiceWaveformOverlay()
+    }
+
+    private fun showVoiceWaveformOverlay() {
+        try {
+            val rootView = findViewById<android.view.View>(android.R.id.content) ?: return
+            val parent = rootView as? android.view.ViewGroup ?: return
+
+            if (voiceWaveformOverlay != null) {
+                voiceWaveformOverlay?.visibility = android.view.View.VISIBLE
+                return
+            }
+
+            val density = resources.displayMetrics.density
+            val overlay = android.widget.FrameLayout(this).apply {
+                setBackgroundColor(0xDD0A0A1A.toInt())
+                val size = (280 * density).toInt()
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    (200 * density).toInt(),
+                    android.view.Gravity.BOTTOM
+                )
+                setPadding(0, (16 * density).toInt(), 0, (16 * density).toInt())
+            }
+
+            val waveformView = VoiceWaveformBarView(this).apply {
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    (120 * density).toInt()
+                )
+            }
+            overlay.addView(waveformView)
+
+            val tvHint = android.widget.TextView(this).apply {
+                text = "🎤 正在录音，点击麦克风停止"
+                setTextColor(0xFF81D4FA.toInt())
+                textSize = 13f
+                gravity = android.view.Gravity.CENTER
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+            overlay.addView(tvHint)
+
+            parent.addView(overlay)
+            voiceWaveformOverlay = overlay
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.e(TAG, "showVoiceWaveformOverlay: ${e.message}")
+        }
+    }
+
+    private fun hideVoiceWaveformOverlay() {
+        try {
+            voiceWaveformOverlay?.visibility = android.view.View.GONE
+        } catch (_: Exception) {}
+    }
+
+    class VoiceWaveformBarView(context: android.content.Context) : android.view.View(context) {
+        private var phase = 0f
+        private val barCount = 50
+        private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        private val barWidth = 3f * resources.displayMetrics.density
+        private val barGap = 2f * resources.displayMetrics.density
+
+        override fun onDraw(canvas: android.graphics.Canvas) {
+            super.onDraw(canvas)
+            val w = width.toFloat()
+            val h = height.toFloat()
+            val totalWidth = barCount * (barWidth + barGap)
+            val startX = (w - totalWidth) / 2f
+            val centerY = h / 2f
+
+            phase += 0.1f
+
+            for (i in 0 until barCount) {
+                val x = startX + i * (barWidth + barGap)
+                val normalizedPos = (i.toFloat() / barCount - 0.5f) * 2f
+                val wave1 = Math.sin((i * 0.4 + phase * 3.0).toDouble()).toFloat()
+                val wave2 = Math.sin((i * 0.8 + phase * 2.2).toDouble()).toFloat()
+                val envelope = 1f - normalizedPos * normalizedPos
+                val amplitude = (h * 0.35f * envelope * (0.3f + 0.7f * Math.abs(wave1 + wave2 * 0.4f)))
+                    .coerceIn(4f * resources.displayMetrics.density, h * 0.4f)
+
+                val alpha = (0.4f + 0.6f * (amplitude / (h * 0.4f))).coerceIn(0f, 1f)
+                paint.color = android.graphics.Color.argb((alpha * 255).toInt(), 0x64, 0xFF, 0xDA)
+
+                val rect = android.graphics.RectF(x, centerY - amplitude / 2, x + barWidth, centerY + amplitude / 2)
+                canvas.drawRoundRect(rect, barWidth / 2, barWidth / 2, paint)
+            }
+
+            postInvalidateDelayed(66)
+        }
+    }
+
     private fun sendMessage() {
         val text = etMessage?.text?.toString()?.trim() ?: ""
         if (text.isEmpty()) return
+        com.aicompanion.util.AppLogger.d(TAG, "sendMessage: 用户发送 '${text.take(50)}'")
         etMessage?.text?.clear()
         scrollPredictions?.visibility = View.GONE
 
@@ -876,6 +1054,8 @@ class MainActivity : AppCompatActivity() {
         chatAdapter?.notifyItemInserted(messages.size - 1)
         recyclerChat?.scrollToPosition(messages.size - 1)
         statsManager?.recordUserMessage(text)
+        saveChatHistory()
+        saveMessageToFile(messages.last())
 
         affectionManager?.addMessage()
         affectionManager?.evaluateUserBehavior(text, currentUserMoodName.let { nm ->
@@ -969,28 +1149,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAiMomentTrigger() {
-        val momentsMgr = com.aicompanion.moments.MomentsManager(this)
-        momentsMgr.loadMoments()
         val apiClient = AppContainer.apiClient ?: return
-
-        val pm = com.aicompanion.persona.PersonaManager(this)
-        pm.load()
-        val allPersonas = pm.getAllPersonas()
-        if (allPersonas.isEmpty()) return
-
-        val postingPersona = allPersonas.random()
-        val prefs = getSharedPreferences("persona_data_${postingPersona.id}", MODE_PRIVATE)
-        val am = com.aicompanion.affection.AffectionManager(this, postingPersona.id)
+        val am = affectionManager ?: return
         val affectionLevel = am.affectionLevel
 
+        val momentsMgr = com.aicompanion.moments.MomentsManager(this)
         if (!momentsMgr.shouldAiPost(affectionLevel)) return
 
-        val name = postingPersona.name
+        val personaPrefs = getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
+        val name = personaPrefs.getString("persona_name", null)
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("ai_name", "星尘") ?: "星尘"
         val prompt = buildString {
             append("你是「$name」。")
-            postingPersona.personality.takeIf { it.isNotBlank() }?.let { append("\n性格：$it") }
-            postingPersona.speechStyle.takeIf { it.isNotBlank() }?.let { append("\n说话风格：$it") }
-            prefs.getString("persona_desc", "")?.takeIf { it.isNotBlank() }?.let { append("\n简介：$it") }
+            personaPrefs.getString("persona_personality", "")?.takeIf { it.isNotBlank() }?.let { append("\n性格：$it") }
+            personaPrefs.getString("persona_speech_style", "")?.takeIf { it.isNotBlank() }?.let { append("\n说话风格：$it") }
+            personaPrefs.getString("persona_desc", "")?.takeIf { it.isNotBlank() }?.let { append("\n简介：$it") }
         }
 
         messageScope.launch {
@@ -999,7 +1172,7 @@ class MainActivity : AppCompatActivity() {
                 name,
                 prompt,
                 affectionLevel,
-                postingPersona.id
+                activePersonaId
             )
         }
     }
@@ -1046,17 +1219,20 @@ class MainActivity : AppCompatActivity() {
         if (avatarPath?.isNotEmpty() == true) {
             val file = File(avatarPath)
             if (file.exists()) {
-                try {
-                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeFile(avatarPath, options)
-                    options.inSampleSize = calculateSampleSize(options.outWidth, options.outHeight, 96, 96)
-                    options.inJustDecodeBounds = false
-                    val bitmap = BitmapFactory.decodeFile(avatarPath, options)
-                    ivAiAvatarSmall?.setImageBitmap(bitmap)
-                } catch (e: Exception) {
-                    try {
-                        ivAiAvatarSmall?.setImageBitmap(BitmapFactory.decodeFile(avatarPath))
-                    } catch (_: Exception) {}
+                val path = avatarPath
+                messageScope.launch {
+                    val bitmap = withContext(Dispatchers.IO) {
+                        try {
+                            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            BitmapFactory.decodeFile(path, options)
+                            options.inSampleSize = calculateSampleSize(options.outWidth, options.outHeight, 96, 96)
+                            options.inJustDecodeBounds = false
+                            BitmapFactory.decodeFile(path, options)
+                        } catch (_: Exception) {
+                            try { BitmapFactory.decodeFile(path) } catch (_: Exception) { null }
+                        }
+                    }
+                    bitmap?.let { ivAiAvatarSmall?.setImageBitmap(it) }
                 }
             }
         }
@@ -1075,6 +1251,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendToLLM(message: String) {
+        com.aicompanion.util.AppLogger.d(TAG, "sendToLLM: 开始处理消息 '${message.take(50)}'")
+
         if (com.aicompanion.safety.ContentSafetyFilter.shouldBlock(this, message)) {
             addPetMessage(com.aicompanion.safety.ContentSafetyFilter.getRefusalResponse(), com.aicompanion.models.Emotion.NEUTRAL, com.aicompanion.models.Action.IDLE)
             return
@@ -1083,9 +1261,12 @@ class MainActivity : AppCompatActivity() {
         val client = apiClient
         val sm = settingsManager
         if (client == null || sm == null) {
+            com.aicompanion.util.AppLogger.e(TAG, "sendToLLM: apiClient=${client != null}, settingsManager=${sm != null}")
             addPetMessage("请先在设置中配置 API 哦~", Emotion.NEUTRAL, Action.IDLE)
             return
         }
+
+        com.aicompanion.util.AppLogger.d(TAG, "sendToLLM: apiClient已就绪, url=${sm.chatApiUrl.take(30)}, model=${sm.chatModel}")
 
         setLoading(true)
         chatAdapter?.setTypingIndicator(true)
@@ -1096,15 +1277,20 @@ class MainActivity : AppCompatActivity() {
 
         messageScope.launch {
             try {
+                com.aicompanion.util.AppLogger.d(TAG, "sendToLLM: 协程启动，开始获取角色信息")
                 val persona = getPersonaInfo(message)
+                com.aicompanion.util.AppLogger.d(TAG, "sendToLLM: 角色信息获取完成, name=${persona.first}")
                 val memories = emptyList<String>()
-                val history = messages.takeLast(10).filter { it.text.length < 500 }.map { it.isUser to it.text }
+                val ctxHistory = contextManager?.getRecentTurnsAsPairs() ?: emptyList()
+                val history = if (ctxHistory.isNotEmpty()) ctxHistory
+                              else messages.takeLast(settingsManager?.contextTurns ?: 10).filter { it.text.length < 500 }.map { it.isUser to it.text }
                 val tools = actionMgr?.getToolDefinitions() ?: emptyList()
+                com.aicompanion.util.AppLogger.d(TAG, "sendToLLM: history=${history.size}条, tools=${tools.size}个")
 
                 var emotionParams = EmotionParams()
                 if (sm.emotionAnalysisEnabled && client.chatApiUrl.isNotBlank()) {
                     try {
-                        val analyzer = EmotionAnalyzer(client)
+                        val analyzer = emotionAnalyzer ?: com.aicompanion.emotion.EmotionAnalyzer(client).also { emotionAnalyzer = it }
                         emotionParams = withContext(Dispatchers.IO) {
                             analyzer.analyzeEmotion(
                                 personaName = persona.first,
@@ -1142,6 +1328,7 @@ class MainActivity : AppCompatActivity() {
                 val overrideTopP = if (sm.emotionAnalysisEnabled) emotionParams.applyToTopP(sm.llmTopP) else null
 
                 val response = if (tools.isNotEmpty()) {
+                    com.aicompanion.util.AppLogger.d(TAG, "sendToLLM: 调用sendChatWithToolLoop")
                     withContext(Dispatchers.IO) {
                         client.sendChatWithToolLoop(
                             sm.userId, message, persona.first, persona.second + nicknameContext,
@@ -1149,15 +1336,18 @@ class MainActivity : AppCompatActivity() {
                         ) { name, args -> actionMgr!!.executeTool(name, args) }
                     }
                 } else {
+                    com.aicompanion.util.AppLogger.d(TAG, "sendToLLM: 调用sendChat")
                     withContext(Dispatchers.IO) {
                         client.sendChat(
                             sm.userId, message, persona.first, persona.second,
-                            currentUserMoodName, "idle", memories, "", false, systemContext, history,
+                            currentUserMoodName, "idle", memories, "", systemContext, history,
                             overrideTemperature = overrideTemp,
                             overrideTopP = overrideTopP
                         )
                     }
                 }
+
+                com.aicompanion.util.AppLogger.d(TAG, "sendToLLM: API响应=${response != null}, errorMsg=${response?.errorMessage}")
 
                 chatAdapter?.setTypingIndicator(false)
 
@@ -1170,24 +1360,33 @@ class MainActivity : AppCompatActivity() {
                         val chunks = humanizer.humanize(rawText, isComplex)
 
                         if (chunks.isEmpty()) {
-                            addPetMessage(rawText, response.emotion, response.action)
+                            if (rawText.isNotBlank()) {
+                                addPetMessage(rawText, response.emotion, response.action)
+                                if (sm.isTTSEnabled) {
+                                    val msg = messages.lastOrNull { !it.isUser }
+                                    if (msg != null) triggerTtsAndPlay(rawText, response.emotion, msg)
+                                }
+                            } else {
+                                com.aicompanion.util.AppLogger.w(TAG, "sendToLLM: API响应成功但回复内容为空")
+                                addPetMessage("嗯...我好像走神了，能再说一次吗？", Emotion.NEUTRAL, Action.IDLE)
+                            }
                         } else {
                             for (i in chunks.indices) {
                                 val chunk = chunks[i]
+                                if (chunk.text.isBlank()) continue
                                 if (i > 0) delay(chunk.delayMs)
                                 val emot = if (chunk.isThinking) Emotion.NEUTRAL else response.emotion
                                 val act = if (chunk.isThinking) Action.IDLE else response.action
                                 addPetMessage(chunk.text, emot, act)
+                                if (i == 0 && sm.isTTSEnabled) {
+                                    val firstMsg = messages.lastOrNull { !it.isUser }
+                                    if (firstMsg != null) {
+                                        triggerTtsAndPlay(rawText, response.emotion, firstMsg)
+                                    }
+                                }
                             }
                         }
 
-                        if (sm.isTTSEnabled && response.audioUrl != null) {
-                            voiceManager?.playSpeech(response.audioUrl, response.emotion)
-                        } else if (sm.isTTSEnabled) {
-                            val pitchOffset = if (sm.emotionAnalysisEnabled) emotionParams.ttsPitchOffset else 0f
-                            val rateOffset = if (sm.emotionAnalysisEnabled) emotionParams.ttsRateOffset else 0f
-                            voiceManager?.speak(rawText, response.emotion, pitchOffset, rateOffset)
-                        }
                         updatePetDisplay(response)
 
                         tryAttachVirtualWorldImage(message)
@@ -1195,8 +1394,9 @@ class MainActivity : AppCompatActivity() {
                         contextManager?.addTurn(message, rawText)
 
                         triggerPredictions()
+                        checkTurnsDiaryTrigger()
 
-                        launch(Dispatchers.IO) {
+                        memoryScope.launch {
                             try {
                                 contextManager?.evaluateAndUpdateMemory(client)
                             } catch (e: Exception) {
@@ -1205,7 +1405,7 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         if (contextManager?.needsCompression() == true) {
-                            launch(Dispatchers.IO) {
+                            memoryScope.launch {
                                 contextManager?.compress()
                             }
                         }
@@ -1224,11 +1424,15 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 chatAdapter?.setTypingIndicator(false)
-                logHistory.add("[ERROR] ${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())} sendToLLM: ${e.message}")
-                addPetMessage("出错了: ${e.message}", Emotion.SAD, Action.IDLE)
+                com.aicompanion.util.AppLogger.e(TAG, "sendToLLm error: ${e.javaClass.simpleName}: ${e.message}", e)
+                if (!isFinishing && !isDestroyed) {
+                    addPetMessage("出错了: ${e.message}", Emotion.SAD, Action.IDLE)
+                }
                 Log.e(TAG, "sendToLLM error: ${e.message}", e)
             } finally {
-                setLoading(false)
+                if (!isFinishing && !isDestroyed) {
+                    setLoading(false)
+                }
             }
         }
     }
@@ -1290,12 +1494,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addPetMessage(text: String, emotion: Emotion, action: Action) {
+        if (isFinishing || isDestroyed) return
         val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val cleanText = text.replace(Regex("\\[\\[emotion:\\w+\\]\\]", RegexOption.IGNORE_CASE), "").trim()
+        if (cleanText.isBlank()) return
+        com.aicompanion.util.AppLogger.d(TAG, "addPetMessage: AI回复 '${cleanText.take(50)}', emotion=${emotion.name}")
         messages.add(ChatMessage(text = cleanText, time = time, isUser = false, emotion = emotion, timestamp = System.currentTimeMillis()))
         chatAdapter?.notifyItemInserted(messages.size - 1)
         recyclerChat?.scrollToPosition(messages.size - 1)
         saveChatHistory()
+        saveMessageToFile(messages.last())
         statsManager?.recordAiMessage(cleanText)
         statsManager?.recordEmotion(emotion.name)
 
@@ -1305,15 +1513,57 @@ class MainActivity : AppCompatActivity() {
             live2dView?.visibility = View.GONE
         }
 
-        val aiName = getSharedPreferences("app_prefs", MODE_PRIVATE)
-            .getString("ai_name", "星尘") ?: "星尘"
-        val avatarPath = getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
-            .getString("persona_avatar_path", "") ?: ""
+        val aiName = cachedAiName ?: getSharedPreferences("app_prefs", MODE_PRIVATE)
+            .getString("ai_name", "星尘").also { cachedAiName = it } ?: "星尘"
+        val avatarPath = cachedAiAvatarPath ?: getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
+            .getString("persona_avatar_path", "").also { cachedAiAvatarPath = it } ?: ""
 
         chatBubblePopup?.show(aiName, cleanText, avatarPath.ifBlank { null })
 
         if (!hasWindowFocus()) {
             systemMonitor?.showAiMessageNotification(aiName, cleanText)
+        }
+    }
+
+    private fun triggerTtsAndPlay(text: String, emotion: Emotion, message: ChatMessage) {
+        val tm = ttsManager ?: return
+        val engineMode = tm.engineMode
+
+        if (engineMode == com.aicompanion.voice.TtsManager.ENGINE_LOCAL ||
+            (engineMode == com.aicompanion.voice.TtsManager.ENGINE_AUTO && !tm.isCloudConfigured)) {
+            voiceManager?.speak(text, emotion)
+            return
+        }
+
+        memoryScope.launch {
+            try {
+                val result = tm.synthesize(text, emotion)
+                if (result.success && (result.audioPath != null || result.audioUrl != null)) {
+                    message.audioPath = result.audioPath
+                    message.audioUrl = result.audioUrl
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (!isFinishing && !isDestroyed) {
+                            val idx = messages.indexOf(message)
+                            if (idx >= 0) chatAdapter?.notifyItemChanged(idx, "audio")
+                            tm.playAudio(result.audioPath, result.audioUrl)
+                        }
+                    }
+                } else if (!result.success) {
+                    com.aicompanion.util.AppLogger.w(TAG, "TTS失败(${engineMode})，回退本地: ${result.error}")
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (!isFinishing && !isDestroyed) {
+                            voiceManager?.speak(text, emotion)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e(TAG, "triggerTtsAndPlay: ${e.message}")
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (!isFinishing && !isDestroyed) {
+                        voiceManager?.speak(text, emotion)
+                    }
+                }
+            }
         }
     }
 
@@ -1340,7 +1590,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getPersonaInfo(query: String = ""): Pair<String, String> {
+    private suspend fun getPersonaInfo(query: String = ""): Pair<String, String> {
         val personaId = intent.getStringExtra("persona_id")
             ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default")
             ?: "default"
@@ -1365,13 +1615,17 @@ class MainActivity : AppCompatActivity() {
             if (query.isNotBlank() && RagConfig.personaRagEnabled) {
                 checkAndRebuildPersonaIndex()
                 if (personaRagManager?.isReady() == true) {
-                    val ragChunks = personaRagManager!!.retrieveSync(query, 3)
-                    if (ragChunks.isNotEmpty()) {
-                        append("\n\n[相关设定]")
-                        for (chunk in ragChunks) {
-                            append("\n$chunk")
+                    try {
+                        val ragChunks = withContext(Dispatchers.IO) {
+                            personaRagManager!!.retrieveSync(query, 3)
                         }
-                    }
+                        if (ragChunks.isNotEmpty()) {
+                            append("\n\n[相关设定]")
+                            for (chunk in ragChunks) {
+                                append("\n$chunk")
+                            }
+                        }
+                    } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "getPersonaInfo: ${e.message}") }
                 }
             }
 
@@ -1386,11 +1640,9 @@ class MainActivity : AppCompatActivity() {
                 append("\n\n[上下文]\n$ctxBlock")
             }
 
-            append("\n\n【规则】\n")
-            append("- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]\n")
-            append("- 用()描述你的动作、表情、状态、情绪，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)\n")
-            append("- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定\n")
-            append("- 有强烈情绪时用send_sticker。可以反问和主动关心。保持角色不跳戏。")
+            append(com.aicompanion.prompt.PromptBuilder.getCoreRules(this@MainActivity))
+            append("\n- 有强烈情绪时用send_sticker。可以反问和主动关心。保持角色不跳戏。")
+            append("\n- 当用户提到过去的事情、问你记不记得什么、或需要回忆历史经历时，主动使用search_diary工具搜索日记。")
         }
         return Pair(identity.name, fullPrompt)
     }
@@ -1427,26 +1679,33 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        try {
-            val dm = com.aicompanion.diary.DiaryManager(this, activePersonaId)
-            val diaryResults = dm.searchDiariesRag(query, 3)
-            if (diaryResults.isNotEmpty()) {
-                if (sb.isNotEmpty()) sb.appendLine()
-                sb.appendLine("[日记记录]")
-                diaryResults.forEach { entry ->
-                    sb.appendLine("📅 ${entry.date} ${entry.title}")
-                    sb.appendLine(entry.content.take(200))
-                }
-            }
-        } catch (e: Exception) {
-            com.aicompanion.util.AppLogger.w(TAG, "Diary RAG search failed: ${e.message}")
-        }
-
         if (sb.isEmpty()) {
-            return "未找到与「$query」相关的记忆。"
+            return "未找到与「$query」相关的短期记忆。如需查找更早的记录，请使用search_diary工具。"
         }
         com.aicompanion.util.AppLogger.d(TAG, "searchMemory: '$query' -> ${sb.length} chars")
         return sb.toString().trimEnd()
+    }
+
+    private fun searchDiary(query: String, topK: Int): String {
+        try {
+            val dm = com.aicompanion.diary.DiaryManager(this, activePersonaId)
+            val diaryResults = dm.searchDiariesRag(query, topK)
+            if (diaryResults.isEmpty()) {
+                return "未找到与「$query」相关的日记记录。"
+            }
+            val sb = StringBuilder()
+            sb.appendLine("[日记记录]")
+            diaryResults.forEach { entry ->
+                sb.appendLine("📅 ${entry.date} ${entry.title} ${entry.moodEmoji}")
+                sb.appendLine(entry.content.take(300))
+                sb.appendLine()
+            }
+            com.aicompanion.util.AppLogger.d(TAG, "searchDiary: '$query' -> ${diaryResults.size} results, ${sb.length} chars")
+            return sb.toString().trimEnd()
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.e(TAG, "searchDiary failed: ${e.message}")
+            return "日记搜索出错: ${e.message}"
+        }
     }
 
     private fun cosineSim(a: FloatArray, b: FloatArray): Float {
@@ -1476,22 +1735,31 @@ class MainActivity : AppCompatActivity() {
 
             val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
             val bgPath = prefs.getString("chat_background", "")
-            findViewById<ImageView>(R.id.iv_chat_background)?.let { iv ->
-                if (!bgPath.isNullOrEmpty()) {
-                    val file = File(bgPath)
-                    if (file.exists()) {
+            if (!bgPath.isNullOrEmpty()) {
+                val path = bgPath
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val file = File(path)
+                        if (!file.exists()) return@launch
                         val bgOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                        BitmapFactory.decodeFile(bgPath, bgOptions)
+                        BitmapFactory.decodeFile(path, bgOptions)
                         bgOptions.inSampleSize = calculateSampleSize(bgOptions.outWidth, bgOptions.outHeight, 1080, 1920)
                         bgOptions.inJustDecodeBounds = false
-                        val bmp = BitmapFactory.decodeFile(bgPath, bgOptions)
-                        iv.setImageBitmap(bmp)
-                        iv.alpha = 0.3f
+                        val bmp = BitmapFactory.decodeFile(path, bgOptions) ?: return@launch
+                        withContext(Dispatchers.Main) {
+                            if (!isFinishing && !isDestroyed) {
+                                findViewById<ImageView>(R.id.iv_chat_background)?.setImageBitmap(bmp)
+                                findViewById<ImageView>(R.id.iv_chat_background)?.alpha = 0.3f
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
             }
 
             ThemeManager.applyTheme(this)
+            chatAdapter?.cacheSkinSettings(this)
         } catch (e: Exception) {
             Log.e(TAG, "applyTheme: ${e.message}")
         }
@@ -1501,7 +1769,101 @@ class MainActivity : AppCompatActivity() {
         val am = affectionManager ?: return
         tvDaysLabel?.text = "第${am.getDaysSinceFirstUse()}天"
         progressAffection?.progress = am.affectionLevel
-        tvPetName?.text = "✨ ${getPersonaInfo().first}"
+        val personaPrefs = getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
+        val name = personaPrefs.getString("persona_name", null)
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("ai_name", "星尘")
+            ?: "星尘"
+        tvPetName?.text = "✨ $name"
+        checkPersonalityEvolution()
+        checkUserPersonalitySummary()
+    }
+
+    private fun checkUserPersonalitySummary() {
+        val am = affectionManager ?: return
+        if (!am.shouldTriggerPersonalitySummary()) return
+        val client = apiClient ?: return
+        val sm = settingsManager ?: return
+        if (sm.userPersonalityDef.isNotBlank()) return
+
+        val personaPrefs = getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
+        val personaName = personaPrefs.getString("persona_name", null)
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("ai_name", "星尘") ?: "星尘"
+        val recentMessages = messages.takeLast(30)
+        val chatSummary = recentMessages.joinToString("\n") { msg ->
+            val speaker = if (msg.isUser) "用户" else personaName
+            "$speaker: ${msg.text.take(100)}"
+        }
+        if (chatSummary.isBlank()) return
+
+        messageScope.launch(Dispatchers.IO) {
+            try {
+                val result = client.summarizeUserPersonality(
+                    personaName = personaName,
+                    recentChatSummary = chatSummary,
+                    currentSummary = sm.getAiSummarizedPersonality(activePersonaId),
+                    affectionLevel = am.affectionLevel
+                )
+                if (!result.isNullOrBlank()) {
+                    sm.setAiSummarizedPersonality(activePersonaId, result)
+                    com.aicompanion.prompt.PromptBuilder.invalidateCache()
+                    com.aicompanion.util.AppLogger.d(TAG, "User personality summarized: affection=${am.affectionLevel}")
+                }
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.w(TAG, "User personality summary failed: ${e.message}")
+            }
+        }
+    }
+
+    private fun checkPersonalityEvolution() {
+        val am = affectionManager ?: return
+        if (!am.shouldTriggerPersonalityEvolution()) return
+        val client = apiClient ?: return
+        val personaPrefs = getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
+        val personaName = personaPrefs.getString("persona_name", null)
+            ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("ai_name", "星尘") ?: "星尘"
+        val currentPersonality = personaPrefs.getString("persona_personality", "") ?: ""
+        val currentSpeechStyle = personaPrefs.getString("persona_speech_style", "") ?: ""
+        val worldSetting = personaPrefs.getString("world_setting", "") ?: ""
+        val recentMessages = messages.takeLast(20)
+        val chatSummary = recentMessages.joinToString("\n") { msg ->
+            val speaker = if (msg.isUser) "用户" else personaName
+            "$speaker: ${msg.text.take(100)}"
+        }
+        messageScope.launch(Dispatchers.IO) {
+            try {
+                val result = client.evolvePersonality(
+                    personaName = personaName,
+                    currentPersonality = currentPersonality,
+                    currentSpeechStyle = currentSpeechStyle,
+                    affectionLevel = am.affectionLevel,
+                    recentChatSummary = chatSummary,
+                    worldSetting = worldSetting
+                ) ?: return@launch
+                val cleaned = result.trim()
+                    .removePrefix("```json").removePrefix("```")
+                    .removeSuffix("```").trim()
+                val json = org.json.JSONObject(cleaned)
+                val newPersonality = json.optString("personality", "")
+                val newSpeechStyle = json.optString("speech_style", "")
+                if (newPersonality.isNotBlank() || newSpeechStyle.isNotBlank()) {
+                    val editor = personaPrefs.edit()
+                    if (newPersonality.isNotBlank()) editor.putString("persona_personality", newPersonality)
+                    if (newSpeechStyle.isNotBlank()) editor.putString("persona_speech_style", newSpeechStyle)
+                    editor.apply()
+                    val pm = com.aicompanion.persona.PersonaManager(this@MainActivity)
+                    pm.load()
+                    pm.updatePersona(activePersonaId) { persona ->
+                        persona.copy(
+                            personality = if (newPersonality.isNotBlank()) newPersonality else persona.personality,
+                            speechStyle = if (newSpeechStyle.isNotBlank()) newSpeechStyle else persona.speechStyle
+                        )
+                    }
+                    com.aicompanion.util.AppLogger.d(TAG, "Personality evolved: affection=${am.affectionLevel}")
+                }
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.w(TAG, "Personality evolution failed: ${e.message}")
+            }
+        }
     }
 
     private fun updateWeather() {
@@ -1549,23 +1911,6 @@ class MainActivity : AppCompatActivity() {
         return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.time)
     }
 
-    private fun showMoodSelector() {
-        val moods = arrayOf(
-            "😊 开心" to "HAPPY", "😢 难过" to "SAD", "😠 生气" to "ANGRY",
-            "😳 傲娇" to "TSUNDERE", "😲 惊讶" to "SURPRISED", "😐 平静" to "NEUTRAL"
-        )
-        val names = moods.map { it.first }.toTypedArray()
-        android.app.AlertDialog.Builder(this)
-            .setTitle("选择你的心情")
-            .setItems(names) { _, which ->
-                val (emoji, moodName) = moods[which]
-                currentUserMood = emoji
-                currentUserMoodName = moodName
-                Toast.makeText(this, "心情: $emoji", Toast.LENGTH_SHORT).show()
-            }
-            .show()
-    }
-
     private fun showAchievementUnlock(achievement: com.aicompanion.models.Achievement) {
         Toast.makeText(this, "🏆 成就解锁: ${achievement.title}", Toast.LENGTH_LONG).show()
     }
@@ -1585,7 +1930,7 @@ class MainActivity : AppCompatActivity() {
             val imgFile = File(lastWithImage.imageUrl)
             if (!imgFile.exists()) return
             addStickerMessage("ai", lastWithImage.imageUrl)
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "tryAttachVirtualWorldImage: ${e.message}") }
     }
 
     private fun findActiveVirtualWorld(): com.aicompanion.virtualworld.VirtualWorldManager? {
@@ -1599,7 +1944,7 @@ class MainActivity : AppCompatActivity() {
                 val groupVw = com.aicompanion.virtualworld.VirtualWorldManager(this, group.id)
                 if (groupVw.isEnabled) return groupVw
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "findActiveVirtualWorld: ${e.message}") }
 
         return null
     }
@@ -1636,7 +1981,7 @@ class MainActivity : AppCompatActivity() {
                     if (sb.isNotEmpty()) sb.append("\n")
                     sb.append("[系统信息] 当前手机电量：${percentage}%${if (isCharging) "（充电中）" else ""}")
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "buildSystemContext: ${e.message}") }
         }
 
         if (needVirtualWorld) {
@@ -1649,7 +1994,7 @@ class MainActivity : AppCompatActivity() {
                         sb.append(summary)
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "buildSystemContext: ${e.message}") }
         }
 
         return sb.toString()
@@ -1665,18 +2010,31 @@ class MainActivity : AppCompatActivity() {
                     return (level * 100) / scale
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "getBatteryPercentage: ${e.message}") }
         return -1
     }
 
     private fun showLogViewer() {
-        val appLogs = com.aicompanion.util.AppLogger.getRecentLogs(200)
+        val allLogs = com.aicompanion.util.AppLogger.getRecentLogs(300)
         val live2dLog = live2dView?.getLog()?.takeLast(1000) ?: ""
         val historyLog = logHistory.joinToString("\n").takeLast(500)
 
+        val errorLogs = allLogs.lines().filter { it.contains("E/") }.joinToString("\n")
+        val warnLogs = allLogs.lines().filter { it.contains("W/") }.joinToString("\n")
+
         val fullLog = buildString {
-            append("=== 应用日志 (最近200条) ===\n\n")
-            append(if (appLogs.isNotBlank()) appLogs else "暂无日志\n")
+            if (errorLogs.isNotBlank()) {
+                append("=== ❌ 错误日志 ===\n\n")
+                append(errorLogs)
+                append("\n\n")
+            }
+            if (warnLogs.isNotBlank()) {
+                append("=== ⚠️ 警告日志 ===\n\n")
+                append(warnLogs)
+                append("\n\n")
+            }
+            append("=== 📋 全部日志 (最近300条) ===\n\n")
+            append(if (allLogs.isNotBlank()) allLogs else "暂无日志\n")
             if (live2dLog.isNotBlank()) {
                 append("\n\n=== Live2D 日志 ===\n")
                 append(live2dLog)
@@ -1752,7 +2110,7 @@ class MainActivity : AppCompatActivity() {
                 .setTitle("需要无障碍权限")
                 .setMessage("手机自动化需要开启「星尘AI」的无障碍服务才能操作手机。\n\n请前往：系统设置 → 无障碍 → 已安装应用 → 星尘AI → 开启服务\n\n开启后重新进入此功能即可使用。")
                 .setPositiveButton("去开启") { _, _ ->
-                    try { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) } catch (_: Exception) {}
+                    try { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "showAutoOperationDialog: ${e.message}") }
                 }
                 .setNegativeButton("取消", null)
                 .show()
@@ -1867,20 +2225,18 @@ class MainActivity : AppCompatActivity() {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "image/*"
         }
-        try { startActivityForResult(intent, REQUEST_PICK_IMAGE) } catch (_: Exception) {}
+        try { startActivityForResult(intent, REQUEST_PICK_IMAGE) } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "pickBackgroundImage: ${e.message}") }
     }
 
     private fun startFocusTimer() {
         focusActive = true
         focusSecondsLeft = 25 * 60
         focusEndTime = System.currentTimeMillis() + focusSecondsLeft * 1000L
-        updateFocusDisplay()
         addPetMessage("🍅 专注模式启动！25分钟，我会陪着你~", Emotion.HAPPY, Action.STRETCH)
         focusRunnable = object : Runnable {
             override fun run() {
                 if (!focusActive) return
                 focusSecondsLeft = ((focusEndTime - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
-                updateFocusDisplay()
                 if (focusSecondsLeft <= 0) completeFocusSession()
                 else handler.postDelayed(this, 1000)
             }
@@ -1911,12 +2267,12 @@ class MainActivity : AppCompatActivity() {
         val sm = settingsManager ?: return
         val mode = sm.diaryTriggerMode
         if (mode == com.aicompanion.settings.DiaryTriggerMode.MANUAL) return
+        if (mode == com.aicompanion.settings.DiaryTriggerMode.MSG_50) return
 
-        val intervalMs = when (mode) {
+        val delayMs = when (mode) {
             com.aicompanion.settings.DiaryTriggerMode.HOURLY -> 60 * 60 * 1000L
-            com.aicompanion.settings.DiaryTriggerMode.TWO_HOURS -> 2 * 60 * 60 * 1000L
-            com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50 -> 30 * 1000L
-            com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM -> {
+            com.aicompanion.settings.DiaryTriggerMode.EVERY_2H -> 2 * 60 * 60 * 1000L
+            else -> {
                 val cal = java.util.Calendar.getInstance()
                 cal.set(java.util.Calendar.HOUR_OF_DAY, 22)
                 cal.set(java.util.Calendar.MINUTE, 0)
@@ -1924,45 +2280,46 @@ class MainActivity : AppCompatActivity() {
                 if (cal.timeInMillis <= System.currentTimeMillis()) cal.add(java.util.Calendar.DAY_OF_YEAR, 1)
                 cal.timeInMillis - System.currentTimeMillis()
             }
-            else -> return
         }
 
-        handler.postDelayed({
-            if (isFinishing || isDestroyed) return@postDelayed
-            checkDiaryTimerTrigger()
-            if (mode != com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM) {
-                scheduleDiaryTimer()
+        diaryRunnable = Runnable {
+            if (isFinishing || isDestroyed) return@Runnable
+            val dm = com.aicompanion.diary.DiaryManager(this, activePersonaId)
+            val am = affectionManager ?: return@Runnable
+            val todayDiary = dm.getDiaryByDate(
+                java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+            )
+            if (todayDiary == null && messages.count { it.isUser } >= 5) {
+                autoTriggerDiary(dm, am)
             }
-        }, intervalMs)
+            scheduleDiaryTimer()
+        }
+        handler.postDelayed(diaryRunnable!!, delayMs)
     }
 
-    private fun checkDiaryTimerTrigger() {
+    private fun checkTurnsDiaryTrigger() {
         val sm = settingsManager ?: return
+        val mode = sm.diaryTriggerMode
+        if (mode != com.aicompanion.settings.DiaryTriggerMode.MSG_50) return
+
+        val ctxMgr = contextManager ?: return
+        val totalTurns = ctxMgr.sessionManager.currentTurnCount
+        if (totalTurns < 50) return
+
+        val prefs = getSharedPreferences("diary_trigger_$activePersonaId", MODE_PRIVATE)
+        val lastTriggeredTurns = prefs.getInt("last_diary_turns_trigger", 0)
+        if (totalTurns - lastTriggeredTurns < 50) return
+
         val dm = com.aicompanion.diary.DiaryManager(this, activePersonaId)
         val am = affectionManager ?: return
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        val todayDiary = dm.getDiaryByDate(today)
+        if (todayDiary != null) return
 
-        when (sm.diaryTriggerMode) {
-            com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50 -> {
-                val userCount = messages.count { it.isUser }
-                if (userCount > 0 && userCount % 50 == 0) {
-                    val lastTriggered = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                        .getInt("last_diary_trigger_count", 0)
-                    if (userCount != lastTriggered) {
-                        getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
-                            .putInt("last_diary_trigger_count", userCount).apply()
-                        autoTriggerDiary(dm, am)
-                    }
-                }
-            }
-            com.aicompanion.settings.DiaryTriggerMode.HOURLY,
-            com.aicompanion.settings.DiaryTriggerMode.TWO_HOURS -> {
-                autoTriggerDiary(dm, am)
-            }
-            com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM -> {
-                autoTriggerDiary(dm, am)
-            }
-            else -> {}
-        }
+        if (messages.count { it.isUser } < 5) return
+
+        prefs.edit().putInt("last_diary_turns_trigger", totalTurns).apply()
+        autoTriggerDiary(dm, am)
     }
 
     private fun triggerManualDiary() {
@@ -1981,15 +2338,28 @@ class MainActivity : AppCompatActivity() {
         task.invoke()
     }
 
+    private var diaryWriting = false
+
     private fun autoTriggerDiary(dm: com.aicompanion.diary.DiaryManager, am: AffectionManager) {
         val client = apiClient ?: return
         val sm = settingsManager ?: return
         if (sm.chatApiUrl.isBlank()) return
+        if (diaryWriting) return
+
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        val existingDiary = dm.getDiaryByDate(today)
+        if (existingDiary != null && dm.getTodayDiaryAppendCount() >= 3) return
+        if (!dm.canUpdateDiary()) return
+
+        diaryWriting = true
+        dm.markDiaryUpdated()
 
         messageScope.launch {
             try {
                 val persona = getPersonaInfo()
                 val chatTexts = messages.map { it.text }
+                if (chatTexts.isEmpty()) return@launch
+
                 val combined = chatTexts.joinToString(" | ")
 
                 val poolBlock = contextManager?.memoryPool?.getPoolBlock() ?: ""
@@ -2002,9 +2372,6 @@ class MainActivity : AppCompatActivity() {
                 val localMood = analyzeLocalMood(diaryContext)
 
                 val llmContent = withContext(Dispatchers.IO) {
-                    val existing = dm.getDiaryByDate(
-                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
-                    )
                     client.generateDiaryContent(
                         chatTexts, persona.first, persona.second, localMood,
                         when (localMood) {
@@ -2016,16 +2383,16 @@ class MainActivity : AppCompatActivity() {
                             else -> "😊"
                         },
                         am.affectionLevel,
-                        isUpdate = existing != null
+                        isUpdate = existingDiary != null
                     )
                 }
 
                 if (llmContent != null && llmContent.isNotBlank()) {
-                    val existing = dm.getDiaryByDate(
-                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
-                    )
-                    if (existing != null) {
-                        dm.appendLlmDiaryUpdate(llmContent, chatTexts, am.affectionLevel)
+                    val currentExisting = dm.getDiaryByDate(today)
+                    if (currentExisting != null) {
+                        if (dm.getTodayDiaryAppendCount() < 3) {
+                            dm.appendLlmDiaryUpdate(llmContent, chatTexts, am.affectionLevel)
+                        }
                     } else {
                         dm.saveLlmDiary(llmContent, chatTexts, am.affectionLevel)
                     }
@@ -2034,11 +2401,29 @@ class MainActivity : AppCompatActivity() {
                     dm.updateOrGenerateDailyDiary(chatTexts, am.affectionLevel)
                     Toast.makeText(this@MainActivity, "📔 日记已生成（本地模式）", Toast.LENGTH_SHORT).show()
                 }
+
+                val sm = settingsManager
+                if (sm != null && sm.userPersonalityDef.isBlank()) {
+                    try {
+                        val summaryResult = client.summarizeUserPersonality(
+                            personaName = persona.first,
+                            recentChatSummary = chatTexts.takeLast(30).joinToString("\n"),
+                            currentSummary = sm.getAiSummarizedPersonality(activePersonaId),
+                            affectionLevel = am.affectionLevel
+                        )
+                        if (!summaryResult.isNullOrBlank()) {
+                            sm.setAiSummarizedPersonality(activePersonaId, summaryResult)
+                            com.aicompanion.prompt.PromptBuilder.invalidateCache()
+                        }
+                    } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "autoTriggerDiary: ${e.message}") }
+                }
             } catch (e: Exception) {
                 Log.d(TAG, "LLM diary failed, falling back: ${e.message}")
                 val chatTexts = messages.map { it.text }
                 dm.updateOrGenerateDailyDiary(chatTexts, am.affectionLevel)
                 Toast.makeText(this@MainActivity, "📔 日记已生成（本地模式）", Toast.LENGTH_SHORT).show()
+            } finally {
+                diaryWriting = false
             }
         }
     }
@@ -2081,8 +2466,9 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
                 }
+                val oldSize = messages.size
                 messages.clear()
-                chatAdapter?.notifyDataSetChanged()
+                chatAdapter?.notifyItemRangeRemoved(0, oldSize)
                 saveChatHistory()
                 addPetMessage("✨ 新会话已开启！我已保留了核心记忆并生成了日记~", Emotion.HAPPY, Action.TAIL_FLICK)
             } catch (e: Exception) {
@@ -2112,19 +2498,13 @@ class MainActivity : AppCompatActivity() {
         return if (max != null && max.value > 0) max.key else "normal"
     }
 
-    private fun updateFocusDisplay() {
-        if (!focusActive) return
-        val min = focusSecondsLeft / 60
-        val sec = focusSecondsLeft % 60
-    }
-
     private fun triggerProactiveChat() {
         if (isDestroyed || isFinishing) return
         if (isInForeground) return
         val client = apiClient ?: return
         val sm = settingsManager ?: return
 
-        val chatHistory = messages.takeLast(10).map { msg ->
+        val chatHistory = messages.takeLast(sm.contextTurns).map { msg ->
             Pair(msg.isUser, msg.text)
         }
 
@@ -2133,7 +2513,8 @@ class MainActivity : AppCompatActivity() {
                 val response = withContext(Dispatchers.IO) {
                     if (sm.chatApiUrl.isNotBlank()) {
                         val memCtx = contextManager?.memoryPool?.getPoolBlock()
-                        client.generateNagContent(getPersonaInfo().first, getPersonaInfo().second, memoryContext = memCtx, chatHistory = chatHistory)
+                        val persona = getPersonaInfo()
+                        client.generateNagContent(persona.first, persona.second, memoryContext = memCtx, chatHistory = chatHistory)
                     } else null
                 }
                 if (response != null && response.text.isNotBlank() && response.errorMessage == null) {
@@ -2188,7 +2569,7 @@ class MainActivity : AppCompatActivity() {
                         worldsToTick.add(groupVw)
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "scheduleVirtualWorldTick: ${e.message}") }
 
             for (vwManager in worldsToTick) {
                 if (vwManager.shouldTick()) {
@@ -2215,7 +2596,7 @@ class MainActivity : AppCompatActivity() {
         val sm = settingsManager ?: return
         if (sm.chatApiUrl.isBlank()) return
 
-        val chatHistory = messages.takeLast(10).map { msg ->
+        val chatHistory = messages.takeLast(sm.contextTurns).map { msg ->
             Pair(msg.isUser, msg.text)
         }
 
@@ -2223,8 +2604,9 @@ class MainActivity : AppCompatActivity() {
             try {
                 val response = withContext(Dispatchers.IO) {
                     val memCtx = contextManager?.memoryPool?.getPoolBlock()
+                    val persona = getPersonaInfo()
                     client.generateNagContent(
-                        getPersonaInfo().first, getPersonaInfo().second,
+                        persona.first, persona.second,
                         systemAlert = "主人的手机电量只剩 $percentage% 了！请提醒主人及时充电，语气要关心和温柔。",
                         memoryContext = memCtx,
                         chatHistory = chatHistory
@@ -2245,8 +2627,10 @@ class MainActivity : AppCompatActivity() {
         if (prefs.getBoolean("first_launch", true)) {
             prefs.edit().putBoolean("first_launch", false).apply()
             showTutorial()
-            val name = getPersonaInfo().first
-            addPetMessage("你好呀！我是${name}，你的AI伙伴~", Emotion.HAPPY, Action.TAIL_FLICK)
+            messageScope.launch {
+                val name = getPersonaInfo().first
+                addPetMessage("你好呀！我是${name}，你的AI伙伴~", Emotion.HAPPY, Action.TAIL_FLICK)
+            }
         }
     }
 
@@ -2257,12 +2641,33 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadChatHistory() {
         try {
+            val stored = chatStorage.getRecentMessages("persona", activePersonaId, 200)
+            if (stored.isNotEmpty()) {
+                val result = stored.map { s ->
+                    ChatMessage(
+                        id = s.id, text = s.text, time = s.time, isUser = s.isUser,
+                        userMood = s.userMood, feedback = s.feedback,
+                        emotion = try { Emotion.valueOf(s.emotion) } catch (_: Exception) { Emotion.NEUTRAL },
+                        timestamp = s.timestamp, isFavorited = s.isFavorited,
+                        reactionEmoji = s.reactionEmoji, stickerPath = s.stickerPath,
+                        audioPath = s.audioPath, audioUrl = s.audioUrl
+                    )
+                }
+                messages.clear()
+                messages.addAll(result)
+                chatAdapter?.notifyItemRangeInserted(0, messages.size)
+                if (messages.isNotEmpty()) recyclerChat?.scrollToPosition(messages.size - 1)
+                com.aicompanion.util.AppLogger.d(TAG, "loadChatHistory: 从文件加载了${result.size}条消息")
+                return
+            }
+
             val prefs = getSharedPreferences(getChatPrefsName(), MODE_PRIVATE)
             val json = prefs.getString("messages", "[]") ?: "[]"
             val arr = org.json.JSONArray(json)
+            val result = mutableListOf<ChatMessage>()
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
-                messages.add(ChatMessage(
+                result.add(ChatMessage(
                     id = obj.optString("id", java.util.UUID.randomUUID().toString()),
                     text = obj.optString("text", ""),
                     time = obj.optString("time", ""),
@@ -2274,17 +2679,44 @@ class MainActivity : AppCompatActivity() {
                     reactionEmoji = obj.optString("reactionEmoji", "")
                 ))
             }
-            chatAdapter?.notifyDataSetChanged()
+            messages.clear()
+            messages.addAll(result)
+            chatAdapter?.notifyItemRangeInserted(0, messages.size)
             if (messages.isNotEmpty()) recyclerChat?.scrollToPosition(messages.size - 1)
+            com.aicompanion.util.AppLogger.d(TAG, "loadChatHistory: 从SP加载了${result.size}条消息")
+
+            if (result.isNotEmpty()) {
+                memoryScope.launch {
+                    try {
+                        val migrated = chatStorage.migrateFromSharedPreferences(getChatPrefsName(), "persona", activePersonaId)
+                        com.aicompanion.util.AppLogger.i(TAG, "loadChatHistory: 迁移了${migrated}条消息到文件存储")
+                    } catch (_: Exception) {}
+                }
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "loadChatHistory: ${e.message}")
+            com.aicompanion.util.AppLogger.e(TAG, "loadChatHistory失败: ${e.message}", e)
         }
     }
 
+    private var chatSaveJob: kotlinx.coroutines.Job? = null
+
     private fun saveChatHistory() {
+        chatSaveJob?.cancel()
+        chatSaveJob = memoryScope.launch(Dispatchers.IO) {
+            delay(500)
+            try {
+                doSaveChatHistory()
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e(TAG, "saveChatHistory: ${e.message}")
+            }
+        }
+    }
+
+    private fun doSaveChatHistory() {
         try {
+            val snapshot = messages.takeLast(100)
             val arr = org.json.JSONArray()
-            messages.takeLast(100).forEach { msg ->
+            snapshot.forEach { msg ->
                 arr.put(org.json.JSONObject().apply {
                     put("id", msg.id)
                     put("text", msg.text)
@@ -2297,9 +2729,10 @@ class MainActivity : AppCompatActivity() {
                     put("reactionEmoji", msg.reactionEmoji)
                 })
             }
-            getSharedPreferences(getChatPrefsName(), MODE_PRIVATE).edit().putString("messages", arr.toString()).apply()
+            val json = arr.toString()
+            getSharedPreferences(getChatPrefsName(), MODE_PRIVATE).edit()
+                .putString("messages", json).apply()
         } catch (e: OutOfMemoryError) {
-            Log.e(TAG, "saveChatHistory OOM: ${e.message}")
             try {
                 val arr = org.json.JSONArray()
                 messages.takeLast(20).forEach { msg ->
@@ -2310,10 +2743,30 @@ class MainActivity : AppCompatActivity() {
                         put("isUser", msg.isUser)
                     })
                 }
-                getSharedPreferences(getChatPrefsName(), MODE_PRIVATE).edit().putString("messages", arr.toString()).apply()
-            } catch (_: Exception) {}
+                getSharedPreferences(getChatPrefsName(), MODE_PRIVATE).edit()
+                    .putString("messages", arr.toString()).apply()
+            } catch (e2: Exception) {
+                com.aicompanion.util.AppLogger.e(TAG, "saveChatHistory OOM恢复失败: ${e2.message}", e2)
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "saveChatHistory: ${e.message}")
+            com.aicompanion.util.AppLogger.e(TAG, "saveChatHistory失败: ${e.message}", e)
+        }
+    }
+
+    private fun saveMessageToFile(msg: ChatMessage) {
+        memoryScope.launch {
+            try {
+                chatStorage.addMessage("persona", activePersonaId, com.aicompanion.storage.StoredMessage(
+                    id = msg.id, text = msg.text, time = msg.time, isUser = msg.isUser,
+                    userMood = msg.userMood, feedback = msg.feedback,
+                    emotion = msg.emotion.name, timestamp = msg.timestamp,
+                    isFavorited = msg.isFavorited, reactionEmoji = msg.reactionEmoji,
+                    stickerPath = msg.stickerPath,
+                    audioPath = msg.audioPath, audioUrl = msg.audioUrl
+                ))
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e(TAG, "saveMessageToFile: ${e.message}")
+            }
         }
     }
 
@@ -2388,8 +2841,11 @@ class MainActivity : AppCompatActivity() {
         isInForeground = true
         if (isFinishing || isDestroyed) return
 
+        chatAdapter?.cacheSkinSettings(this)
+
         if (settingsManager?.live2dEnabled == true) {
             loadLive2DSettings()
+            recyclerChat?.setWillNotDraw(true)
             val view = live2dView
             if (view != null && !view.isDestroyed) {
                 view.post {
@@ -2404,26 +2860,39 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             hideLive2DView()
+            recyclerChat?.setWillNotDraw(false)
         }
 
         rebuildApiClient()
         updateWeather()
         updateAffectionDisplay()
+
+        if (proactiveRunnable != null) scheduleProactiveChat()
+        if (virtualWorldRunnable != null) scheduleVirtualWorldTick()
+        if (diaryRunnable != null) scheduleDiaryTimer()
     }
 
     override fun onPause() {
         super.onPause()
         isInForeground = false
+        focusRunnable?.let { handler.removeCallbacks(it) }
+        proactiveRunnable?.let { handler.removeCallbacks(it) }
+        virtualWorldRunnable?.let { handler.removeCallbacks(it) }
+        diaryRunnable?.let { handler.removeCallbacks(it) }
     }
 
     override fun onDestroy() {
         focusRunnable?.let { handler.removeCallbacks(it) }
         proactiveRunnable?.let { handler.removeCallbacks(it) }
         virtualWorldRunnable?.let { handler.removeCallbacks(it) }
+        diaryRunnable?.let { handler.removeCallbacks(it) }
         longPressRunnable?.let { handler.removeCallbacks(it) }
+        chatSaveJob?.cancel()
+        try { doSaveChatHistory() } catch (_: Exception) {}
         messageScope.cancel()
         systemMonitor?.stopMonitoring()
         voiceManager?.cleanup()
+        ttsManager?.cleanup()
         live2dView?.cleanup()
         super.onDestroy()
     }

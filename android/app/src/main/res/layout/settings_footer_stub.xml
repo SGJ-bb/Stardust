@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="  关于"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#8899dd"
+        android:letterSpacing="0.05"
+        android:layout_marginBottom="10dp" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/bg_settings_card">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="AI桌宠伴侣 v1.0.0"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#c4b5fd"
+                android:gravity="center" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="星尘 - 你的专属AI伙伴"
+                android:textSize="13sp"
+                android:textColor="#667788"
+                android:layout_marginTop="6dp"
+                android:gravity="center" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_settings_card">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🐛"
+                android:textSize="28sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Bug 反馈"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#60A5FA"
+                android:layout_marginTop="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="如果使用过程中有遇到什么问题，或者哪里不足的可以给作者发私信反馈"
+                android:textSize="14sp"
+                android:textColor="#AAAAAA"
+                android:lineSpacingExtra="4dp"
+                android:gravity="center"
+                android:layout_marginTop="8dp" />
+
+            <TextView
+                android:id="@+id/tvBilibiliLink"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📺 B站：搜索 UID 1523985433"
+                android:textSize="13sp"
+                android:textColor="#60A5FA"
+                android:layout_marginTop="10dp"
+                android:padding="6dp" />
+
+            <TextView
+                android:id="@+id/tvDouyinLink"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎵 抖音ID：31991565756"
+                android:textSize="13sp"
+                android:textColor="#60A5FA"
+                android:layout_marginTop="4dp"
+                android:padding="6dp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_settings_card">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📢"
+                android:textSize="28sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="公告"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#c4b5fd"
+                android:layout_marginTop="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="此项目纯心血来潮的vibe coding，没有添加任何非法收集个人信息的功能，项目在GitHub上有源码，不放心的可以审计源码或是逆向app，都可以哦~"
+                android:textSize="14sp"
+                android:textColor="#AAAAAA"
+                android:lineSpacingExtra="4dp"
+                android:gravity="center"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="32dp"
+        android:background="@drawable/bg_settings_card">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💛"
+                android:textSize="32sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="此软件纯vibecoding开源免费，献给热爱自己热爱生活的所有人。不过作者家道中落，快要没米吃饭了，如果愿意资助作者开发，就请点击下面的按钮，你们的支持是我更新下去的动力 ✨"
+                android:textSize="14sp"
+                android:textColor="#CCCCCC"
+                android:lineSpacingExtra="4dp"
+                android:gravity="center"
+                android:layout_marginTop="12dp" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:src="@drawable/donate_image"
+                android:scaleType="fitCenter"
+                android:adjustViewBounds="true"
+                android:layout_marginTop="12dp"
+                android:contentDescription="赞助二维码" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/donateBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="帮助落难作者"
+                android:textSize="15sp"
+                android:textColor="#FFFFFF"
+                app:backgroundTint="#FF6B9D"
+                app:cornerRadius="22dp"
+                android:paddingStart="32dp"
+                android:paddingEnd="32dp"
+                android:layout_marginTop="16dp"
+                style="@style/Widget.Material3.Button" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="14dp"
+        android:background="@drawable/bg_settings_card_alt">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📋 免责声明"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="#ff6b9d"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="1. 本应用仅供娱乐和创意交流使用，AI生成的内容不代表开发者立场。\n2. 用户使用本应用产生的任何行为和后果，均与开发者无关。\n3. 用户应遵守当地法律法规，对自身行为负责。\n4. 本应用不收集任何个人隐私数据。"
+                android:textSize="12sp"
+                android:textColor="#8899bb"
+                android:lineSpacingExtra="4dp" />
+        </LinearLayout>
+    </FrameLayout>
+
+</LinearLayout>

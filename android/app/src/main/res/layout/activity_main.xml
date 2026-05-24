@@ -27,7 +27,6 @@
             android:background="#b316162a"
             android:clickable="true"
             android:focusable="true"
-            android:elevation="8dp"
             app:titleTextColor="@android:color/white">
 
             <LinearLayout
@@ -178,7 +177,6 @@
             android:paddingTop="8dp"
             android:paddingBottom="48dp"
             android:clipToPadding="false"
-            android:scrollbars="vertical"
             android:clickable="true"
             android:focusable="true" />
 
@@ -189,7 +187,7 @@
             android:layout_marginTop="80dp"
             android:layout_marginBottom="68dp"
             android:alpha="0.9"
-            android:visibility="visible" />
+            android:visibility="gone" />
 
         <LinearLayout
             android:id="@+id/layout_bottom_bar"
@@ -197,7 +195,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
             android:orientation="vertical"
-            android:elevation="12dp">
+            android:elevation="0dp">
 
             <HorizontalScrollView
                 android:id="@+id/scroll_predictions"
@@ -290,6 +288,18 @@
                 android:background="@drawable/bg_icon_button"
                 app:tint="#c4b5fd"
                 android:contentDescription="语音" />
+
+            <ImageButton
+                android:id="@+id/btn_phone_call"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_phone_call"
+                android:scaleType="centerInside"
+                android:padding="8dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/bg_icon_button"
+                app:tint="#c4b5fd"
+                android:contentDescription="语音通话" />
 
             <ImageButton
                 android:id="@+id/btn_send"

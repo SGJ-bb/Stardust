@@ -39,11 +39,13 @@ import android.widget.LinearLayout
 import com.aicompanion.stats.PersonaStatsManager
 import com.aicompanion.theme.BubbleSkinManager
 import com.aicompanion.ui.ChatBubblePopup
+import com.aicompanion.util.AppLogger
 import com.aicompanion.ui.VirtualWorldActivity
 import com.aicompanion.virtualworld.VirtualWorldManager
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -70,6 +72,9 @@ class GroupChatActivity : AppCompatActivity() {
     private lateinit var chatPredictor: ChatPredictor
 
     private val contextManagers = mutableMapOf<String, ContextManager>()
+    private val chatStorage by lazy { com.aicompanion.storage.ChatHistoryStorage(this) }
+    private val voiceManager by lazy { com.aicompanion.voice.VoiceManager(this) }
+    private val ttsManager by lazy { com.aicompanion.voice.TtsManager(this) }
     private val groupContextManager: ContextManager by lazy {
         ContextManager(this, "group_$groupId", "group_$groupId")
     }
@@ -97,6 +102,11 @@ class GroupChatActivity : AppCompatActivity() {
                 )
                 messages.add(msg)
                 groupChatManager.addMessage(groupId, msg)
+                chatStorage.addMessage("group", groupId, com.aicompanion.storage.StoredMessage(
+                    id = msg.id, text = msg.text, time = msg.time, isUser = msg.isUser,
+                    timestamp = msg.timestamp, senderName = msg.senderName,
+                    senderPersonaId = msg.senderPersonaId, emotion = msg.emotion
+                ))
                 adapter.notifyItemInserted(messages.size - 1)
                 recyclerView.scrollToPosition(messages.size - 1)
             } catch (e: Exception) {
@@ -127,7 +137,28 @@ class GroupChatActivity : AppCompatActivity() {
         currentSpeakMode = group.speakMode
 
         recyclerView = findViewById(R.id.rv_group_messages)
-        messages = groupChatManager.getMessages(groupId).toMutableList()
+        val storedMsgs = chatStorage.getRecentMessages("group", groupId)
+        if (storedMsgs.isNotEmpty()) {
+            messages = storedMsgs.map { sm ->
+                GroupMessage(
+                    id = sm.id, senderPersonaId = sm.senderPersonaId,
+                    senderName = sm.senderName, text = sm.text,
+                    time = sm.time, timestamp = sm.timestamp,
+                    isUser = sm.isUser, emotion = sm.emotion
+                )
+            }.toMutableList()
+        } else {
+            messages = groupChatManager.getMessages(groupId).toMutableList()
+            if (messages.isNotEmpty()) {
+                chatStorage.addMessages("group", groupId, messages.map { msg ->
+                    com.aicompanion.storage.StoredMessage(
+                        id = msg.id, text = msg.text, time = msg.time, isUser = msg.isUser,
+                        timestamp = msg.timestamp, senderName = msg.senderName,
+                        senderPersonaId = msg.senderPersonaId, emotion = msg.emotion
+                    )
+                })
+            }
+        }
         adapter = GroupMessageAdapter(messages)
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
@@ -167,6 +198,33 @@ class GroupChatActivity : AppCompatActivity() {
             showMemoryPoolDialog()
         }
 
+        findViewById<View>(R.id.btn_chat_history).setOnClickListener {
+            AnimeUtils.pulse(it)
+            try {
+                val intent = Intent(this, com.aicompanion.ui.ChatHistoryActivity::class.java)
+                intent.putExtra("scope", "group")
+                intent.putExtra("scopeId", groupId)
+                intent.putExtra("scopeName", group.name)
+                startActivity(intent)
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e("GroupChat", "chatHistory: ${e.message}")
+            }
+        }
+
+        findViewById<View>(R.id.btn_phone_call).setOnClickListener {
+            AnimeUtils.pulse(it)
+            try {
+                val intent = Intent(this, com.aicompanion.ui.PhoneCallActivity::class.java)
+                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_PERSONA_ID, "")
+                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_PERSONA_NAME, group.name)
+                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_SCOPE, "group")
+                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_SCOPE_ID, groupId)
+                startActivity(intent)
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e("GroupChat", "phoneCall: ${e.message}")
+            }
+        }
+
         findViewById<View>(R.id.btn_image_upload).setOnClickListener {
             val intent = Intent(Intent.ACTION_PICK)
             intent.type = "image/*"
@@ -200,19 +258,45 @@ class GroupChatActivity : AppCompatActivity() {
         }
     }
 
+    private fun triggerGroupTts(text: String, emotionStr: String) {
+        val emotion = try { com.aicompanion.models.Emotion.valueOf(emotionStr.uppercase()) } catch (_: Exception) { com.aicompanion.models.Emotion.NEUTRAL }
+        val engineMode = ttsManager.engineMode
+
+        if (engineMode == com.aicompanion.voice.TtsManager.ENGINE_LOCAL || !ttsManager.isCloudConfigured) {
+            voiceManager.speak(text, emotion)
+            return
+        }
+
+        lifecycleScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) { ttsManager.synthesize(text, emotion) }
+                if (result.success && (result.audioPath != null || result.audioUrl != null)) {
+                    ttsManager.playAudio(result.audioPath, result.audioUrl)
+                } else if (!result.success) {
+                    AppLogger.w("GroupChat", "云端TTS失败，回退本地: ${result.error}")
+                    voiceManager.speak(text, emotion)
+                }
+            } catch (e: Exception) {
+                AppLogger.e("GroupChat", "triggerGroupTts: ${e.message}")
+                voiceManager.speak(text, emotion)
+            }
+        }
+    }
+
     private fun showMemoryPoolDialog() {
         val group = groupChatManager.getGroup(groupId) ?: return
         val sb = StringBuilder()
 
         sb.appendLine("━━━ 🌐 群聊共享记忆池 ━━━")
-        val groupPool = groupContextManager.memoryPool
+        val groupCtxMgr = groupContextManager
+        val groupPool = groupCtxMgr.memoryPool
         val groupPoolBlock = groupPool.getPoolBlock()
         if (groupPoolBlock.isNotBlank()) {
             sb.appendLine(groupPoolBlock)
         } else {
             sb.appendLine("（空）")
         }
-        sb.appendLine(groupPool.getStats())
+        sb.appendLine(groupCtxMgr.getSessionStats())
         sb.appendLine()
 
         for (personaId in group.memberPersonaIds) {
@@ -227,7 +311,7 @@ class GroupChatActivity : AppCompatActivity() {
             } else {
                 sb.appendLine("（空）")
             }
-            sb.appendLine(pool.getStats())
+            sb.appendLine(ctxMgr.getSessionStats())
             sb.appendLine()
         }
 
@@ -411,7 +495,7 @@ class GroupChatActivity : AppCompatActivity() {
                     val bmp = BitmapFactory.decodeFile(bgPath, options)
                     iv.setImageBitmap(bmp)
                     iv.alpha = 0.3f
-                } catch (_: Exception) {}
+                } catch (e: Exception) { AppLogger.e("GroupChat", "loadChatBackground: ${e.message}") }
             }
         }
     }
@@ -439,6 +523,11 @@ class GroupChatActivity : AppCompatActivity() {
         )
         messages.add(msg)
         groupChatManager.addMessage(groupId, msg)
+        chatStorage.addMessage("group", groupId, com.aicompanion.storage.StoredMessage(
+            id = msg.id, text = msg.text, time = msg.time, isUser = msg.isUser,
+            timestamp = msg.timestamp, senderName = msg.senderName,
+            senderPersonaId = msg.senderPersonaId, emotion = msg.emotion
+        ))
         adapter.notifyItemInserted(messages.size - 1)
         recyclerView.scrollToPosition(messages.size - 1)
 
@@ -467,7 +556,7 @@ class GroupChatActivity : AppCompatActivity() {
             }
         }
 
-        CoroutineScope(Dispatchers.Main).launch {
+        lifecycleScope.launch {
             val chainQueue = mutableListOf<String>()
 
             for (personaId in targetIds) {
@@ -518,22 +607,37 @@ class GroupChatActivity : AppCompatActivity() {
                         )
                         messages.add(aiMsg)
                         groupChatManager.addMessage(groupId, aiMsg)
+                        chatStorage.addMessage("group", groupId, com.aicompanion.storage.StoredMessage(
+                            id = aiMsg.id, text = aiMsg.text, time = aiMsg.time, isUser = aiMsg.isUser,
+                            timestamp = aiMsg.timestamp, senderName = aiMsg.senderName,
+                            senderPersonaId = aiMsg.senderPersonaId, emotion = aiMsg.emotion
+                        ))
                         adapter.notifyItemInserted(messages.size - 1)
                         recyclerView.scrollToPosition(messages.size - 1)
 
-                        chatBubblePopup?.show(persona.name, cleanText, persona.avatarPath.ifBlank { null })
+                        if (settingsManager.isTTSEnabled) {
+                            triggerGroupTts(cleanText, emotionStr)
+                        }
 
-                        val statsMgr = PersonaStatsManager(this@GroupChatActivity, personaId)
-                        statsMgr.recordAiMessage(cleanText)
-                        statsMgr.recordEmotion(emotionStr)
+                        if (!isFinishing && !isDestroyed) {
+                            chatBubblePopup?.show(persona.name, cleanText, persona.avatarPath.ifBlank { null })
+                        }
 
-                        val affectionMgr = AffectionManager(this@GroupChatActivity, personaId)
-                        affectionMgr.addMessage()
+                        try {
+                            val statsMgr = PersonaStatsManager(this@GroupChatActivity, personaId)
+                            statsMgr.recordAiMessage(cleanText)
+                            statsMgr.recordEmotion(emotionStr)
+                        } catch (e: Exception) { AppLogger.e("GroupChat", "triggerAiResponses/recordStats: ${e.message}") }
+
+                        try {
+                            val affectionMgr = AffectionManager(this@GroupChatActivity, personaId)
+                            affectionMgr.addMessage()
+                        } catch (e: Exception) { AppLogger.e("GroupChat", "triggerAiResponses/addAffection: ${e.message}") }
 
                         try {
                             val memMgr = MemoryManager(this@GroupChatActivity, personaId)
                             memMgr.addMemoryFact(cleanText, "群聊对话")
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) { AppLogger.e("GroupChat", "triggerAiResponses/addMemory: ${e.message}") }
 
                         try {
                             val ctxMgr = getContextManager(personaId)
@@ -552,21 +656,36 @@ class GroupChatActivity : AppCompatActivity() {
                                 settingsManager.llmMaxTokens,
                                 settingsManager.apiProvider
                             )
-                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                            withContext(Dispatchers.IO) {
                                 try {
                                     ctxMgr.evaluateAndUpdateMemory(client)
                                     ctxMgr.memoryPool.saveToStorage()
                                     groupContextManager.evaluateAndUpdateMemory(client)
                                     groupContextManager.memoryPool.saveToStorage()
-                                } catch (_: Exception) {}
+                                } catch (e: Exception) { AppLogger.e("GroupChat", "triggerAiResponses/evaluateMemory: ${e.message}") }
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) { AppLogger.e("GroupChat", "triggerAiResponses/updateContext: ${e.message}") }
 
                         try {
                             val dm = DiaryManager(this@GroupChatActivity, personaId)
-                            val chatTexts = messages.takeLast(20).map { it.text }
-                            dm.updateOrGenerateDailyDiary(chatTexts, affectionMgr.affectionLevel)
-                        } catch (_: Exception) {}
+                            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                            val existingDiary = dm.getDiaryByDate(today)
+                            if (existingDiary == null) {
+                                val ctxMgr = getContextManager(personaId)
+                                val totalTurns = ctxMgr.sessionManager.currentTurnCount
+                                val prefs = getSharedPreferences("diary_trigger_gc_$personaId", MODE_PRIVATE)
+                                val lastTriggered = prefs.getInt("last_diary_turns_trigger", 0)
+                                if (totalTurns - lastTriggered >= 75 || totalTurns >= 75 && lastTriggered == 0) {
+                                    prefs.edit().putInt("last_diary_turns_trigger", totalTurns).apply()
+                                    val poolBlock = ctxMgr.memoryPool.getPoolBlock()
+                                    val chatTexts = messages.takeLast(30).map { it.text }
+                                    if (poolBlock.isNotBlank()) {
+                                        val am = AffectionManager(this@GroupChatActivity, personaId)
+                                        dm.updateOrGenerateDailyDiary(chatTexts, am.affectionLevel)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) { AppLogger.e("GroupChat", "triggerAiResponses/generateDiary: ${e.message}") }
 
                         if (aiMentions.isNotEmpty()) {
                             for (mid in aiMentions) {
@@ -585,17 +704,19 @@ class GroupChatActivity : AppCompatActivity() {
                 }
             }
 
-            if (depth == 0) {
-                isProcessing = false
-                triggerGroupPredictions(group)
-            }
-
             if (chainQueue.isNotEmpty() && depth < 3) {
                 val lastAiMsg = messages.lastOrNull { !it.isUser }
                 val chainText = if (lastAiMsg != null) {
                     "${lastAiMsg.senderName}：${lastAiMsg.text}"
                 } else triggerText
                 triggerAiResponses(group, chainText, chainQueue.toSet(), depth + 1)
+            }
+
+            if (depth == 0) {
+                isProcessing = false
+                if (!isFinishing && !isDestroyed) {
+                    triggerGroupPredictions(group)
+                }
             }
         }
     }
@@ -672,7 +793,7 @@ class GroupChatActivity : AppCompatActivity() {
             settingsManager.apiProvider
         )
 
-        val recentContext = messages.takeLast(10).map { msg ->
+        val recentContext = messages.takeLast(settingsManager.contextTurns).map { msg ->
             if (msg.isUser) "[用户说] ${msg.text}" else "[${msg.senderName}说] ${msg.text}"
         }.joinToString("\n")
 
@@ -694,14 +815,16 @@ class GroupChatActivity : AppCompatActivity() {
         }
         if (recent.isEmpty()) return
         val memberNames = group.memberPersonaIds.mapNotNull { personaManager.getPersona(it)?.name }
-        CoroutineScope(Dispatchers.Main).launch {
+        lifecycleScope.launch {
             val predictions = withContext(Dispatchers.IO) {
                 chatPredictor.predictGroupChat(
                     recentMessages = recent,
                     memberNames = memberNames
                 )
             }
-            showGroupPredictions(predictions)
+            if (!isFinishing && !isDestroyed) {
+                showGroupPredictions(predictions)
+            }
         }
     }
 
@@ -723,9 +846,10 @@ class GroupChatActivity : AppCompatActivity() {
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
+                    if (isFinishing || isDestroyed) return@setOnClickListener
                     et.setText(text)
                     et.setSelection(text.length)
-                    val sendBtn = findViewById<View>(R.id.btn_send)
+                    val sendBtn = findViewById<View>(R.id.btn_send) ?: return@setOnClickListener
                     sendBtn.performClick()
                 }
             }
@@ -763,7 +887,7 @@ class GroupChatActivity : AppCompatActivity() {
         val ctxMgr = getContextManager(persona.id)
         val memoryContext = ctxMgr.getContextBlock()
 
-        val groupContext = PromptBuilder.buildGroupChatPrompt(identity, otherNames, otherAffections, emptyList(), isMentioned, group.relationshipSetting)
+        val groupContext = PromptBuilder.buildGroupChatPrompt(identity, otherNames, otherAffections, emptyList(), isMentioned, group.relationshipSetting, this)
 
         val client = ApiClient(
             settingsManager.chatApiUrl,
@@ -788,7 +912,7 @@ class GroupChatActivity : AppCompatActivity() {
                     chatHistory = messages.takeLast(6).map { it.isUser to it.text },
                     currentEmotion = "neutral"
                 )
-            } catch (_: Exception) {}
+            } catch (e: Exception) { AppLogger.e("GroupChat", "callPersonaLLM/analyzeEmotion: ${e.message}") }
         }
 
         val effectiveTemp = if (settingsManager.emotionAnalysisEnabled) emotionParams.applyToTemperature(settingsManager.llmTemperature) else settingsManager.llmTemperature
@@ -884,9 +1008,10 @@ class GroupChatActivity : AppCompatActivity() {
             val msg = items[position]
 
             if (msg.isUser) {
-                holder.cvAvatar.visibility = View.GONE
+                holder.cvAvatar.visibility = View.VISIBLE
                 holder.tvSenderName.text = "我"
                 holder.tvSenderName.setTextColor(0xFFff6b9d.toInt())
+                loadUserAvatar(holder.ivAvatar, holder.cvAvatar)
             } else {
                 holder.cvAvatar.visibility = View.VISIBLE
                 holder.tvSenderName.text = msg.senderName
@@ -947,6 +1072,35 @@ class GroupChatActivity : AppCompatActivity() {
             val frameAvatar = cvAvatar.parent as? FrameLayout
             if (aiImageFrame != null && frameAvatar != null) {
                 BubbleSkinManager.applyImageAvatarFrame(frameAvatar, this@GroupChatActivity, aiImageFrame)
+            } else if (frameAvatar != null) {
+                BubbleSkinManager.clearImageAvatarFrame(frameAvatar)
+            }
+        }
+
+        private fun loadUserAvatar(
+            ivAvatar: ImageView,
+            cvAvatar: com.google.android.material.card.MaterialCardView
+        ) {
+            val userAvatarPath = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                .getString("user_avatar", "")
+            if (!userAvatarPath.isNullOrBlank()) {
+                val bmp = loadAvatarBitmap(userAvatarPath)
+                if (bmp != null) {
+                    ivAvatar.setImageBitmap(bmp)
+                } else {
+                    ivAvatar.setImageResource(R.drawable.ic_avatar_default_user)
+                }
+            } else {
+                ivAvatar.setImageResource(R.drawable.ic_avatar_default_user)
+            }
+
+            val userFrame = BubbleSkinManager.getActiveUserFrame(this@GroupChatActivity)
+            BubbleSkinManager.applyAvatarFrame(cvAvatar, userFrame)
+
+            val userImageFrame = BubbleSkinManager.getActiveUserImageFrame(this@GroupChatActivity)
+            val frameAvatar = cvAvatar.parent as? FrameLayout
+            if (userImageFrame != null && frameAvatar != null) {
+                BubbleSkinManager.applyImageAvatarFrame(frameAvatar, this@GroupChatActivity, userImageFrame)
             } else if (frameAvatar != null) {
                 BubbleSkinManager.clearImageAvatarFrame(frameAvatar)
             }

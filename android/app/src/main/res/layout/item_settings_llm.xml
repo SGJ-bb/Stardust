@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="  大模型对话配置"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#8899dd"
+        android:letterSpacing="0.05"
+        android:layout_marginBottom="10dp" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_settings_card">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="API 厂商"
+                android:textSize="13sp"
+                android:textColor="#8899bb"
+                android:layout_marginBottom="4dp" />
+
+            <Spinner
+                android:id="@+id/spinner_api_provider"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_input_field"
+                android:popupBackground="#1a1a30"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/tv_api_provider_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="#667eea"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="API 地址"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxStrokeColor="#667eea"
+                app:hintTextColor="#667eea"
+                android:layout_marginBottom="10dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_chat_api_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:textColorHint="#667788" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="API Key"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxStrokeColor="#667eea"
+                app:hintTextColor="#667eea"
+                android:layout_marginBottom="10dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_chat_api_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:textColorHint="#667788"
+                    android:inputType="textPassword" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="模型名称"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxStrokeColor="#667eea"
+                app:hintTextColor="#667eea"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_chat_model"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:textColorHint="#667788" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_test_chat_api"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="测试连接"
+                android:textSize="14sp"
+                android:textColor="#667eea"
+                app:strokeColor="#667eea"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="16dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#2a2a4a"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="LLM 参数调节"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#c4b5fd"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tv_provider_param_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="#667788"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="温度 (Temperature)"
+                android:textSize="13sp"
+                android:textColor="#8899bb"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <SeekBar
+                    android:id="@+id/seek_temperature"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="200"
+                    android:progress="70"
+                    android:progressTint="#667eea"
+                    android:thumbTint="#c4b5fd" />
+
+                <TextView
+                    android:id="@+id/tv_temperature_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0.70"
+                    android:textSize="13sp"
+                    android:textColor="#c4b5fd"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Top P"
+                android:textSize="13sp"
+                android:textColor="#8899bb"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <SeekBar
+                    android:id="@+id/seek_top_p"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="100"
+                    android:progressTint="#667eea"
+                    android:thumbTint="#c4b5fd" />
+
+                <TextView
+                    android:id="@+id/tv_top_p_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1.00"
+                    android:textSize="13sp"
+                    android:textColor="#c4b5fd"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/layout_freq_penalty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="频率惩罚 (Frequency Penalty)"
+                    android:textSize="13sp"
+                    android:textColor="#8899bb"
+                    android:layout_marginBottom="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <SeekBar
+                        android:id="@+id/seek_freq_penalty"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="400"
+                        android:progress="200"
+                        android:progressTint="#667eea"
+                        android:thumbTint="#c4b5fd" />
+
+                    <TextView
+                        android:id="@+id/tv_freq_penalty_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0.00"
+                        android:textSize="13sp"
+                        android:textColor="#c4b5fd"
+                        android:layout_marginStart="8dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/layout_presence_penalty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="存在惩罚 (Presence Penalty)"
+                    android:textSize="13sp"
+                    android:textColor="#8899bb"
+                    android:layout_marginBottom="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <SeekBar
+                        android:id="@+id/seek_presence_penalty"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="400"
+                        android:progress="200"
+                        android:progressTint="#667eea"
+                        android:thumbTint="#c4b5fd" />
+
+                    <TextView
+                        android:id="@+id/tv_presence_penalty_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0.00"
+                        android:textSize="13sp"
+                        android:textColor="#c4b5fd"
+                        android:layout_marginStart="8dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="最大 Token 数"
+                android:textSize="13sp"
+                android:textColor="#8899bb"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <SeekBar
+                    android:id="@+id/seek_max_tokens"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="4096"
+                    android:progress="2048"
+                    android:progressTint="#667eea"
+                    android:thumbTint="#c4b5fd" />
+
+                <EditText
+                    android:id="@+id/et_max_tokens"
+                    android:layout_width="80dp"
+                    android:layout_height="36dp"
+                    android:text="2048"
+                    android:textSize="13sp"
+                    android:textColor="#c4b5fd"
+                    android:inputType="number"
+                    android:gravity="center"
+                    android:background="@drawable/bg_input_field"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_max_tokens_limit_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="#667788" />
+        </LinearLayout>
+    </FrameLayout>
+
+</LinearLayout>

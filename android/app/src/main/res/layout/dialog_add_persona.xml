@@ -169,6 +169,16 @@
             android:paddingStart="16dp"
             android:paddingEnd="16dp" />
 
+        <Spinner
+            android:id="@+id/spinner_persona_gender"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_input_field"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:spinnerMode="dropdown" />
+
         <EditText
             android:id="@+id/et_persona_desc"
             android:layout_width="match_parent"
@@ -256,6 +266,47 @@
             android:paddingTop="14dp"
             android:paddingBottom="14dp"
             android:lineSpacingExtra="2dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_user_personality_def"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_input_field"
+            android:hint="用户性格定义（选填）"
+            android:textColorHint="#556677"
+            app:hintEnabled="true"
+            app:boxBackgroundMode="none">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_user_personality_def"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="2"
+                android:maxLines="4"
+                android:gravity="top"
+                android:inputType="textMultiLine"
+                android:textSize="14sp"
+                android:textColor="#e0e0f0"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
+                android:lineSpacingExtra="2dp"
+                android:background="@null" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:id="@+id/tv_user_personality_def_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="留空则AI将从对话中自动总结"
+            android:textSize="12sp"
+            android:textColor="#667788"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:layout_marginTop="2dp" />
 
         <LinearLayout
             android:layout_width="match_parent"

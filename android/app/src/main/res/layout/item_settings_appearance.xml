@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="  外观与交互"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#8899dd"
+        android:letterSpacing="0.05"
+        android:layout_marginBottom="10dp" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_settings_card">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_change_theme"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="切换主题色调"
+                android:textSize="14sp"
+                android:textColor="#667eea"
+                app:strokeColor="#667eea"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="10dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_view_log"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="查看日志"
+                android:textSize="14sp"
+                android:textColor="#7c5cfc"
+                app:strokeColor="#7c5cfc"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="10dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_model_manager"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="模型管理"
+                android:textSize="14sp"
+                android:textColor="#FFFFFF"
+                app:backgroundTint="#667eea"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="10dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_model_adjust"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="调整模型参数"
+                android:textSize="14sp"
+                android:textColor="#667eea"
+                app:strokeColor="#667eea"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="10dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_local_model"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="本地模型"
+                android:textSize="14sp"
+                android:textColor="#c4b5fd"
+                app:strokeColor="#c4b5fd"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="14dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#2a2a4a"
+                android:layout_marginBottom="14dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Live2D"
+                    android:textSize="15sp"
+                    android:textColor="#d0d0e0" />
+
+                <Switch
+                    android:id="@+id/switch_live2d"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:trackTint="#667eea"
+                    android:thumbTint="#c4b5fd" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#2a2a4a"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="聊天气泡与头像框"
+                android:textSize="13sp"
+                android:textColor="#8899bb"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="10dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_bubble_skin"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="气泡皮肤"
+                    android:textSize="12sp"
+                    android:textColor="#c4b5fd"
+                    app:strokeColor="#c4b5fd"
+                    app:cornerRadius="10dp"
+                    android:layout_marginEnd="4dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_ai_frame"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="AI头像框"
+                    android:textSize="12sp"
+                    android:textColor="#c4b5fd"
+                    app:strokeColor="#c4b5fd"
+                    app:cornerRadius="10dp"
+                    android:layout_marginStart="4dp" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_user_frame"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:text="我的头像框"
+                android:textSize="12sp"
+                android:textColor="#c4b5fd"
+                app:strokeColor="#c4b5fd"
+                app:cornerRadius="10dp"
+                android:layout_marginBottom="14dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#2a2a4a"
+                android:layout_marginBottom="14dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_start_overlay"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="启动悬浮窗"
+                android:textSize="14sp"
+                android:textColor="#FFFFFF"
+                app:backgroundTint="#7c5cfc"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="悬浮窗大小"
+                android:textSize="13sp"
+                android:textColor="#8899bb"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <SeekBar
+                    android:id="@+id/seek_overlay_size"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="200"
+                    android:progress="100"
+                    android:progressTint="#667eea"
+                    android:thumbTint="#c4b5fd" />
+
+                <TextView
+                    android:id="@+id/tv_overlay_size_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="100%"
+                    android:textSize="13sp"
+                    android:textColor="#c4b5fd"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+</LinearLayout>

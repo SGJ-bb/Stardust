@@ -2,6 +2,7 @@ package com.aicompanion.memory
 
 import android.content.Context
 import com.aicompanion.network.ApiClient
+import com.aicompanion.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -43,9 +44,12 @@ class SessionManager(private val context: Context) {
 
     fun checkMemoryLimit(memoryPool: MemoryPool): Boolean {
         val charCount = memoryPool.getPoolCharCount()
+        if (charCount > 1500) {
+            onSessionWarning?.invoke("记忆池已达${charCount}字，建议开启新会话")
+            return true
+        }
         if (charCount > 800) {
             onSessionWarning?.invoke("记忆池已达${charCount}字，即将自动整理")
-            return false
         }
         return false
     }
@@ -121,7 +125,7 @@ class SessionManager(private val context: Context) {
                 arr.put(obj)
             }
             prefs.edit().putString("sessions", arr.toString()).apply()
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("SessionManager", "saveSessions: ${e.message}") }
     }
 
     private fun loadSessions() {

@@ -8,11 +8,11 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import com.aicompanion.diary.DiaryManager
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.settings.DiaryTriggerMode
 import com.aicompanion.ui.MainActivity
+import com.aicompanion.util.AppLogger
 
 class BackgroundService : android.app.Service() {
 
@@ -21,7 +21,6 @@ class BackgroundService : android.app.Service() {
     private var lastDiaryCheckDay = ""
 
     companion object {
-        private const val TAG = "BackgroundService"
         private const val NOTIFICATION_CHANNEL_ID = "background_service_channel"
         private const val NOTIFICATION_ID = 1002
         const val ACTION_STOP = "com.aicompanion.action.STOP_BACKGROUND"
@@ -32,15 +31,18 @@ class BackgroundService : android.app.Service() {
         try {
             settingsManager = SettingsManager(this)
             diaryManager = DiaryManager(this, getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default") ?: "default")
-            Log.d(TAG, "Background service created")
+            AppLogger.d("BgService", "Background service created")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create background service: ${e.message}", e)
+            AppLogger.e("BgService", "Failed to create background service: ${e.message}", e)
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
-            if (intent?.action == ACTION_STOP) {
+            val action = intent?.action
+            AppLogger.i("BgService", "onStartCommand: action=$action")
+
+            if (action == ACTION_STOP) {
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -50,9 +52,9 @@ class BackgroundService : android.app.Service() {
 
             checkDailyDiary()
 
-            Log.d(TAG, "Background service started")
+            AppLogger.d("BgService", "Background service started")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start background service: ${e.message}", e)
+            AppLogger.e("BgService", "Failed to start background service: ${e.message}", e)
         }
         return START_STICKY
     }
@@ -63,7 +65,7 @@ class BackgroundService : android.app.Service() {
         super.onDestroy()
         settingsManager = null
         diaryManager = null
-        Log.d(TAG, "Background service destroyed")
+        AppLogger.d("BgService", "Background service destroyed")
     }
 
     private fun checkDailyDiary() {
@@ -74,8 +76,11 @@ class BackgroundService : android.app.Service() {
         if (today != lastDiaryCheckDay) {
             lastDiaryCheckDay = today
             val mode = sm?.diaryTriggerMode
-            if (mode == DiaryTriggerMode.HOURLY || mode == DiaryTriggerMode.TWO_HOURS || mode == DiaryTriggerMode.MESSAGES_50) {
+            if (mode != null && mode != DiaryTriggerMode.MANUAL && mode != DiaryTriggerMode.DAILY_10PM) {
                 dm.updateOrGenerateDailyDiary(emptyList(), 50)
+                AppLogger.i("BgService", "checkDailyDiary: triggered, mode=$mode")
+            } else {
+                AppLogger.w("BgService", "checkDailyDiary: skipped, mode=$mode")
             }
         }
     }
