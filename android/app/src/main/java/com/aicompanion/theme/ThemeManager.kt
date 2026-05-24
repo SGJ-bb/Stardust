@@ -3,19 +3,11 @@ package com.aicompanion.theme
 
 import android.app.Activity
 import android.content.Context
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.Switch
 import android.widget.TextView
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.card.MaterialCardView
-import com.google.android.material.chip.Chip
-import com.google.android.material.textfield.TextInputLayout
-import com.google.android.material.textfield.TextInputEditText
 
 data class ColorScheme(
     val id: String,
@@ -151,63 +143,29 @@ object ThemeManager {
         try {
             activity.window.statusBarColor = Color.parseColor(scheme.toolbarColor)
         } catch (_: Exception) {}
-
-        val decorView = activity.window.decorView
-        if (decorView is ViewGroup) {
-            applyThemeToViewGroup(decorView, scheme)
-        }
-    }
-
-    private fun applyThemeToViewGroup(parent: ViewGroup, scheme: ColorScheme) {
-        for (i in 0 until parent.childCount) {
-            val child = parent.getChildAt(i)
-            applyThemeToView(child, scheme)
-            if (child is ViewGroup) applyThemeToViewGroup(child, scheme)
-        }
-    }
-
-    private fun applyThemeToView(view: View, scheme: ColorScheme) {
-        val primary = safeColor(scheme.primaryColor, 0xFF667eea.toInt())
-        val accent = safeColor(scheme.accentColor, 0xFFaabbdd.toInt())
-        val surface = safeColor(scheme.surfaceColor, 0xFFCC1a0a2a.toInt())
-        val card = safeColor(scheme.cardColor, 0xFF1a1a2e.toInt())
-        val text = safeColor(scheme.textColor, 0xFFffffff.toInt())
-        val textSec = safeColor(scheme.textSecondaryColor, 0xFF8899cc.toInt())
-        val toolbar = safeColor(scheme.toolbarColor, 0xFF1a1a2e.toInt())
-
         try {
+            activity.window.navigationBarColor = Color.parseColor(scheme.toolbarColor)
+        } catch (_: Exception) {}
+        try {
+            activity.window.decorView.setBackgroundColor(Color.parseColor(scheme.backgroundDark))
+        } catch (_: Exception) {}
+    }
+
+    fun applyThemeToViews(activity: Activity, vararg viewIds: Int) {
+        val scheme = getCurrentScheme(activity)
+        for (id in viewIds) {
+            val view = activity.findViewById<View>(id) ?: continue
             when (view) {
-                is MaterialCardView -> {
-                    view.setCardBackgroundColor(card)
-                    view.strokeColor = accent
-                }
-                is MaterialButton -> {
-                    if (view.strokeWidth > 0 && view.strokeColor != null) {
-                        view.strokeColor = ColorStateList.valueOf(primary)
+                is TextView -> {
+                    if (view.textSize >= 18f) {
+                        view.setTextColor(safeColor(scheme.textColor, 0xFFffffff.toInt()))
+                    } else {
+                        view.setTextColor(safeColor(scheme.textSecondaryColor, 0xFF8899cc.toInt()))
                     }
                 }
-                is Chip -> {
-                    view.chipBackgroundColor = ColorStateList.valueOf(surface)
-                    view.setTextColor(text)
-                }
-                is Switch -> {
-                    view.setTextColor(text)
-                }
-                is TextInputLayout -> {
-                    view.boxStrokeColor = accent
-                    view.hintTextColor = ColorStateList.valueOf(textSec)
-                    view.defaultHintTextColor = ColorStateList.valueOf(textSec)
-                }
-                is TextInputEditText -> {
-                    view.setTextColor(text)
-                    view.setHintTextColor(textSec)
-                }
-                is com.google.android.material.appbar.MaterialToolbar -> {
-                    view.setBackgroundColor(toolbar)
-                    view.setTitleTextColor(text)
-                }
+                is ViewGroup -> view.setBackgroundColor(safeColor(scheme.surfaceColor, 0xFFCC1a0a2a.toInt()))
             }
-        } catch (_: Exception) {}
+        }
     }
 
     private fun createRoundedDrawable(color: Int, radius: Float): GradientDrawable {

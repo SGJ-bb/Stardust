@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
@@ -16,24 +15,13 @@
         android:clipChildren="false"
         android:clipToPadding="false">
 
-        <com.google.android.material.card.MaterialCardView
+        <ImageView
             android:id="@+id/iv_ai_avatar_chat"
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:layout_gravity="center"
-            app:cardCornerRadius="18dp"
-            app:cardElevation="0dp"
-            app:cardBackgroundColor="#1a1a3e"
-            app:strokeWidth="1.5dp"
-            app:strokeColor="#667eea">
-
-            <ImageView
-                android:id="@+id/iv_ai_avatar_img"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:src="@drawable/ic_avatar_default_ai" />
-        </com.google.android.material.card.MaterialCardView>
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_avatar_default_ai" />
     </FrameLayout>
 
     <LinearLayout
@@ -47,10 +35,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_message_pet"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp">
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp">
 
             <LinearLayout
                 android:layout_width="wrap_content"

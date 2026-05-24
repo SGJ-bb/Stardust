@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.aicompanion.network.ApiClient
+import com.aicompanion.util.AppLogger
 import com.aicompanion.prompt.PromptBuilder
 import com.aicompanion.rag.RagConfig
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +49,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
     private fun writeIndex(index: JSONObject) {
         try {
             getIndexFile().writeText(index.toString(2))
-        } catch (_: Exception) {}
+        } catch (e: Exception) { AppLogger.e("DiaryManager", "writeIndex: ${e.message}") }
     }
 
     private fun updateIndex(entry: DiaryEntry) {
@@ -72,7 +73,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
             try {
                 val json = JSONObject(file.readText())
                 diaries.add(DiaryEntry.fromJson(json))
-            } catch (_: Exception) {}
+            } catch (e: Exception) { AppLogger.e("DiaryManager", "getAllDiaries: ${e.message}") }
         }
         return diaries.sortedByDescending { it.date }
     }
@@ -134,7 +135,18 @@ class DiaryManager(private val context: Context, private val personaId: String =
     fun canUpdateDiary(): Boolean {
         val now = System.currentTimeMillis()
         if (now - lastUpdateTime < MIN_UPDATE_INTERVAL_MS) return false
+        if (getTodayDiaryAppendCount() >= 3) return false
         return true
+    }
+
+    fun markDiaryUpdated() {
+        lastUpdateTime = System.currentTimeMillis()
+    }
+
+    fun getTodayDiaryAppendCount(): Int {
+        val today = dateFormat.format(Date())
+        val existing = getDiaryByDate(today) ?: return 0
+        return existing.content.split(Regex("""---\s*\d{1,2}:\d{2}\s*追加\s*---""")).size - 1
     }
 
     fun generateDailyDiary(chatTexts: List<String>, affectionLevel: Int) {
@@ -300,6 +312,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
     fun appendLlmDiaryUpdate(llmUpdateContent: String, chatTexts: List<String>, affectionLevel: Int) {
         val today = dateFormat.format(Date())
         val existing = getDiaryByDate(today) ?: return
+        if (getTodayDiaryAppendCount() >= 3) return
 
         val combined = chatTexts.takeLast(20).joinToString(" | ")
         val mood = analyzeMood(combined)
@@ -495,7 +508,11 @@ class DiaryManager(private val context: Context, private val personaId: String =
 
     fun exportToMarkdown(entries: List<DiaryEntry>): String {
         val sb = StringBuilder()
-        sb.appendLine("# 星尘日记")
+        val aiName = context.getSharedPreferences("persona_data_$personaId", Context.MODE_PRIVATE)
+            .getString("persona_name", null)
+            ?: context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                .getString("ai_name", "星尘") ?: "星尘"
+        sb.appendLine("# ${aiName}日记")
         sb.appendLine()
         sb.appendLine("> 导出时间：${fullDateFormat.format(Date())}")
         sb.appendLine("> 应用版本：$APP_VERSION")
@@ -647,7 +664,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
                     }
                     index.put(date, idxObj)
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) { AppLogger.e("DiaryManager", "rebuildIndex: ${e.message}") }
         }
         writeIndex(index)
     }

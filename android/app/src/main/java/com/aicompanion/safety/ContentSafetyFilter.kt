@@ -2,6 +2,7 @@ package com.aicompanion.safety
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.aicompanion.util.AppLogger
 
 object ContentSafetyFilter {
     private const val PREFS_NAME = "safety_prefs"
@@ -54,9 +55,18 @@ object ContentSafetyFilter {
     fun shouldBlock(context: Context, text: String): Boolean {
         if (!isEnabled(context)) return false
         val lower = text.lowercase()
-        return pornPatterns.any { lower.contains(it) } ||
+        val blocked = pornPatterns.any { lower.contains(it) } ||
                 violencePatterns.any { lower.contains(it) } ||
                 illegalPatterns.any { lower.contains(it) }
+        if (blocked) {
+            val type = when {
+                pornPatterns.any { lower.contains(it) } -> "porn"
+                violencePatterns.any { lower.contains(it) } -> "violence"
+                else -> "illegal"
+            }
+            AppLogger.w("Safety", "shouldBlock: blocked, type=$type")
+        }
+        return blocked
     }
 
     fun getRefusalResponse(): String {
@@ -64,7 +74,10 @@ object ContentSafetyFilter {
     }
 
     fun filterUserInput(context: Context, text: String): String? {
-        if (shouldBlock(context, text)) return null
+        if (shouldBlock(context, text)) {
+            AppLogger.w("Safety", "filterUserInput: blocked, len=${text.length}")
+            return null
+        }
         return text
     }
 }

@@ -13,7 +13,6 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="#cc0a0a1a"
-        android:elevation="8dp"
         android:paddingStart="16dp"
         android:paddingEnd="8dp">
 
@@ -26,6 +25,26 @@
             android:textColor="@android:color/white"
             android:fontFamily="sans-serif-medium"
             android:letterSpacing="0.03" />
+
+        <ImageView
+            android:id="@+id/btn_import_personas"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_download"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="#8899bb"
+            android:contentDescription="导入" />
+
+        <ImageView
+            android:id="@+id/btn_export_personas"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_share"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="#8899bb"
+            android:contentDescription="导出" />
 
         <ImageView
             android:id="@+id/btn_settings_entry"
@@ -213,9 +232,9 @@
             android:src="@android:drawable/ic_menu_add"
             app:tint="@android:color/white"
             app:backgroundTint="#667eea"
-            app:elevation="12dp"
+            app:elevation="0dp"
             app:borderWidth="0dp"
-            app:pressedTranslationZ="14dp"
+            app:pressedTranslationZ="6dp"
             android:contentDescription="新建角色" />
     </FrameLayout>
 

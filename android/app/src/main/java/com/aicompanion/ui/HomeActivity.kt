@@ -113,6 +113,14 @@ class HomeActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
+        findViewById<View>(R.id.btn_export_personas).setOnClickListener {
+            exportPersonas()
+        }
+
+        findViewById<View>(R.id.btn_import_personas).setOnClickListener {
+            importPersonas()
+        }
+
         applyTheme()
     }
 
@@ -144,6 +152,21 @@ class HomeActivity : AppCompatActivity() {
                     }
                 }
             }
+            if (requestCode == REQUEST_IMPORT_PERSONAS && uri != null) {
+                try {
+                    val json = contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: return
+                    val result = personaManager.importPersonas(json)
+                    refreshList()
+                    val msg = if (result.errors.isEmpty()) {
+                        "导入成功：${result.imported}个角色"
+                    } else {
+                        "导入${result.imported}个，跳过${result.skipped}个，错误：${result.errors.joinToString()}"
+                    }
+                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(this, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -172,7 +195,7 @@ class HomeActivity : AppCompatActivity() {
             opts.inJustDecodeBounds = false
             val bmp = BitmapFactory.decodeFile(path, opts)
             iv.setImageBitmap(bmp)
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("HomeActivity", "loadAvatarIntoView: ${e.message}") }
     }
 
     private fun refreshList() {
@@ -281,7 +304,7 @@ class HomeActivity : AppCompatActivity() {
                 0xFF0a0a1a.toInt()
             }
             findViewById<View>(R.id.home_root)?.setBackgroundColor(bgColor)
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("HomeActivity", "applyTheme: ${e.message}") }
     }
 
     private fun showPersonaPicker(featureName: String, onSelect: (String) -> Unit) {
@@ -294,14 +317,50 @@ class HomeActivity : AppCompatActivity() {
             onSelect(personas.first().id)
             return
         }
-        val names = personas.map { it.name }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("选择查看${featureName}的角色")
-            .setItems(names) { _, which ->
-                onSelect(personas[which].id)
+
+        val sheetView = LayoutInflater.from(this).inflate(R.layout.dialog_persona_picker, null)
+        val tvTitle = sheetView.findViewById<TextView>(R.id.tv_picker_title)
+        tvTitle?.text = "选择${featureName}的角色"
+
+        val sheet = BottomSheetDialog(this)
+
+        val recycler = sheetView.findViewById<RecyclerView>(R.id.rv_picker_personas)
+        recycler.layoutManager = LinearLayoutManager(this)
+        recycler.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                val itemView = LayoutInflater.from(parent.context).inflate(R.layout.item_persona_picker, parent, false)
+                return object : RecyclerView.ViewHolder(itemView) {}
             }
-            .setNegativeButton("取消", null)
-            .show()
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+                val p = personas[position]
+                val tvName = holder.itemView.findViewById<TextView>(R.id.tv_picker_name)
+                val tvDesc = holder.itemView.findViewById<TextView>(R.id.tv_picker_desc)
+                val ivAvatar = holder.itemView.findViewById<ImageView>(R.id.iv_picker_avatar)
+                tvName?.text = p.name
+                tvDesc?.text = p.personality.ifBlank { p.description.ifBlank { "暂无简介" } }
+                val avatarPath = p.avatarPath.ifBlank {
+                    getSharedPreferences("avatar_data", MODE_PRIVATE).getString("ai_avatar", "") ?: ""
+                }
+                if (avatarPath.isNotBlank() && File(avatarPath).exists()) {
+                    try {
+                        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(avatarPath, opts)
+                        opts.inSampleSize = calculateSampleSize(opts.outWidth, opts.outHeight, 64, 64)
+                        opts.inJustDecodeBounds = false
+                        ivAvatar?.setImageBitmap(BitmapFactory.decodeFile(avatarPath, opts))
+                    } catch (e: Exception) { com.aicompanion.util.AppLogger.e("HomeActivity", "showPersonaPicker: ${e.message}") }
+                }
+                holder.itemView.setOnClickListener {
+                    com.aicompanion.anim.AnimeUtils.pulse(it)
+                    onSelect(p.id)
+                    sheet.dismiss()
+                }
+            }
+            override fun getItemCount() = personas.size
+        }
+
+        sheet.setContentView(sheetView)
+        sheet.show()
     }
 
     private fun showAddPersonaDialog() {
@@ -325,7 +384,25 @@ class HomeActivity : AppCompatActivity() {
         val etKeywords = view.findViewById<EditText>(R.id.et_ai_keywords)
         val btnAiGenerate = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_ai_generate)
         val progressAi = view.findViewById<ProgressBar>(R.id.progress_ai_generate)
+        val spinnerGender = view.findViewById<android.widget.Spinner>(R.id.spinner_persona_gender)
+        val etUserPersonalityDef = view.findViewById<EditText>(R.id.et_user_personality_def)
         pendingAvatarIv = ivPreview
+
+        if (spinnerGender != null) {
+            val genderOptions = arrayOf("未设定", "男", "女")
+            val genderAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, genderOptions)
+            genderAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            spinnerGender.adapter = genderAdapter
+            val savedGender = getSharedPreferences("app_prefs", MODE_PRIVATE).getString("user_gender", "") ?: ""
+            val genderIndex = when (savedGender) {
+                "male" -> 1; "female" -> 2; else -> 0
+            }
+            spinnerGender.setSelection(genderIndex)
+        }
+
+        val savedPersonalityDef = getSharedPreferences("companion_settings", MODE_PRIVATE)
+            .getString("user_personality_def", "") ?: ""
+        etUserPersonalityDef?.setText(savedPersonalityDef)
 
         view.findViewById<View>(R.id.btn_select_avatar).setOnClickListener {
             com.aicompanion.anim.AnimeUtils.pulse(it)
@@ -433,8 +510,6 @@ class HomeActivity : AppCompatActivity() {
             personaPrefs.edit().apply {
                 putString("persona_desc", desc)
                 putString("persona_greeting", greeting)
-                putString("user_identity", userIdentity)
-                putString("user_abilities", userAbilities)
                 putString("persona_catchphrases", catchphrases)
                 putString("persona_appearance", appearance)
                 putString("persona_preferences", preferences)
@@ -443,6 +518,19 @@ class HomeActivity : AppCompatActivity() {
                 putString("world_rules", worldRules)
                 apply()
             }
+
+            val globalPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            globalPrefs.edit().apply {
+                putString("global_user_identity", userIdentity)
+                putString("global_user_abilities", userAbilities)
+                val genderPos = spinnerGender?.selectedItemPosition ?: 0
+                putString("user_gender", when (genderPos) { 1 -> "male"; 2 -> "female"; else -> "" })
+                apply()
+            }
+
+            val userPersonalityDef = etUserPersonalityDef?.text?.toString()?.trim() ?: ""
+            getSharedPreferences("companion_settings", MODE_PRIVATE).edit()
+                .putString("user_personality_def", userPersonalityDef).apply()
 
             refreshList()
             sheet.dismiss()
@@ -473,7 +561,23 @@ class HomeActivity : AppCompatActivity() {
         val etKeywords = view.findViewById<EditText>(R.id.et_ai_keywords)
         val btnAiGenerate = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_ai_generate)
         val progressAi = view.findViewById<ProgressBar>(R.id.progress_ai_generate)
+        val spinnerGender = view.findViewById<android.widget.Spinner>(R.id.spinner_persona_gender)
+        val etUserPersonalityDef = view.findViewById<EditText>(R.id.et_user_personality_def)
         pendingAvatarIv = ivPreview
+
+        if (spinnerGender != null) {
+            val genderOptions = arrayOf("未设定", "男", "女")
+            val genderAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, genderOptions)
+            genderAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            spinnerGender.adapter = genderAdapter
+            val savedGender = getSharedPreferences("app_prefs", MODE_PRIVATE).getString("user_gender", "") ?: ""
+            val genderIndex = when (savedGender) { "male" -> 1; "female" -> 2; else -> 0 }
+            spinnerGender.setSelection(genderIndex)
+        }
+
+        val savedPersonalityDef = getSharedPreferences("companion_settings", MODE_PRIVATE)
+            .getString("user_personality_def", "") ?: ""
+        etUserPersonalityDef?.setText(savedPersonalityDef)
 
         etName.setText(persona.name)
         etPersonality.setText(persona.personality)
@@ -483,8 +587,8 @@ class HomeActivity : AppCompatActivity() {
         val personaPrefs = getSharedPreferences("persona_data_${persona.id}", MODE_PRIVATE)
         etDesc.setText(personaPrefs.getString("persona_desc", ""))
         etGreeting.setText(personaPrefs.getString("persona_greeting", ""))
-        etUserIdentity.setText(personaPrefs.getString("user_identity", ""))
-        etUserAbilities.setText(personaPrefs.getString("user_abilities", ""))
+        etUserIdentity.setText(getSharedPreferences("app_prefs", MODE_PRIVATE).getString("global_user_identity", ""))
+        etUserAbilities.setText(getSharedPreferences("app_prefs", MODE_PRIVATE).getString("global_user_abilities", ""))
         etCatchphrases.setText(personaPrefs.getString("persona_catchphrases", ""))
         etAppearance.setText(personaPrefs.getString("persona_appearance", ""))
         etPreferences.setText(personaPrefs.getString("persona_preferences", ""))
@@ -609,8 +713,6 @@ class HomeActivity : AppCompatActivity() {
             editPrefs.edit().apply {
                 putString("persona_desc", desc)
                 putString("persona_greeting", greeting)
-                putString("user_identity", userIdentity)
-                putString("user_abilities", userAbilities)
                 putString("persona_catchphrases", catchphrases)
                 putString("persona_appearance", appearance)
                 putString("persona_preferences", preferences)
@@ -620,6 +722,19 @@ class HomeActivity : AppCompatActivity() {
                 apply()
             }
 
+            val globalPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            globalPrefs.edit().apply {
+                putString("global_user_identity", userIdentity)
+                putString("global_user_abilities", userAbilities)
+                val genderPos = spinnerGender?.selectedItemPosition ?: 0
+                putString("user_gender", when (genderPos) { 1 -> "male"; 2 -> "female"; else -> "" })
+                apply()
+            }
+
+            val userPersonalityDef = etUserPersonalityDef?.text?.toString()?.trim() ?: ""
+            getSharedPreferences("companion_settings", MODE_PRIVATE).edit()
+                .putString("user_personality_def", userPersonalityDef).apply()
+
             refreshList()
             sheet.dismiss()
         }
@@ -628,6 +743,9 @@ class HomeActivity : AppCompatActivity() {
     }
 
     inner class PersonaAdapter(private var items: List<Persona>) : RecyclerView.Adapter<PersonaAdapter.VH>() {
+        private val avatarCache = android.util.LruCache<String, android.graphics.Bitmap>(12)
+        private val lastMsgCache = mutableMapOf<String, String>()
+
         inner class VH(view: View) : RecyclerView.ViewHolder(view) {
             val tvName: TextView = view.findViewById(R.id.tv_persona_name)
             val tvDesc: TextView = view.findViewById(R.id.tv_persona_desc)
@@ -648,7 +766,7 @@ class HomeActivity : AppCompatActivity() {
             holder.tvName.text = persona.name
             holder.tvDesc.text = persona.personality.ifBlank { persona.description.ifBlank { "暂无简介" } }
 
-            val lastMsg = getLastMessage(persona.id)
+            val lastMsg = lastMsgCache[persona.id] ?: getLastMessage(persona.id).also { lastMsgCache[persona.id] = it }
             holder.tvLastMsg.text = lastMsg
 
             val avatarPath = persona.avatarPath.ifBlank {
@@ -657,13 +775,17 @@ class HomeActivity : AppCompatActivity() {
             }
             if (avatarPath.isNotBlank() && File(avatarPath).exists()) {
                 try {
-                    val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeFile(avatarPath, opts)
-                    opts.inSampleSize = calculateSampleSize(opts.outWidth, opts.outHeight, 96, 96)
-                    opts.inJustDecodeBounds = false
-                    val bmp = BitmapFactory.decodeFile(avatarPath, opts)
-                    holder.ivAvatar.setImageBitmap(bmp)
-                } catch (_: Exception) {}
+                    var bmp = avatarCache.get(avatarPath)
+                    if (bmp == null) {
+                        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(avatarPath, opts)
+                        opts.inSampleSize = calculateSampleSize(opts.outWidth, opts.outHeight, 96, 96)
+                        opts.inJustDecodeBounds = false
+                        bmp = BitmapFactory.decodeFile(avatarPath, opts)
+                        if (bmp != null) avatarCache.put(avatarPath, bmp)
+                    }
+                    if (bmp != null) holder.ivAvatar.setImageBitmap(bmp)
+                } catch (e: Exception) { com.aicompanion.util.AppLogger.e("HomeActivity", "onBindViewHolder: ${e.message}") }
             }
 
             holder.itemView.setOnClickListener {
@@ -685,6 +807,7 @@ class HomeActivity : AppCompatActivity() {
 
         fun updateData(newItems: List<Persona>) {
             items = newItems
+            lastMsgCache.clear()
             notifyDataSetChanged()
         }
     }
@@ -700,7 +823,7 @@ class HomeActivity : AppCompatActivity() {
                 val text = last.optString("text", "")
                 return if (text.length > 30) text.take(30) + "..." else text
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("HomeActivity", "getLastMessage: ${e.message}") }
         return "暂无消息"
     }
 
@@ -714,5 +837,67 @@ class HomeActivity : AppCompatActivity() {
             }
         }
         return inSampleSize
+    }
+
+    private fun exportPersonas() {
+        val allPersonas = personaManager.getAllPersonas()
+        if (allPersonas.isEmpty()) {
+            Toast.makeText(this, "没有可导出的角色", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val names = allPersonas.map { it.name }.toTypedArray()
+        val checked = BooleanArray(allPersonas.size) { true }
+        AlertDialog.Builder(this)
+            .setTitle("选择要导出的角色")
+            .setMultiChoiceItems(names, checked) { _, _, _ -> }
+            .setPositiveButton("导出") { _, _ ->
+                val selected = allPersonas.filterIndexed { i, _ -> checked[i] }
+                if (selected.isEmpty()) {
+                    Toast.makeText(this, "未选择任何角色", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                doExport(selected)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun doExport(selected: List<com.aicompanion.persona.Persona>) {
+        try {
+            val json = personaManager.exportPersonas(selected)
+            val exportDir = File(cacheDir, "exports")
+            if (!exportDir.exists()) exportDir.mkdirs()
+            val exportFile = File(exportDir, "personas_export_${System.currentTimeMillis()}.json")
+            exportFile.writeText(json)
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                "${packageName}.fileprovider",
+                exportFile
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "导出角色设定"))
+        } catch (e: Exception) {
+            Toast.makeText(this, "导出失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun importPersonas() {
+        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "application/json"
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+        try {
+            startActivityForResult(Intent.createChooser(intent, "选择角色设定文件"), REQUEST_IMPORT_PERSONAS)
+        } catch (e: Exception) {
+            Toast.makeText(this, "无法打开文件选择器", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    companion object {
+        private const val REQUEST_IMPORT_PERSONAS = 2001
     }
 }

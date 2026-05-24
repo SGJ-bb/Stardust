@@ -19,6 +19,8 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.aicompanion.R
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.settings.LanguageStyle
@@ -37,8 +39,10 @@ import java.util.*
 class SettingsActivity : AppCompatActivity() {
 
     private var settingsManager: SettingsManager? = null
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var settingsAdapter: SettingsAdapter
+    private val loadedItemTypes = mutableSetOf<Int>()
 
-    // UI components
     private var btnPersonaEditor: com.google.android.material.button.MaterialButton? = null
     private var btnModelManager: com.google.android.material.button.MaterialButton? = null
     private var btnModelAdjust: com.google.android.material.button.MaterialButton? = null
@@ -51,7 +55,6 @@ class SettingsActivity : AppCompatActivity() {
     private var radioNagFrequency: RadioGroup? = null
     private var radioLanguageStyle: RadioGroup? = null
 
-    // API settings
     private var spinnerApiProvider: Spinner? = null
     private var tvApiProviderHint: TextView? = null
     private var etChatApiUrl: TextView? = null
@@ -64,22 +67,25 @@ class SettingsActivity : AppCompatActivity() {
     private var etTtsModel: TextView? = null
     private var etUserId: TextView? = null
 
-    // Switches
     private var switchScreenRecognition: Switch? = null
     private var switchSimpleScreenMode: Switch? = null
     private var switchVoiceRecognition: Switch? = null
     private var switchTts: Switch? = null
+    private var spinnerTtsEngine: Spinner? = null
+    private var spinnerEdgeVoice: Spinner? = null
+    private var layoutEdgeVoice: View? = null
+    private var layoutCloudTts: View? = null
     private var switchOfflineMode: Switch? = null
+    private var btnWechatBind: com.google.android.material.button.MaterialButton? = null
+    private var tvWechatStatus: TextView? = null
     private var switchSearchEnabled: Switch? = null
     private var switchLive2d: Switch? = null
 
-    // Wake up settings
     private var switchWakeEnabled: Switch? = null
     private var btnSetWakeTime: com.google.android.material.button.MaterialButton? = null
     private var btnSetWakeMessage: com.google.android.material.button.MaterialButton? = null
     private var tvWakeInfo: TextView? = null
 
-    // Search config
     private var spinnerSearchProvider: Spinner? = null
     private var etSearchApiUrl: TextView? = null
     private var etSearchApiKey: TextView? = null
@@ -88,8 +94,48 @@ class SettingsActivity : AppCompatActivity() {
     private var tilSearchApiKey: View? = null
     private var tilSearchEngineId: View? = null
 
-    // Spinner auto-fill guard
     private var isSpinnerInitialized = false
+
+    private var seekTemp: SeekBar? = null
+    private var tvTemp: TextView? = null
+    private var seekTopP: SeekBar? = null
+    private var tvTopP: TextView? = null
+    private var seekFreqP: SeekBar? = null
+    private var tvFreqP: TextView? = null
+    private var seekPresP: SeekBar? = null
+    private var tvPresP: TextView? = null
+    private var seekMaxTok: SeekBar? = null
+    private var etMaxTok: android.widget.EditText? = null
+    private var layoutFreqP: View? = null
+    private var layoutPresP: View? = null
+    private var tvProviderHint: TextView? = null
+    private var tvMaxTokLimit: TextView? = null
+
+    private var switchSafetyMode: Switch? = null
+    private var switchAutoStart: Switch? = null
+    private var switchBackgroundRunning: Switch? = null
+    private var switchVirtualWorld: Switch? = null
+    private var switchEmotionAnalysis: Switch? = null
+    private var radioDiaryTrigger: RadioGroup? = null
+    private var btnLocalModel: com.google.android.material.button.MaterialButton? = null
+    private var btnBubbleSkin: com.google.android.material.button.MaterialButton? = null
+    private var btnAiFrame: com.google.android.material.button.MaterialButton? = null
+    private var btnUserFrame: com.google.android.material.button.MaterialButton? = null
+    private var btnClearChatHistory: com.google.android.material.button.MaterialButton? = null
+    private var btnVirtualWorld: com.google.android.material.button.MaterialButton? = null
+    private var etImageApiUrl: com.google.android.material.textfield.TextInputEditText? = null
+    private var etImageApiKey: com.google.android.material.textfield.TextInputEditText? = null
+    private var etImageModel: com.google.android.material.textfield.TextInputEditText? = null
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T : View> findSettingsView(id: Int): T? {
+        val rv = recyclerView
+        for (i in 0 until rv.adapter!!.itemCount) {
+            val holder = rv.findViewHolderForAdapterPosition(i)
+            holder?.itemView?.findViewById<T>(id)?.let { return it }
+        }
+        return null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,13 +144,452 @@ class SettingsActivity : AppCompatActivity() {
         try {
             settingsManager = SettingsManager(this)
 
-            initViews()
-            setupSpinner()
-            loadSettings()
-            setupClickListeners()
-            applyTheme()
+            setupRecyclerView()
+
+            recyclerView.post {
+                initViews()
+                loadSettings()
+                setupClickListeners()
+                applyTheme()
+            }
         } catch (e: Exception) {
             Toast.makeText(this, "设置加载失败: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun setupRecyclerView() {
+        recyclerView = findViewById(R.id.recycler_settings)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.overScrollMode = View.OVER_SCROLL_NEVER
+
+        val items = listOf(
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_APPEARANCE),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_SEARCH),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_LLM),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_SCREEN),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_ASR),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_TTS),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_USER),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_DIARY),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_AI_FEATURES),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_SAFETY),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_MEMORY),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_STYLE),
+            SettingsAdapter.SettingsItem(SettingsAdapter.TYPE_FOOTER),
+        )
+
+        settingsAdapter = SettingsAdapter(items) { view, type ->
+            onItemBound(view, type)
+        }
+        recyclerView.adapter = settingsAdapter
+        recyclerView.setItemViewCacheSize(13)
+
+        recyclerView.setHasFixedSize(true)
+    }
+
+    private fun onItemBound(view: View, type: Int) {
+        if (type == SettingsAdapter.TYPE_FOOTER) {
+            setupFooterClickListeners(view)
+            return
+        }
+
+        updateFieldReferences(view, type)
+
+        if (type !in loadedItemTypes) {
+            loadedItemTypes.add(type)
+            loadSettingsForType(view, type)
+            setupListenersForType(view, type)
+        }
+    }
+
+    private fun updateFieldReferences(view: View, type: Int) {
+        when (type) {
+            SettingsAdapter.TYPE_APPEARANCE -> {
+                btnChangeTheme = view.findViewById(R.id.btn_change_theme)
+                btnViewLog = view.findViewById(R.id.btn_view_log)
+                btnModelManager = view.findViewById(R.id.btn_model_manager)
+                btnModelAdjust = view.findViewById(R.id.btn_model_adjust)
+                btnLocalModel = view.findViewById(R.id.btn_local_model)
+                switchLive2d = view.findViewById(R.id.switch_live2d)
+                btnBubbleSkin = view.findViewById(R.id.btn_bubble_skin)
+                btnAiFrame = view.findViewById(R.id.btn_ai_frame)
+                btnUserFrame = view.findViewById(R.id.btn_user_frame)
+                btnStartOverlay = view.findViewById(R.id.btn_start_overlay)
+                seekOverlaySize = view.findViewById(R.id.seek_overlay_size)
+                tvOverlaySizeValue = view.findViewById(R.id.tv_overlay_size_value)
+            }
+            SettingsAdapter.TYPE_SEARCH -> {
+                switchSearchEnabled = view.findViewById(R.id.switch_search_enabled)
+                spinnerSearchProvider = view.findViewById(R.id.spinner_search_provider)
+                etSearchApiUrl = view.findViewById(R.id.et_search_api_url)
+                etSearchApiKey = view.findViewById(R.id.et_search_api_key)
+                etSearchEngineId = view.findViewById(R.id.et_search_engine_id)
+                tilSearchApiUrl = view.findViewById(R.id.til_search_api_url)
+                tilSearchApiKey = view.findViewById(R.id.til_search_api_key)
+                tilSearchEngineId = view.findViewById(R.id.til_search_engine_id)
+            }
+            SettingsAdapter.TYPE_LLM -> {
+                spinnerApiProvider = view.findViewById(R.id.spinner_api_provider)
+                tvApiProviderHint = view.findViewById(R.id.tv_api_provider_hint)
+                etChatApiUrl = view.findViewById(R.id.et_chat_api_url)
+                etChatApiKey = view.findViewById(R.id.et_chat_api_key)
+                etChatModel = view.findViewById(R.id.et_chat_model)
+                btnTestChatApi = view.findViewById(R.id.btn_test_chat_api)
+                seekTemp = view.findViewById(R.id.seek_temperature)
+                tvTemp = view.findViewById(R.id.tv_temperature_value)
+                seekTopP = view.findViewById(R.id.seek_top_p)
+                tvTopP = view.findViewById(R.id.tv_top_p_value)
+                seekFreqP = view.findViewById(R.id.seek_freq_penalty)
+                tvFreqP = view.findViewById(R.id.tv_freq_penalty_value)
+                seekPresP = view.findViewById(R.id.seek_presence_penalty)
+                tvPresP = view.findViewById(R.id.tv_presence_penalty_value)
+                seekMaxTok = view.findViewById(R.id.seek_max_tokens)
+                etMaxTok = view.findViewById(R.id.et_max_tokens)
+                layoutFreqP = view.findViewById(R.id.layout_freq_penalty)
+                layoutPresP = view.findViewById(R.id.layout_presence_penalty)
+                tvProviderHint = view.findViewById(R.id.tv_provider_param_hint)
+                tvMaxTokLimit = view.findViewById(R.id.tv_max_tokens_limit_hint)
+            }
+            SettingsAdapter.TYPE_SCREEN -> {
+                switchScreenRecognition = view.findViewById(R.id.switch_screen_recognition)
+                etScreenApiUrl = view.findViewById(R.id.et_screen_api_url)
+                etScreenModel = view.findViewById(R.id.et_screen_model)
+                switchSimpleScreenMode = view.findViewById(R.id.switch_simple_screen_mode)
+            }
+            SettingsAdapter.TYPE_ASR -> {
+                switchVoiceRecognition = view.findViewById(R.id.switch_voice_recognition)
+                etAsrApiUrl = view.findViewById(R.id.et_asr_api_url)
+            }
+            SettingsAdapter.TYPE_TTS -> {
+                switchTts = view.findViewById(R.id.switch_tts)
+                etTtsApiUrl = view.findViewById(R.id.et_tts_api_url)
+                etTtsModel = view.findViewById(R.id.et_tts_model)
+                switchEmotionAnalysis = view.findViewById(R.id.switch_emotion_analysis)
+                spinnerTtsEngine = view.findViewById(R.id.spinner_tts_engine)
+                spinnerEdgeVoice = view.findViewById(R.id.spinner_edge_voice)
+                layoutEdgeVoice = view.findViewById(R.id.layout_edge_voice)
+                layoutCloudTts = view.findViewById(R.id.layout_cloud_tts)
+            }
+            SettingsAdapter.TYPE_USER -> {
+                etUserId = view.findViewById(R.id.et_user_id)
+                switchOfflineMode = view.findViewById(R.id.switch_offline_mode)
+                btnWechatBind = view.findViewById(R.id.btn_wechat_bind)
+                tvWechatStatus = view.findViewById(R.id.tv_wechat_status)
+            }
+            SettingsAdapter.TYPE_DIARY -> {
+                switchAutoStart = view.findViewById(R.id.switch_auto_start)
+                switchBackgroundRunning = view.findViewById(R.id.switch_background_running)
+                radioDiaryTrigger = view.findViewById(R.id.radio_diary_trigger)
+            }
+            SettingsAdapter.TYPE_AI_FEATURES -> {
+                switchWakeEnabled = view.findViewById(R.id.switch_wake_enabled)
+                btnSetWakeTime = view.findViewById(R.id.btn_set_wake_time)
+                btnSetWakeMessage = view.findViewById(R.id.btn_set_wake_message)
+                tvWakeInfo = view.findViewById(R.id.tv_wake_info)
+                switchVirtualWorld = view.findViewById(R.id.switch_virtual_world)
+                btnVirtualWorld = view.findViewById(R.id.btn_virtual_world)
+                etImageApiUrl = view.findViewById(R.id.et_image_api_url)
+                etImageApiKey = view.findViewById(R.id.et_image_api_key)
+                etImageModel = view.findViewById(R.id.et_image_model)
+            }
+            SettingsAdapter.TYPE_SAFETY -> {
+                switchSafetyMode = view.findViewById(R.id.switch_safety_mode)
+            }
+            SettingsAdapter.TYPE_MEMORY -> {
+                btnPersonaEditor = view.findViewById(R.id.btn_persona_editor)
+                btnClearChatHistory = view.findViewById(R.id.btn_clear_chat_history)
+            }
+            SettingsAdapter.TYPE_STYLE -> {
+                radioNagFrequency = view.findViewById(R.id.radio_nag_frequency)
+                radioLanguageStyle = view.findViewById(R.id.radio_language_style)
+            }
+        }
+    }
+
+    private fun loadSettingsForType(view: View, type: Int) {
+        val sm = settingsManager ?: return
+        when (type) {
+            SettingsAdapter.TYPE_APPEARANCE -> {
+                switchLive2d?.isChecked = sm.live2dEnabled
+                setupOverlaySize()
+            }
+            SettingsAdapter.TYPE_SEARCH -> {
+                switchSearchEnabled?.isChecked = sm.searchEnabled
+                setupSearchSpinner()
+                etSearchApiUrl?.text = sm.searchApiUrl
+                etSearchApiKey?.text = sm.searchApiKey
+                etSearchEngineId?.text = sm.searchEngineId
+                updateSearchFieldsVisibility()
+            }
+            SettingsAdapter.TYPE_LLM -> {
+                setupSpinner()
+                etChatApiUrl?.text = sm.chatApiUrl
+                etChatApiKey?.text = sm.chatApiKey
+                etChatModel?.text = sm.chatModel
+                setupLlmParams()
+            }
+            SettingsAdapter.TYPE_SCREEN -> {
+                switchScreenRecognition?.isChecked = sm.screenRecognitionEnabled
+                etScreenApiUrl?.text = sm.screenApiUrl
+                etScreenModel?.text = sm.screenModel
+                switchSimpleScreenMode?.isChecked = sm.simpleScreenMode
+            }
+            SettingsAdapter.TYPE_ASR -> {
+                switchVoiceRecognition?.isChecked = sm.voiceRecognitionEnabled
+                etAsrApiUrl?.text = sm.asrApiUrl
+            }
+            SettingsAdapter.TYPE_TTS -> {
+                switchTts?.isChecked = sm.ttsEnabled
+                etTtsApiUrl?.text = sm.ttsApiUrl
+                etTtsModel?.text = sm.ttsModel
+                setupTtsEngine(sm)
+                setupTtsParams()
+                switchEmotionAnalysis?.isChecked = sm.emotionAnalysisEnabled
+            }
+            SettingsAdapter.TYPE_USER -> {
+                etUserId?.text = sm.userId
+                switchOfflineMode?.isChecked = sm.offlineMode
+                updateWechatStatus()
+            }
+            SettingsAdapter.TYPE_DIARY -> {
+                switchAutoStart?.isChecked = sm.autoStart
+                switchBackgroundRunning?.isChecked = sm.backgroundRunning
+                radioDiaryTrigger?.check(
+                    when (sm.diaryTriggerMode) {
+                        com.aicompanion.settings.DiaryTriggerMode.MANUAL -> R.id.radio_diary_manual
+                        com.aicompanion.settings.DiaryTriggerMode.MSG_50 -> R.id.radio_diary_50msg
+                        com.aicompanion.settings.DiaryTriggerMode.HOURLY -> R.id.radio_diary_hourly
+                        com.aicompanion.settings.DiaryTriggerMode.EVERY_2H -> R.id.radio_diary_2h
+                        com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM -> R.id.radio_diary_10pm
+                    }
+                )
+            }
+            SettingsAdapter.TYPE_AI_FEATURES -> {
+                switchWakeEnabled?.isChecked = WakeUpScheduler.isWakeupEnabled(this)
+                updateWakeInfoDisplay()
+                val vwManager = VirtualWorldManager(this)
+                switchVirtualWorld?.isChecked = vwManager.isEnabled
+                etImageApiUrl?.setText(vwManager.imageApiUrl)
+                etImageApiKey?.setText(vwManager.imageApiKey)
+                etImageModel?.setText(vwManager.imageModel)
+            }
+            SettingsAdapter.TYPE_SAFETY -> {
+                switchSafetyMode?.isChecked = com.aicompanion.safety.ContentSafetyFilter.isEnabled(this)
+            }
+            SettingsAdapter.TYPE_MEMORY -> {
+                // No settings to load for memory buttons
+            }
+            SettingsAdapter.TYPE_STYLE -> {
+                radioNagFrequency?.check(
+                    when (sm.nagFrequency) {
+                        NagFrequency.OFF -> R.id.radio_off
+                        NagFrequency.LOW -> R.id.radio_low
+                        NagFrequency.MEDIUM -> R.id.radio_medium
+                        NagFrequency.HIGH -> R.id.radio_high
+                    }
+                )
+                radioLanguageStyle?.check(
+                    when (sm.languageStyle) {
+                        LanguageStyle.NORMAL -> R.id.radio_normal
+                        LanguageStyle.TSUNDERE -> R.id.radio_tsundere
+                        LanguageStyle.CUTE -> R.id.radio_cute
+                    }
+                )
+            }
+        }
+    }
+
+    private fun setupListenersForType(view: View, type: Int) {
+        when (type) {
+            SettingsAdapter.TYPE_APPEARANCE -> {
+                btnChangeTheme?.setOnClickListener { showThemePicker() }
+                btnViewLog?.setOnClickListener { showLive2DLog() }
+                btnModelManager?.setOnClickListener {
+                    try {
+                        startActivity(Intent(this, ModelManagerActivity::class.java))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "无法打开模型管理: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                btnModelAdjust?.setOnClickListener {
+                    try {
+                        startActivity(Intent(this, ModelAdjustActivity::class.java))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "无法打开模型调整: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                btnLocalModel?.setOnClickListener {
+                    try {
+                        startActivity(Intent(this, LocalModelActivity::class.java))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "无法打开本地模型: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                btnBubbleSkin?.setOnClickListener {
+                    try {
+                        startActivity(Intent(this, SkinShopActivity::class.java))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "无法打开皮肤商店", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                btnAiFrame?.setOnClickListener {
+                    try {
+                        val intent = Intent(this, SkinShopActivity::class.java)
+                        intent.putExtra("tab", 1)
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "无法打开皮肤商店", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                btnUserFrame?.setOnClickListener {
+                    try {
+                        val intent = Intent(this, SkinShopActivity::class.java)
+                        intent.putExtra("tab", 2)
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "无法打开皮肤商店", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                btnStartOverlay?.setOnClickListener {
+                    try {
+                        if (!android.provider.Settings.canDrawOverlays(this)) {
+                            val intent = Intent(
+                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                android.net.Uri.parse("package:$packageName")
+                            )
+                            Toast.makeText(this, "请授予悬浮窗权限", Toast.LENGTH_LONG).show()
+                            startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION)
+                            return@setOnClickListener
+                        }
+                        val serviceIntent = Intent(this, com.aicompanion.services.OverlayService::class.java)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(serviceIntent)
+                        } else {
+                            startService(serviceIntent)
+                        }
+                        Toast.makeText(this, "悬浮窗服务已启动", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "启动失败: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            SettingsAdapter.TYPE_LLM -> {
+                btnTestChatApi?.setOnClickListener { testChatApi() }
+                setupEndpointAutoComplete()
+            }
+            SettingsAdapter.TYPE_AI_FEATURES -> {
+                switchWakeEnabled?.setOnCheckedChangeListener { _, _ ->
+                    startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
+                    updateWakeInfoDisplay()
+                }
+                btnSetWakeTime?.setOnClickListener {
+                    startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
+                }
+                btnSetWakeMessage?.setOnClickListener {
+                    startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
+                }
+                switchVirtualWorld?.setOnCheckedChangeListener { _, isChecked ->
+                    val vwMgr = VirtualWorldManager(this)
+                    if (isChecked) {
+                        if (!vwMgr.hasChatModelConfigured()) {
+                            Toast.makeText(this, "请先配置聊天API才能启用虚拟世界", Toast.LENGTH_LONG).show()
+                            switchVirtualWorld?.isChecked = false
+                            return@setOnCheckedChangeListener
+                        }
+                    }
+                    vwMgr.isEnabled = isChecked
+                    if (!isChecked) {
+                        vwMgr.isRunning = false
+                    }
+                }
+                btnVirtualWorld?.setOnClickListener {
+                    val vwMgr = VirtualWorldManager(this)
+                    if (!vwMgr.isEnabled) {
+                        Toast.makeText(this, "请先开启虚拟世界开关", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    if (!vwMgr.hasChatModelConfigured()) {
+                        Toast.makeText(this, "请先配置聊天API", Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
+                    try {
+                        startActivity(Intent(this, VirtualWorldActivity::class.java))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "无法打开虚拟世界: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            SettingsAdapter.TYPE_SAFETY -> {
+                switchSafetyMode?.setOnCheckedChangeListener { _, isChecked ->
+                    com.aicompanion.safety.ContentSafetyFilter.setEnabled(this, isChecked)
+                }
+            }
+            SettingsAdapter.TYPE_USER -> {
+                btnWechatBind?.setOnClickListener {
+                    try {
+                        startActivity(Intent(this, com.aicompanion.ilink.WechatBindActivity::class.java))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "无法打开微信绑定: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            SettingsAdapter.TYPE_DIARY -> {
+                switchAutoStart?.setOnCheckedChangeListener { _, isChecked ->
+                    settingsManager?.autoStart = isChecked
+                }
+                switchBackgroundRunning?.setOnCheckedChangeListener { _, isChecked ->
+                    settingsManager?.backgroundRunning = isChecked
+                }
+            }
+            SettingsAdapter.TYPE_MEMORY -> {
+                btnPersonaEditor?.setOnClickListener {
+                    try {
+                        val intent = Intent(this, PersonaEditorActivity::class.java)
+                        val personaId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                            .getString("active_persona_id", "default") ?: "default"
+                        intent.putExtra("persona_id", personaId)
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(this, "无法打开角色设定: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                btnClearChatHistory?.setOnClickListener {
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("清空聊天记录")
+                        .setMessage("确定要清空当前角色的所有聊天记录吗？此操作不可撤销。")
+                        .setPositiveButton("清空") { _, _ ->
+                            val personaId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                                .getString("active_persona_id", "default") ?: "default"
+                            getSharedPreferences("chat_history_$personaId", MODE_PRIVATE).edit().clear().apply()
+                            Toast.makeText(this, "聊天记录已清空", Toast.LENGTH_SHORT).show()
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
+                }
+            }
+        }
+    }
+
+    private fun updateWechatStatus() {
+        val authManager = com.aicompanion.ilink.IlinkAuthManager(this)
+        if (authManager.isBound) {
+            tvWechatStatus?.text = "已绑定 ✓"
+            tvWechatStatus?.setTextColor(0xFF07c160.toInt())
+            btnWechatBind?.text = "管理微信"
+        } else {
+            tvWechatStatus?.text = "未绑定"
+            tvWechatStatus?.setTextColor(0xFF667788.toInt())
+            btnWechatBind?.text = "绑定微信"
         }
     }
 
@@ -136,7 +621,7 @@ class SettingsActivity : AppCompatActivity() {
             )
 
             fun applyBtnColor(id: Int, tintColor: Int, textColor: Int, outline: Boolean) {
-                val btn = findViewById<View?>(id) ?: return
+                val btn = findSettingsView<View>(id) ?: return
                 try {
                     if (btn is com.google.android.material.button.MaterialButton) {
                         if (outline) {
@@ -173,141 +658,38 @@ class SettingsActivity : AppCompatActivity() {
         val toolbar = findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)
         toolbar.setNavigationOnClickListener { finish() }
 
-        // Buttons
-        btnPersonaEditor = findViewById<View?>(R.id.btn_persona_editor) as? com.google.android.material.button.MaterialButton
-        btnModelManager = findViewById<View?>(R.id.btn_model_manager) as? com.google.android.material.button.MaterialButton
-        btnModelAdjust = findViewById<View?>(R.id.btn_model_adjust) as? com.google.android.material.button.MaterialButton
-        btnChangeTheme = findViewById<View?>(R.id.btn_change_theme) as? com.google.android.material.button.MaterialButton
-        btnViewLog = findViewById<View?>(R.id.btn_view_log) as? com.google.android.material.button.MaterialButton
-        btnStartOverlay = findViewById<View?>(R.id.btn_start_overlay) as? com.google.android.material.button.MaterialButton
-        btnTestChatApi = findViewById<View?>(R.id.btn_test_chat_api) as? com.google.android.material.button.MaterialButton
+        for (i in 0 until settingsAdapter.itemCount) {
+            val holder = recyclerView.findViewHolderForAdapterPosition(i)
+            if (holder != null) {
+                val type = settingsAdapter.items[i].type
+                updateFieldReferences(holder.itemView, type)
+            }
+        }
+    }
 
-        // SeekBar
-        seekOverlaySize = findViewById(R.id.seek_overlay_size)
-        tvOverlaySizeValue = findViewById(R.id.tv_overlay_size_value)
-
-        // Radio groups
-        radioNagFrequency = findViewById(R.id.radio_nag_frequency)
-        radioLanguageStyle = findViewById(R.id.radio_language_style)
-
-        // API settings
-        spinnerApiProvider = findViewById(R.id.spinner_api_provider)
-        tvApiProviderHint = findViewById(R.id.tv_api_provider_hint)
-        etChatApiUrl = findViewById(R.id.et_chat_api_url)
-        etChatApiKey = findViewById(R.id.et_chat_api_key)
-        etChatModel = findViewById(R.id.et_chat_model)
-        etScreenApiUrl = findViewById(R.id.et_screen_api_url)
-        etScreenModel = findViewById(R.id.et_screen_model)
-        etAsrApiUrl = findViewById(R.id.et_asr_api_url)
-        etTtsApiUrl = findViewById(R.id.et_tts_api_url)
-        etTtsModel = findViewById(R.id.et_tts_model)
-        etUserId = findViewById(R.id.et_user_id)
-
-        // Switches
-        switchScreenRecognition = findViewById(R.id.switch_screen_recognition)
-        switchSimpleScreenMode = findViewById(R.id.switch_simple_screen_mode)
-        switchVoiceRecognition = findViewById(R.id.switch_voice_recognition)
-        switchTts = findViewById(R.id.switch_tts)
-        switchOfflineMode = findViewById(R.id.switch_offline_mode)
-        switchLive2d = findViewById(R.id.switch_live2d)
-
-        findViewById<Switch>(R.id.switch_safety_mode)?.isChecked = com.aicompanion.safety.ContentSafetyFilter.isEnabled(this)
-
-        // Wake up settings
-        switchWakeEnabled = findViewById(R.id.switch_wake_enabled)
-        btnSetWakeTime = findViewById<View?>(R.id.btn_set_wake_time) as? com.google.android.material.button.MaterialButton
-        btnSetWakeMessage = findViewById<View?>(R.id.btn_set_wake_message) as? com.google.android.material.button.MaterialButton
-        tvWakeInfo = findViewById(R.id.tv_wake_info)
-
-        // Search config
-        switchSearchEnabled = findViewById(R.id.switch_search_enabled)
-        spinnerSearchProvider = findViewById(R.id.spinner_search_provider)
-        etSearchApiUrl = findViewById(R.id.et_search_api_url)
-        etSearchApiKey = findViewById(R.id.et_search_api_key)
-        etSearchEngineId = findViewById(R.id.et_search_engine_id)
-        tilSearchApiUrl = findViewById(R.id.til_search_api_url)
-        tilSearchApiKey = findViewById(R.id.til_search_api_key)
-        tilSearchEngineId = findViewById(R.id.til_search_engine_id)
-
-        setupOverlaySize()
-        setupEndpointAutoComplete()
-        setupLlmParams()
-        setupTtsParams()
+    private fun setupFooterClickListeners(footerView: View) {
+        footerView.findViewById<View?>(R.id.donateBtn)?.setOnClickListener {
+            showDonateDialog()
+        }
+        footerView.findViewById<View?>(R.id.tvBilibiliLink)?.setOnClickListener {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://space.bilibili.com/1523985433"))
+                startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(this, "无法打开链接，请手动搜索B站UID: 1523985433", Toast.LENGTH_LONG).show()
+            }
+        }
+        footerView.findViewById<View?>(R.id.tvDouyinLink)?.setOnClickListener {
+            val clip = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clipData = android.content.ClipData.newPlainText("抖音ID", "31991565756")
+            clip.setPrimaryClip(clipData)
+            Toast.makeText(this, "抖音ID已复制到剪贴板：31991565756", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun loadSettings() {
-        val sm = settingsManager ?: return
-
-        // Load API settings
-        etChatApiUrl?.text = sm.chatApiUrl
-        etChatApiKey?.text = sm.chatApiKey
-        etChatModel?.text = sm.chatModel
-        etScreenApiUrl?.text = sm.screenApiUrl
-        etScreenModel?.text = sm.screenModel
-        etAsrApiUrl?.text = sm.asrApiUrl
-        etTtsApiUrl?.text = sm.ttsApiUrl
-        etTtsModel?.text = sm.ttsModel
-        etUserId?.text = sm.userId
-
-        switchScreenRecognition?.isChecked = sm.screenRecognitionEnabled
-        switchSimpleScreenMode?.isChecked = sm.simpleScreenMode
-        switchVoiceRecognition?.isChecked = sm.voiceRecognitionEnabled
-        switchTts?.isChecked = sm.ttsEnabled
-        switchOfflineMode?.isChecked = sm.offlineMode
-        switchLive2d?.isChecked = sm.live2dEnabled
-
-        // Radio groups
-        radioNagFrequency?.check(
-            when (sm.nagFrequency) {
-                NagFrequency.OFF -> R.id.radio_off
-                NagFrequency.LOW -> R.id.radio_low
-                NagFrequency.MEDIUM -> R.id.radio_medium
-                NagFrequency.HIGH -> R.id.radio_high
-            }
-        )
-
-        radioLanguageStyle?.check(
-            when (sm.languageStyle) {
-                LanguageStyle.NORMAL -> R.id.radio_normal
-                LanguageStyle.TSUNDERE -> R.id.radio_tsundere
-                LanguageStyle.CUTE -> R.id.radio_cute
-            }
-        )
-
-        // Load wake up settings
-        switchWakeEnabled?.isChecked = WakeUpScheduler.isWakeupEnabled(this)
-        updateWakeInfoDisplay()
-
-        // Diary + background settings
-        findViewById<Switch>(R.id.switch_auto_start)?.isChecked = sm.autoStart
-        findViewById<Switch>(R.id.switch_background_running)?.isChecked = sm.backgroundRunning
-
-        findViewById<RadioGroup>(R.id.radio_diary_trigger)?.check(
-            when (sm.diaryTriggerMode) {
-                com.aicompanion.settings.DiaryTriggerMode.MANUAL -> R.id.radio_diary_manual
-                com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50 -> R.id.radio_diary_50msg
-                com.aicompanion.settings.DiaryTriggerMode.HOURLY -> R.id.radio_diary_hourly
-                com.aicompanion.settings.DiaryTriggerMode.TWO_HOURS -> R.id.radio_diary_2h
-                com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM -> R.id.radio_diary_10pm
-            }
-        )
-
-        // Load search settings
-        switchSearchEnabled?.isChecked = sm.searchEnabled
-        setupSearchSpinner()
-        etSearchApiUrl?.text = sm.searchApiUrl
-        etSearchApiKey?.text = sm.searchApiKey
-        etSearchEngineId?.text = sm.searchEngineId
-        updateSearchFieldsVisibility()
-
-        val vwManager = VirtualWorldManager(this)
-        findViewById<Switch>(R.id.switch_virtual_world)?.isChecked = vwManager.isEnabled
-
-        findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_url)?.setText(vwManager.imageApiUrl)
-        findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_key)?.setText(vwManager.imageApiKey)
-        findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_model)?.setText(vwManager.imageModel)
-
-        findViewById<Switch>(R.id.switch_emotion_analysis)?.isChecked = sm.emotionAnalysisEnabled
+        // Settings are loaded per-item via onItemBound callback
+        // This method is kept for compatibility - initial visible items are already loaded
     }
 
     private fun updateWakeInfoDisplay() {
@@ -321,204 +703,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        (findViewById<View?>(R.id.donateBtn))?.setOnClickListener {
-            showDonateDialog()
-        }
-
-        btnPersonaEditor?.setOnClickListener {
-            try {
-                val intent = Intent(this, PersonaEditorActivity::class.java)
-                val personaId = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                    .getString("active_persona_id", "default") ?: "default"
-                intent.putExtra("persona_id", personaId)
-                startActivity(intent)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "无法打开角色设定: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        btnModelManager?.setOnClickListener {
-            try {
-                startActivity(Intent(this, ModelManagerActivity::class.java))
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "无法打开模型管理: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        btnModelAdjust?.setOnClickListener {
-            try {
-                startActivity(Intent(this, ModelAdjustActivity::class.java))
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "无法打开模型调整: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_local_model)?.setOnClickListener {
-            try {
-                startActivity(Intent(this, LocalModelActivity::class.java))
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "无法打开本地模型: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        btnChangeTheme?.setOnClickListener {
-            showThemePicker()
-        }
-
-        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_bubble_skin)?.setOnClickListener {
-            try {
-                startActivity(Intent(this, SkinShopActivity::class.java))
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "无法打开皮肤商店", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_ai_frame)?.setOnClickListener {
-            try {
-                val intent = Intent(this, SkinShopActivity::class.java)
-                intent.putExtra("tab", 1)
-                startActivity(intent)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "无法打开皮肤商店", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_user_frame)?.setOnClickListener {
-            try {
-                val intent = Intent(this, SkinShopActivity::class.java)
-                intent.putExtra("tab", 2)
-                startActivity(intent)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "无法打开皮肤商店", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        btnViewLog?.setOnClickListener {
-            showLive2DLog()
-        }
-
-        btnStartOverlay?.setOnClickListener {
-            try {
-                if (!android.provider.Settings.canDrawOverlays(this)) {
-                    val intent = Intent(
-                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        android.net.Uri.parse("package:$packageName")
-                    )
-                    Toast.makeText(this, "请授予悬浮窗权限", Toast.LENGTH_LONG).show()
-                    startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION)
-                    return@setOnClickListener
-                }
-                val serviceIntent = Intent(this, com.aicompanion.services.OverlayService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(serviceIntent)
-                } else {
-                    startService(serviceIntent)
-                }
-                Toast.makeText(this, "悬浮窗服务已启动", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "启动失败: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-
-        btnTestChatApi?.setOnClickListener {
-            testChatApi()
-        }
-
-        switchWakeEnabled?.setOnCheckedChangeListener { _, _ ->
-            startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
-            updateWakeInfoDisplay()
-        }
-
-        btnSetWakeTime?.setOnClickListener {
-            startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
-        }
-
-        btnSetWakeMessage?.setOnClickListener {
-            startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
-        }
-
-        findViewById<View?>(R.id.tvBilibiliLink)?.setOnClickListener {
-            try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://space.bilibili.com/1523985433"))
-                startActivity(intent)
-            } catch (e: Exception) {
-                Toast.makeText(this, "无法打开链接，请手动搜索B站UID: 1523985433", Toast.LENGTH_LONG).show()
-            }
-        }
-
-        findViewById<View?>(R.id.tvDouyinLink)?.setOnClickListener {
-            val clip = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-            val clipData = android.content.ClipData.newPlainText("抖音ID", "31991565756")
-            clip.setPrimaryClip(clipData)
-            Toast.makeText(this, "抖音ID已复制到剪贴板：31991565756", Toast.LENGTH_LONG).show()
-        }
-
-        findViewById<Switch>(R.id.switch_safety_mode)?.setOnCheckedChangeListener { _, isChecked ->
-            com.aicompanion.safety.ContentSafetyFilter.setEnabled(this, isChecked)
-        }
-
-        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_clear_chat_history)?.setOnClickListener {
-            android.app.AlertDialog.Builder(this)
-                .setTitle("清空聊天记录")
-                .setMessage("确定要清空当前角色的所有聊天记录吗？此操作不可撤销。")
-                .setPositiveButton("清空") { _, _ ->
-                    val personaId = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                        .getString("active_persona_id", "default") ?: "default"
-                    getSharedPreferences("chat_history_$personaId", MODE_PRIVATE).edit().clear().apply()
-                    Toast.makeText(this, "聊天记录已清空", Toast.LENGTH_SHORT).show()
-                }
-                .setNegativeButton("取消", null)
-                .show()
-        }
-
-        findViewById<Switch>(R.id.switch_auto_start)?.setOnCheckedChangeListener { _, isChecked ->
-            settingsManager?.autoStart = isChecked
-        }
-
-        findViewById<Switch>(R.id.switch_background_running)?.setOnCheckedChangeListener { _, isChecked ->
-            settingsManager?.backgroundRunning = isChecked
-        }
-
-        findViewById<Switch>(R.id.switch_virtual_world)?.setOnCheckedChangeListener { _, isChecked ->
-            val vwMgr = VirtualWorldManager(this)
-            if (isChecked) {
-                if (!vwMgr.hasChatModelConfigured()) {
-                    Toast.makeText(this, "请先配置聊天API才能启用虚拟世界", Toast.LENGTH_LONG).show()
-                    findViewById<Switch>(R.id.switch_virtual_world)?.isChecked = false
-                    return@setOnCheckedChangeListener
-                }
-            }
-            vwMgr.isEnabled = isChecked
-            if (!isChecked) {
-                vwMgr.isRunning = false
-            }
-        }
-
-        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_virtual_world)?.setOnClickListener {
-            val vwMgr = VirtualWorldManager(this)
-            if (!vwMgr.isEnabled) {
-                Toast.makeText(this, "请先开启虚拟世界开关", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (!vwMgr.hasChatModelConfigured()) {
-                Toast.makeText(this, "请先配置聊天API", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            try {
-                startActivity(Intent(this, VirtualWorldActivity::class.java))
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "无法打开虚拟世界: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
+        // Click listeners are set up per-item via onItemBound callback
     }
 
     private fun showThemePicker() {
@@ -633,8 +818,6 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 if (isSpinnerInitialized && url.isNotEmpty()) {
                     etChatApiUrl?.setText(url)
-                    // Only auto-fill model if user hasn't customized it:
-                    // model is empty OR matches a known default from another provider
                     val currentModel = etChatModel?.text?.toString()?.trim() ?: ""
                     val knownDefaults = setOf(
                         "gpt-4o-mini", "qwen-plus", "qwen-max", "glm-4-flash",
@@ -653,8 +836,6 @@ class SettingsActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // Use post to ensure any deferred selection callbacks fire BEFORE we enable auto-fill.
-        // This prevents the spinner from overwriting saved model/URL on initial setup.
         spinnerApiProvider?.post {
             isSpinnerInitialized = true
         }
@@ -698,39 +879,28 @@ class SettingsActivity : AppCompatActivity() {
     private fun setupLlmParams() {
         val sm = settingsManager ?: return
 
-        val seekTemp = findViewById<SeekBar>(R.id.seek_temperature)
-        val tvTemp = findViewById<TextView>(R.id.tv_temperature_value)
-        val seekTopP = findViewById<SeekBar>(R.id.seek_top_p)
-        val tvTopP = findViewById<TextView>(R.id.tv_top_p_value)
-        val seekFreqP = findViewById<SeekBar>(R.id.seek_freq_penalty)
-        val tvFreqP = findViewById<TextView>(R.id.tv_freq_penalty_value)
-        val seekPresP = findViewById<SeekBar>(R.id.seek_presence_penalty)
-        val tvPresP = findViewById<TextView>(R.id.tv_presence_penalty_value)
-        val seekMaxTok = findViewById<SeekBar>(R.id.seek_max_tokens)
-        val etMaxTok = findViewById<android.widget.EditText>(R.id.et_max_tokens)
-        val layoutFreqP = findViewById<View>(R.id.layout_freq_penalty)
-        val layoutPresP = findViewById<View>(R.id.layout_presence_penalty)
-        val tvProviderHint = findViewById<TextView>(R.id.tv_provider_param_hint)
-        val tvMaxTokLimit = findViewById<TextView>(R.id.tv_max_tokens_limit_hint)
-
         seekTemp?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 val value = progress / 100f
                 tvTemp?.text = String.format("%.2f", value)
-                sm.llmTemperature = value
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val sm = settingsManager ?: return
+                sm.llmTemperature = seekBar?.progress?.div(100f) ?: return
+            }
         })
 
         seekTopP?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 val value = progress / 100f
                 tvTopP?.text = String.format("%.2f", value)
-                sm.llmTopP = value
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val sm = settingsManager ?: return
+                sm.llmTopP = seekBar?.progress?.div(100f) ?: return
+            }
         })
 
         seekFreqP?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -739,10 +909,15 @@ class SettingsActivity : AppCompatActivity() {
                 val range = profile.freqPenaltyRange ?: (-2f)..2f
                 val value = range.start + (progress / 400f) * (range.endInclusive - range.start)
                 tvFreqP?.text = String.format("%.2f", value)
-                sm.llmFrequencyPenalty = value
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val sm = settingsManager ?: return
+                val profile = sm.getCurrentProfile()
+                val range = profile.freqPenaltyRange ?: (-2f)..2f
+                val value = range.start + ((seekBar?.progress ?: 0) / 400f) * (range.endInclusive - range.start)
+                sm.llmFrequencyPenalty = value
+            }
         })
 
         seekPresP?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -751,10 +926,15 @@ class SettingsActivity : AppCompatActivity() {
                 val range = profile.presPenaltyRange ?: (-2f)..2f
                 val value = range.start + (progress / 400f) * (range.endInclusive - range.start)
                 tvPresP?.text = String.format("%.2f", value)
-                sm.llmPresencePenalty = value
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val sm = settingsManager ?: return
+                val profile = sm.getCurrentProfile()
+                val range = profile.presPenaltyRange ?: (-2f)..2f
+                val value = range.start + ((seekBar?.progress ?: 0) / 400f) * (range.endInclusive - range.start)
+                sm.llmPresencePenalty = value
+            }
         })
 
         seekMaxTok?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -767,17 +947,26 @@ class SettingsActivity : AppCompatActivity() {
                     scaled.coerceIn(50, limit)
                 }
                 etMaxTok?.setText("$value")
-                sm.llmMaxTokens = value
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val sm = settingsManager ?: return
+                val limit = sm.getEffectiveMaxTokensLimit()
+                val value = if (limit <= 10000) {
+                    (seekBar?.progress ?: 50).coerceIn(50, limit)
+                } else {
+                    ((seekBar?.progress ?: 0) / 10000f * limit).toInt().coerceIn(50, limit)
+                }
+                sm.llmMaxTokens = value
+            }
         })
 
         etMaxTok?.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
-                val text = etMaxTok.text?.toString()?.trim() ?: ""
+                val et = etMaxTok ?: return@setOnFocusChangeListener
+                val text = et.text?.toString()?.trim() ?: ""
                 val value = text.toIntOrNull()?.coerceIn(50, sm.getEffectiveMaxTokensLimit()) ?: sm.llmMaxTokens
-                etMaxTok.setText("$value")
+                et.setText("$value")
                 sm.llmMaxTokens = value
                 updateMaxTokensSeekBar(seekMaxTok, value, sm.getEffectiveMaxTokensLimit())
             }
@@ -799,21 +988,6 @@ class SettingsActivity : AppCompatActivity() {
     fun updateParamsForProvider(providerId: String) {
         val sm = settingsManager ?: return
         val profile = ProviderProfile.getProfile(providerId)
-
-        val seekTemp = findViewById<SeekBar>(R.id.seek_temperature)
-        val tvTemp = findViewById<TextView>(R.id.tv_temperature_value)
-        val seekTopP = findViewById<SeekBar>(R.id.seek_top_p)
-        val tvTopP = findViewById<TextView>(R.id.tv_top_p_value)
-        val seekFreqP = findViewById<SeekBar>(R.id.seek_freq_penalty)
-        val tvFreqP = findViewById<TextView>(R.id.tv_freq_penalty_value)
-        val seekPresP = findViewById<SeekBar>(R.id.seek_presence_penalty)
-        val tvPresP = findViewById<TextView>(R.id.tv_presence_penalty_value)
-        val seekMaxTok = findViewById<SeekBar>(R.id.seek_max_tokens)
-        val etMaxTok = findViewById<android.widget.EditText>(R.id.et_max_tokens)
-        val layoutFreqP = findViewById<View>(R.id.layout_freq_penalty)
-        val layoutPresP = findViewById<View>(R.id.layout_presence_penalty)
-        val tvProviderHint = findViewById<TextView>(R.id.tv_provider_param_hint)
-        val tvMaxTokLimit = findViewById<TextView>(R.id.tv_max_tokens_limit_hint)
 
         seekTemp?.max = (profile.tempRange.endInclusive * 100).toInt()
         val currentTemp = sm.llmTemperature.coerceIn(profile.tempRange)
@@ -870,13 +1044,78 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupTtsEngine(sm: SettingsManager) {
+        val engineNames = listOf("Edge TTS (免费)", "云端 TTS", "自动", "仅本地")
+        val engineValues = listOf(
+            com.aicompanion.voice.TtsManager.ENGINE_EDGE,
+            com.aicompanion.voice.TtsManager.ENGINE_CLOUD,
+            com.aicompanion.voice.TtsManager.ENGINE_AUTO,
+            com.aicompanion.voice.TtsManager.ENGINE_LOCAL
+        )
+
+        val engineAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, engineNames)
+        engineAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerTtsEngine?.adapter = engineAdapter
+
+        val currentEngine = sm.ttsEngineMode
+        val engineIdx = engineValues.indexOf(currentEngine).coerceAtLeast(0)
+        spinnerTtsEngine?.setSelection(engineIdx)
+
+        val voices = com.aicompanion.voice.EdgeTtsEngine.VOICES
+        val voiceNames = voices.map { "${it.displayName} (${it.gender}) - ${it.locale}" }
+        val voiceAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, voiceNames)
+        voiceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerEdgeVoice?.adapter = voiceAdapter
+
+        val currentVoice = sm.ttsVoice
+        val voiceIdx = voices.indexOfFirst { it.id == currentVoice }.coerceAtLeast(0)
+        spinnerEdgeVoice?.setSelection(voiceIdx)
+
+        updateTtsVisibility(currentEngine)
+
+        spinnerTtsEngine?.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selectedEngine = engineValues[position]
+                sm.ttsEngineMode = selectedEngine
+                updateTtsVisibility(selectedEngine)
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+
+        spinnerEdgeVoice?.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (position in voices.indices) {
+                    sm.ttsVoice = voices[position].id
+                }
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+    }
+
+    private fun updateTtsVisibility(engine: String) {
+        when (engine) {
+            com.aicompanion.voice.TtsManager.ENGINE_EDGE -> {
+                layoutEdgeVoice?.visibility = View.VISIBLE
+                layoutCloudTts?.visibility = View.GONE
+            }
+            com.aicompanion.voice.TtsManager.ENGINE_CLOUD -> {
+                layoutEdgeVoice?.visibility = View.GONE
+                layoutCloudTts?.visibility = View.VISIBLE
+            }
+            else -> {
+                layoutEdgeVoice?.visibility = View.GONE
+                layoutCloudTts?.visibility = View.GONE
+            }
+        }
+    }
+
     private fun setupTtsParams() {
         val sm = settingsManager ?: return
 
-        val seekPitch = findViewById<SeekBar>(R.id.seek_tts_pitch)
-        val tvPitch = findViewById<TextView>(R.id.tv_tts_pitch_value)
-        val seekRate = findViewById<SeekBar>(R.id.seek_tts_rate)
-        val tvRate = findViewById<TextView>(R.id.tv_tts_rate_value)
+        val seekPitch = findSettingsView<SeekBar>(R.id.seek_tts_pitch)
+        val tvPitch = findSettingsView<TextView>(R.id.tv_tts_pitch_value)
+        val seekRate = findSettingsView<SeekBar>(R.id.seek_tts_rate)
+        val tvRate = findSettingsView<TextView>(R.id.tv_tts_rate_value)
 
         seekPitch?.progress = (sm.ttsPitch * 100).toInt().coerceIn(50, 150)
         tvPitch?.text = String.format("%.2f", sm.ttsPitch)
@@ -887,20 +1126,24 @@ class SettingsActivity : AppCompatActivity() {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 val value = progress / 100f
                 tvPitch?.text = String.format("%.2f", value)
-                sm.ttsPitch = value
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val sm = settingsManager ?: return
+                sm.ttsPitch = (seekBar?.progress ?: 100) / 100f
+            }
         })
 
         seekRate?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 val value = progress / 100f
                 tvRate?.text = String.format("%.2f", value)
-                sm.ttsRate = value
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val sm = settingsManager ?: return
+                sm.ttsRate = (seekBar?.progress ?: 100) / 100f
+            }
         })
     }
 
@@ -914,11 +1157,13 @@ class SettingsActivity : AppCompatActivity() {
         seekOverlaySize?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 tvOverlaySizeValue?.text = "${progress}%"
-                prefs.edit().putInt("overlay_size_percent", progress).apply()
-                com.aicompanion.overlay.OverlayWindow.notifySizeChanged()
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                prefs.edit().putInt("overlay_size_percent", seekBar?.progress ?: 100).apply()
+                com.aicompanion.overlay.OverlayWindow.notifySizeChanged()
+            }
         })
     }
 
@@ -945,7 +1190,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onResume()
         switchWakeEnabled?.isChecked = WakeUpScheduler.isWakeupEnabled(this)
         updateWakeInfoDisplay()
-        applyTheme()
+        updateWechatStatus()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -979,60 +1224,62 @@ class SettingsActivity : AppCompatActivity() {
     private fun saveSettings() {
         val sm = settingsManager ?: return
 
-        sm.chatApiUrl = etChatApiUrl?.text?.toString() ?: ""
-        sm.chatApiKey = etChatApiKey?.text?.toString() ?: ""
-        sm.chatModel = etChatModel?.text?.toString() ?: "gpt-4o-mini"
-        sm.screenApiUrl = etScreenApiUrl?.text?.toString() ?: ""
-        sm.screenModel = etScreenModel?.text?.toString() ?: "gpt-4o"
-        sm.asrApiUrl = etAsrApiUrl?.text?.toString() ?: ""
-        sm.ttsApiUrl = etTtsApiUrl?.text?.toString() ?: ""
-        sm.ttsModel = etTtsModel?.text?.toString() ?: "tts-1"
-        sm.userId = etUserId?.text?.toString() ?: sm.userId
+        sm.chatApiUrl = findSettingsView<TextView>(R.id.et_chat_api_url)?.text?.toString() ?: sm.chatApiUrl
+        sm.chatApiKey = findSettingsView<TextView>(R.id.et_chat_api_key)?.text?.toString() ?: sm.chatApiKey
+        sm.chatModel = findSettingsView<TextView>(R.id.et_chat_model)?.text?.toString() ?: sm.chatModel
+        sm.screenApiUrl = findSettingsView<TextView>(R.id.et_screen_api_url)?.text?.toString() ?: sm.screenApiUrl
+        sm.screenModel = findSettingsView<TextView>(R.id.et_screen_model)?.text?.toString() ?: sm.screenModel
+        sm.asrApiUrl = findSettingsView<TextView>(R.id.et_asr_api_url)?.text?.toString() ?: sm.asrApiUrl
+        sm.ttsApiUrl = findSettingsView<TextView>(R.id.et_tts_api_url)?.text?.toString() ?: sm.ttsApiUrl
+        sm.ttsModel = findSettingsView<TextView>(R.id.et_tts_model)?.text?.toString() ?: sm.ttsModel
+        sm.userId = findSettingsView<TextView>(R.id.et_user_id)?.text?.toString() ?: sm.userId
 
-        sm.screenRecognitionEnabled = switchScreenRecognition?.isChecked ?: false
-        sm.simpleScreenMode = switchSimpleScreenMode?.isChecked ?: false
-        sm.voiceRecognitionEnabled = switchVoiceRecognition?.isChecked ?: false
-        sm.ttsEnabled = switchTts?.isChecked ?: false
-        sm.offlineMode = switchOfflineMode?.isChecked ?: false
-        sm.live2dEnabled = switchLive2d?.isChecked ?: true
+        sm.screenRecognitionEnabled = findSettingsView<Switch>(R.id.switch_screen_recognition)?.isChecked ?: sm.screenRecognitionEnabled
+        sm.simpleScreenMode = findSettingsView<Switch>(R.id.switch_simple_screen_mode)?.isChecked ?: sm.simpleScreenMode
+        sm.voiceRecognitionEnabled = findSettingsView<Switch>(R.id.switch_voice_recognition)?.isChecked ?: sm.voiceRecognitionEnabled
+        sm.ttsEnabled = findSettingsView<Switch>(R.id.switch_tts)?.isChecked ?: sm.ttsEnabled
+        sm.offlineMode = findSettingsView<Switch>(R.id.switch_offline_mode)?.isChecked ?: sm.offlineMode
+        sm.live2dEnabled = findSettingsView<Switch>(R.id.switch_live2d)?.isChecked ?: sm.live2dEnabled
 
-        sm.nagFrequency = when (radioNagFrequency?.checkedRadioButtonId) {
+        val nagRadio = findSettingsView<RadioGroup>(R.id.radio_nag_frequency)
+        sm.nagFrequency = when (nagRadio?.checkedRadioButtonId) {
             R.id.radio_low -> NagFrequency.LOW
             R.id.radio_medium -> NagFrequency.MEDIUM
             R.id.radio_high -> NagFrequency.HIGH
             else -> NagFrequency.OFF
         }
 
-        sm.languageStyle = when (radioLanguageStyle?.checkedRadioButtonId) {
+        val langRadio = findSettingsView<RadioGroup>(R.id.radio_language_style)
+        sm.languageStyle = when (langRadio?.checkedRadioButtonId) {
             R.id.radio_tsundere -> LanguageStyle.TSUNDERE
             R.id.radio_cute -> LanguageStyle.CUTE
             else -> LanguageStyle.NORMAL
         }
 
-        sm.autoStart = findViewById<Switch>(R.id.switch_auto_start)?.isChecked ?: true
-        sm.backgroundRunning = findViewById<Switch>(R.id.switch_background_running)?.isChecked ?: true
+        sm.autoStart = findSettingsView<Switch>(R.id.switch_auto_start)?.isChecked ?: sm.autoStart
+        sm.backgroundRunning = findSettingsView<Switch>(R.id.switch_background_running)?.isChecked ?: sm.backgroundRunning
 
-        sm.diaryTriggerMode = when (findViewById<RadioGroup>(R.id.radio_diary_trigger)?.checkedRadioButtonId) {
+        val diaryRadio = findSettingsView<RadioGroup>(R.id.radio_diary_trigger)
+        sm.diaryTriggerMode = when (diaryRadio?.checkedRadioButtonId) {
             R.id.radio_diary_manual -> com.aicompanion.settings.DiaryTriggerMode.MANUAL
+            R.id.radio_diary_50msg -> com.aicompanion.settings.DiaryTriggerMode.MSG_50
             R.id.radio_diary_hourly -> com.aicompanion.settings.DiaryTriggerMode.HOURLY
-            R.id.radio_diary_2h -> com.aicompanion.settings.DiaryTriggerMode.TWO_HOURS
+            R.id.radio_diary_2h -> com.aicompanion.settings.DiaryTriggerMode.EVERY_2H
             R.id.radio_diary_10pm -> com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM
-            else -> com.aicompanion.settings.DiaryTriggerMode.MESSAGES_50
+            else -> com.aicompanion.settings.DiaryTriggerMode.DAILY_10PM
         }
 
-        sm.searchEnabled = switchSearchEnabled?.isChecked ?: true
-        sm.searchApiUrl = etSearchApiUrl?.text?.toString() ?: ""
-        sm.searchApiKey = etSearchApiKey?.text?.toString() ?: ""
-        sm.searchEngineId = etSearchEngineId?.text?.toString() ?: ""
+        sm.searchEnabled = findSettingsView<Switch>(R.id.switch_search_enabled)?.isChecked ?: sm.searchEnabled
+        sm.searchApiUrl = findSettingsView<TextView>(R.id.et_search_api_url)?.text?.toString() ?: sm.searchApiUrl
+        sm.searchApiKey = findSettingsView<TextView>(R.id.et_search_api_key)?.text?.toString() ?: sm.searchApiKey
+        sm.searchEngineId = findSettingsView<TextView>(R.id.et_search_engine_id)?.text?.toString() ?: sm.searchEngineId
 
         val vwMgr = VirtualWorldManager(this)
-        vwMgr.imageApiUrl = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_url)?.text?.toString() ?: ""
-        vwMgr.imageApiKey = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_key)?.text?.toString() ?: ""
-        vwMgr.imageModel = findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_model)?.text?.toString() ?: "dall-e-3"
+        vwMgr.imageApiUrl = findSettingsView<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_url)?.text?.toString() ?: vwMgr.imageApiUrl
+        vwMgr.imageApiKey = findSettingsView<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_key)?.text?.toString() ?: vwMgr.imageApiKey
+        vwMgr.imageModel = findSettingsView<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_model)?.text?.toString() ?: vwMgr.imageModel
 
-        sm.emotionAnalysisEnabled = findViewById<Switch>(R.id.switch_emotion_analysis)?.isChecked ?: false
-
-        Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show()
+        sm.emotionAnalysisEnabled = findSettingsView<Switch>(R.id.switch_emotion_analysis)?.isChecked ?: sm.emotionAnalysisEnabled
     }
 
     private fun setupSearchSpinner() {

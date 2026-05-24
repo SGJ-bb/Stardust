@@ -9,9 +9,9 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
-import android.util.Log
 import com.aicompanion.models.Emotion
 import com.aicompanion.settings.SettingsManager
+import com.aicompanion.util.AppLogger
 import java.util.*
 
 class VoiceManager(private val context: Context) {
@@ -31,30 +31,36 @@ class VoiceManager(private val context: Context) {
             if (SpeechRecognizer.isRecognitionAvailable(context)) {
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
             } else {
-                Log.w(TAG, "Speech recognition not available on this device")
+                AppLogger.w(TAG, "Speech recognition not available on this device")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create speech recognizer: ${e.message}")
+            AppLogger.e(TAG, "Failed to create speech recognizer: ${e.message}", e)
         }
 
         try {
-            textToSpeech = TextToSpeech(context) { status ->
+            textToSpeech = TextToSpeech(context.applicationContext) { status ->
                 if (status == TextToSpeech.SUCCESS) {
                     isTTSReady = true
-                    val cn = Locale.CHINESE
-                    if (textToSpeech?.isLanguageAvailable(cn) == TextToSpeech.LANG_AVAILABLE ||
-                        textToSpeech?.isLanguageAvailable(cn) == TextToSpeech.LANG_COUNTRY_AVAILABLE) {
-                        textToSpeech?.language = cn
-                    } else {
-                        textToSpeech?.language = Locale.getDefault()
-                        Log.w(TAG, "Chinese TTS not available, using default locale")
+                    try {
+                        val cn = Locale.CHINESE
+                        if (textToSpeech?.isLanguageAvailable(cn) == TextToSpeech.LANG_AVAILABLE ||
+                            textToSpeech?.isLanguageAvailable(cn) == TextToSpeech.LANG_COUNTRY_AVAILABLE) {
+                            textToSpeech?.language = cn
+                        } else {
+                            textToSpeech?.language = Locale.getDefault()
+                            AppLogger.w(TAG, "Chinese TTS not available, using default locale")
+                        }
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG, "TTS language setting failed: ${e.message}")
                     }
                 } else {
-                    Log.e(TAG, "TTS initialization failed with status: $status")
+                    AppLogger.w(TAG, "TTS initialization failed with status: $status (device may lack TTS engine)")
+                    isTTSReady = false
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create TTS: ${e.message}")
+            AppLogger.w(TAG, "Failed to create TTS: ${e.message}")
+            isTTSReady = false
         }
     }
 
@@ -62,7 +68,7 @@ class VoiceManager(private val context: Context) {
         if (isListening) return
         val recognizer = speechRecognizer
         if (recognizer == null) {
-            Log.w(TAG, "SpeechRecognizer not initialized, cannot start listening")
+            AppLogger.w(TAG, "SpeechRecognizer not initialized, cannot start listening")
             return
         }
 
@@ -96,7 +102,7 @@ class VoiceManager(private val context: Context) {
                         SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "未检测到语音"
                         else -> "未知错误($error)"
                     }
-                    Log.w(TAG, "Speech recognition error: $errorStr")
+                    AppLogger.w(TAG, "Speech recognition error: $errorStr")
                 }
                 override fun onResults(results: Bundle?) {
                     isListening = false
@@ -111,7 +117,7 @@ class VoiceManager(private val context: Context) {
 
             recognizer.startListening(intent)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start listening: ${e.message}")
+            AppLogger.e(TAG, "Failed to start listening: ${e.message}", e)
             isListening = false
         }
     }
@@ -121,13 +127,13 @@ class VoiceManager(private val context: Context) {
         try {
             speechRecognizer?.stopListening()
         } catch (e: Exception) {
-            Log.w(TAG, "Error stopping listening: ${e.message}")
+            AppLogger.w(TAG, "Error stopping listening: ${e.message}", e)
         }
     }
 
     fun speak(text: String, emotion: Emotion = Emotion.NEUTRAL, emotionPitchOffset: Float = 0f, emotionRateOffset: Float = 0f) {
         if (!isTTSReady) {
-            Log.w(TAG, "TTS not ready, cannot speak")
+            AppLogger.w(TAG, "TTS not ready, cannot speak")
             return
         }
         if (text.isBlank()) return
@@ -153,13 +159,13 @@ class VoiceManager(private val context: Context) {
             val utteranceId = UUID.randomUUID().toString()
             textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
         } catch (e: Exception) {
-            Log.e(TAG, "TTS speak failed: ${e.message}")
+            AppLogger.e(TAG, "TTS speak failed: ${e.message}", e)
         }
     }
 
     fun playSpeech(audioUrl: String, emotion: Emotion = Emotion.NEUTRAL) {
         if (audioUrl.isBlank()) {
-            Log.w(TAG, "Empty audio URL")
+            AppLogger.w(TAG, "Empty audio URL")
             return
         }
         try {
@@ -170,13 +176,13 @@ class VoiceManager(private val context: Context) {
                 setOnPreparedListener { start() }
                 setOnCompletionListener { cleanupMediaPlayer() }
                 setOnErrorListener { _, what, extra ->
-                    Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
+                    AppLogger.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
                     cleanupMediaPlayer()
                     true
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to play speech: ${e.message}")
+            AppLogger.e(TAG, "Failed to play speech: ${e.message}", e)
             cleanupMediaPlayer()
         }
     }
@@ -191,7 +197,7 @@ class VoiceManager(private val context: Context) {
                 mediaPlayer?.release()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error cleaning up MediaPlayer: ${e.message}")
+            AppLogger.w(TAG, "Error cleaning up MediaPlayer: ${e.message}", e)
         }
         mediaPlayer = null
     }
@@ -201,7 +207,7 @@ class VoiceManager(private val context: Context) {
         try {
             speechRecognizer?.destroy()
         } catch (e: Exception) {
-            Log.w(TAG, "Error destroying speech recognizer: ${e.message}")
+            AppLogger.w(TAG, "Error destroying speech recognizer: ${e.message}", e)
         }
         speechRecognizer = null
 
@@ -209,7 +215,7 @@ class VoiceManager(private val context: Context) {
             textToSpeech?.stop()
             textToSpeech?.shutdown()
         } catch (e: Exception) {
-            Log.w(TAG, "Error shutting down TTS: ${e.message}")
+            AppLogger.w(TAG, "Error shutting down TTS: ${e.message}", e)
         }
         textToSpeech = null
 

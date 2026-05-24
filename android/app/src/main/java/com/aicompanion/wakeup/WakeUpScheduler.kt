@@ -100,8 +100,8 @@ class WakeUpReceiver : BroadcastReceiver() {
                 )
                 securePrefs.getString("chat_api_key", "") ?: ""
             } catch (e: Exception) {
-                Log.w("WakeUpReceiver", "EncryptedSharedPreferences unavailable, falling back to plaintext storage", e)
-                context.getSharedPreferences("companion_prefs_fallback", Context.MODE_PRIVATE)
+                com.aicompanion.util.AppLogger.e("WakeUpReceiver", "EncryptedSharedPreferences unavailable: ${e.message}")
+                context.getSharedPreferences("companion_secure_fallback", Context.MODE_PRIVATE)
                     .getString("chat_api_key", "") ?: ""
             }
 

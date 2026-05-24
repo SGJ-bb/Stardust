@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "prediction-immutability": {
+      "type": "PreToolUse",
+      "matcher": "Write|Edit",
+      "command": "powershell -File \"f:\\stradust\\content\\.claude\\prediction-immutability.sh\"",
+      "description": "阻止修改 predictions/ 目录中已写文件的 ## 预测 段"
+    },
+    "session-start": {
+      "type": "SessionStart",
+      "command": "powershell -Command \"Write-Host 'Cheat on Content 状态:'; if (Test-Path 'f:\\stradust\\content\\STATUS.md') { Get-Content 'f:\\stradust\\content\\STATUS.md' -Head 20 } else { Write-Host '未初始化' }\"",
+      "description": "Session 启动时自动显示状态看板"
+    }
+  }
+}

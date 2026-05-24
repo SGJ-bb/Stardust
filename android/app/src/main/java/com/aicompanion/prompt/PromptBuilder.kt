@@ -5,12 +5,37 @@ import com.aicompanion.persona.PersonaManager
 
 object PromptBuilder {
 
+    private var cachedIdentity: IdentityBlock? = null
+    private var cachedIdentityPersonaId: String? = null
+    private var cachedCoreRules: String? = null
+    private var cachedCoreRulesEmotion: Boolean? = null
+
     private const val CORE_RULES = "\n【规则】\n" +
             "- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]\n" +
             "- 用()描述你的动作、表情、状态、情绪，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)(猛地跳起来，双手在空中挥舞，尾巴兴奋地左右摇摆)(慵懒地趴在桌上，用指尖无意识地画圈，眼神迷离)\n" +
             "- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定"
 
+    private const val CORE_RULES_NO_EMOTION = "\n【规则】\n" +
+            "- 像真人聊天，简短自然。关心对方情绪\n" +
+            "- 用()描述你的动作、表情、状态、情绪，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)(猛地跳起来，双手在空中挥舞，尾巴兴奋地左右摇摆)(慵懒地趴在桌上，用指尖无意识地画圈，眼神迷离)\n" +
+            "- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定"
+
+    fun getCoreRules(context: Context): String {
+        val sm = com.aicompanion.settings.SettingsManager(context)
+        val emotionEnabled = sm.llmEmotionAnalysisEnabled
+        if (cachedCoreRules != null && cachedCoreRulesEmotion == emotionEnabled) {
+            return cachedCoreRules!!
+        }
+        val rules = if (emotionEnabled) CORE_RULES else CORE_RULES_NO_EMOTION
+        cachedCoreRules = rules
+        cachedCoreRulesEmotion = emotionEnabled
+        return rules
+    }
+
     fun buildIdentity(context: Context, personaId: String): IdentityBlock {
+        if (cachedIdentity != null && cachedIdentityPersonaId == personaId) {
+            return cachedIdentity!!
+        }
         val prefs = context.getSharedPreferences("persona_data_$personaId", android.content.Context.MODE_PRIVATE)
         val pm = PersonaManager(context)
         pm.load()
@@ -27,18 +52,40 @@ object PromptBuilder {
         } ?: prefs.getString("persona_speech_style", "") ?: ""
         val prompt = persona?.prompt ?: ""
         val nickname = prefs.getString("user_nickname", "") ?: ""
-        val userIdentity = prefs.getString("user_identity", "") ?: ""
-        val userAbilities = prefs.getString("user_abilities", "") ?: ""
+        val globalPrefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+        val userIdentity = globalPrefs.getString("global_user_identity", "") ?: ""
+        val userAbilities = globalPrefs.getString("global_user_abilities", "") ?: ""
+        val userPersonalityDef = globalPrefs.getString("user_personality_def", "") ?: ""
+        val aiSummarizedPersonality = globalPrefs.getString("ai_summarized_personality", "") ?: ""
 
-        return IdentityBlock(
+        val appPrefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        val userGender = appPrefs.getString("user_gender", "") ?: ""
+        val userGenderLabel = when (userGender) {
+            "male" -> "男性"; "female" -> "女性"; else -> ""
+        }
+
+        val result = IdentityBlock(
             name = name,
             personality = personality,
             speechStyle = speechStyle,
             customPrompt = prompt,
             userNickname = nickname,
             userIdentity = userIdentity,
-            userAbilities = userAbilities
+            userAbilities = userAbilities,
+            userPersonalityDef = userPersonalityDef,
+            aiSummarizedPersonality = aiSummarizedPersonality,
+            userGenderLabel = userGenderLabel
         )
+        cachedIdentity = result
+        cachedIdentityPersonaId = personaId
+        return result
+    }
+
+    fun invalidateCache() {
+        cachedIdentity = null
+        cachedIdentityPersonaId = null
+        cachedCoreRules = null
+        cachedCoreRulesEmotion = null
     }
 
     fun buildPersonaBase(identity: IdentityBlock): String {
@@ -47,8 +94,11 @@ object PromptBuilder {
             if (identity.personality.isNotBlank()) append(" 性格${identity.personality}。")
             if (identity.speechStyle.isNotBlank()) append(" ${identity.speechStyle}。")
             if (identity.userNickname.isNotBlank()) append(" 叫用户「${identity.userNickname}」。")
-            if (identity.userIdentity.isNotBlank()) append(" 用户身份：${identity.userIdentity}。")
-            if (identity.userAbilities.isNotBlank()) append(" 用户能力/特征：${identity.userAbilities}。")
+            if (identity.userIdentity.isNotBlank()) append(" 用户身份：${identity.userIdentity}。你必须认知并尊重用户的身份。")
+            if (identity.userAbilities.isNotBlank()) append(" 用户能力/技能：${identity.userAbilities}。用户拥有这些能力，你的反应和互动必须完全体现这些能力带来的影响，100%承认并围绕这些能力展开互动。")
+            if (identity.userGenderLabel.isNotBlank()) append(" 用户性别：${identity.userGenderLabel}。")
+            val effectivePersonality = identity.userPersonalityDef.ifBlank { identity.aiSummarizedPersonality }
+            if (effectivePersonality.isNotBlank()) append(" 用户性格：$effectivePersonality。你必须根据这个性格来理解和回应用户，让互动更贴合用户个性。")
         }
     }
 
@@ -59,19 +109,22 @@ object PromptBuilder {
             if (identity.speechStyle.isNotBlank()) append("\n说话风格：${identity.speechStyle}")
             if (identity.customPrompt.isNotBlank()) append("\n${identity.customPrompt}")
             if (identity.userNickname.isNotBlank()) append("\n叫用户「${identity.userNickname}」。")
-            if (identity.userIdentity.isNotBlank()) append("\n用户身份：${identity.userIdentity}")
-            if (identity.userAbilities.isNotBlank()) append("\n用户能力/特征：${identity.userAbilities}")
+            if (identity.userIdentity.isNotBlank()) append("\n用户身份：${identity.userIdentity}。你必须认知并尊重用户的身份。")
+            if (identity.userAbilities.isNotBlank()) append("\n用户能力/技能：${identity.userAbilities}。用户拥有这些能力，你的反应和互动必须完全体现这些能力带来的影响，100%承认并围绕这些能力展开互动。")
+            if (identity.userGenderLabel.isNotBlank()) append("\n用户性别：${identity.userGenderLabel}。")
+            val effectivePersonality = identity.userPersonalityDef.ifBlank { identity.aiSummarizedPersonality }
+            if (effectivePersonality.isNotBlank()) append("\n用户性格：$effectivePersonality。你必须根据这个性格来理解和回应用户，让互动更贴合用户个性。")
         }
     }
 
-    fun buildChatPrompt(identity: IdentityBlock, emotion: String, action: String, memories: List<String>): String {
+    fun buildChatPrompt(identity: IdentityBlock, emotion: String, action: String, memories: List<String>, context: Context): String {
         return buildString {
             append(buildPersonaFull(identity))
             append("\n情绪：$emotion。动作：$action。")
             if (memories.isNotEmpty()) {
                 append("\n记得：${memories.takeLast(3).joinToString("；")}")
             }
-            append(CORE_RULES)
+            append(getCoreRules(context))
         }
     }
 
@@ -81,7 +134,8 @@ object PromptBuilder {
         otherAffections: Map<String, Int>,
         memories: List<String>,
         isMentioned: Boolean = true,
-        relationshipSetting: String = ""
+        relationshipSetting: String = "",
+        context: Context? = null
     ): String {
         return buildString {
             append("你是「${identity.name}」。")
@@ -111,10 +165,10 @@ object PromptBuilder {
                 }
             }
             if (identity.userIdentity.isNotBlank()) {
-                append("\n用户身份：${identity.userIdentity}。")
+                append("\n用户身份：${identity.userIdentity}。你必须认知并尊重用户的身份。")
             }
             if (identity.userAbilities.isNotBlank()) {
-                append("用户能力/特征：${identity.userAbilities}。")
+                append("用户能力/技能：${identity.userAbilities}。用户拥有这些能力，你的反应和互动必须完全体现这些能力带来的影响，100%承认并围绕这些能力展开互动。")
             }
             if (otherNames.isNotEmpty()) {
                 append("\n\n【@互动规则 - 极其重要】")
@@ -130,9 +184,13 @@ object PromptBuilder {
                 append("\n记得：${memories.takeLast(3).joinToString("；")}")
             }
             append("\n【规则】\n")
-            append("- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:xxx]]\n")
-            append("- 用()描述你的动作、表情、状态，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)(猛地跳起来，双手在空中挥舞，尾巴兴奋地左右摇摆)\n")
-            append("- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定")
+            if (context != null) {
+                append(getCoreRules(context).replace("\n【规则】\n", ""))
+            } else {
+                append("- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:xxx]]\n")
+                append("- 用()描述你的动作、表情、状态，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)(猛地跳起来，双手在空中挥舞，尾巴兴奋地左右摇摆)\n")
+                append("- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定")
+            }
             if (!isMentioned) {
                 append("不想说就回「沉默」。")
             }
@@ -269,5 +327,8 @@ data class IdentityBlock(
     val customPrompt: String,
     val userNickname: String,
     val userIdentity: String = "",
-    val userAbilities: String = ""
+    val userAbilities: String = "",
+    val userPersonalityDef: String = "",
+    val aiSummarizedPersonality: String = "",
+    val userGenderLabel: String = ""
 )

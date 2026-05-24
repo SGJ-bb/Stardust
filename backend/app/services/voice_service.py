@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import tempfile
 import os
@@ -28,9 +29,13 @@ class VoiceService:
 
         try:
             if use_cloud and settings.AZURE_SPEECH_KEY:
-                audio_path = await self._azure_tts(text, emotion)
+                audio_path = await asyncio.to_thread(
+                    self._azure_tts_sync, text, emotion
+                )
             else:
-                audio_path = await self._local_tts(text, emotion)
+                audio_path = await asyncio.to_thread(
+                    self._local_tts_sync, text, emotion
+                )
 
             if audio_path:
                 self._cache[cache_key] = audio_path
@@ -40,8 +45,8 @@ class VoiceService:
             logger.error(f"TTS failed: {e}")
             return None
 
-    async def _azure_tts(self, text: str, emotion: EmotionEnum) -> Optional[str]:
-        """Azure 高质量语音合成"""
+    def _azure_tts_sync(self, text: str, emotion: EmotionEnum) -> Optional[str]:
+        """Azure 高质量语音合成（同步阻塞，由 asyncio.to_thread 调用）"""
         try:
             import azure.cognitiveservices.speech as speechsdk
 
@@ -52,15 +57,15 @@ class VoiceService:
 
             prosody = self._get_emotion_prosody(emotion)
 
-            ssml = f"""
-            <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">
-                <voice name="zh-CN-XiaoxiaoNeural">
-                    <prosody rate="{prosody['rate']}" pitch="{prosody['pitch']}">
-                        {text}
-                    </prosody>
-                </voice>
-            </speak>
-            """
+            ssml = (
+                '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">'
+                '<voice name="zh-CN-XiaoxiaoNeural">'
+                f'<prosody rate="{prosody["rate"]}" pitch="{prosody["pitch"]}">'
+                f'{text}'
+                '</prosody>'
+                '</voice>'
+                '</speak>'
+            )
 
             audio_path = os.path.join(self._cache_dir, f"tts_{hash(text)}.wav")
 
@@ -80,10 +85,10 @@ class VoiceService:
 
         except ImportError:
             logger.warning("Azure Speech SDK not installed, falling back to local TTS")
-            return await self._local_tts(text, emotion)
+            return self._local_tts_sync(text, emotion)
 
-    async def _local_tts(self, text: str, emotion: EmotionEnum) -> Optional[str]:
-        """本地TTS（使用系统TTS或ChatTTS）"""
+    def _local_tts_sync(self, text: str, emotion: EmotionEnum) -> Optional[str]:
+        """本地TTS（同步阻塞，由 asyncio.to_thread 调用）"""
         try:
             import pyttsx3
 

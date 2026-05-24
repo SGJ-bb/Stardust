@@ -1,6 +1,7 @@
 package com.aicompanion.rag
 
 import android.content.Context
+import com.aicompanion.util.AppLogger
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -77,7 +78,7 @@ class VectorStore(private val context: Context, private val storeName: String = 
                 arr.put(obj)
             }
             prefs.edit().putString("entries", arr.toString()).apply()
-        } catch (_: Exception) {}
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("VectorStore", "save: ${e.message}") }
     }
 
     fun load(): Boolean {

@@ -142,15 +142,15 @@ class WebSearchPlugin(private val context: Context) : ToolPlugin {
 
 class SearchMemoryPlugin : ToolPlugin {
     override val name = "search_memory"
-    override val description = "搜索用户的记忆池和历史日记"
+    override val description = "搜索用户的短期记忆"
     var onSearchMemory: ((String, Int) -> String)? = null
     override fun getDefinition() = ToolDefinition(
         name = "search_memory",
-        description = "搜索用户的记忆池和历史日记。当你想了解用户之前提到过什么、用户的喜好习惯、过去的经历等信息时调用。可以多次调用不同query来获取完整信息。",
+        description = "搜索用户的短期记忆池。用于查找用户最近聊天中提到过的信息、偏好、约定等。注意：短期记忆只包含近期对话中提取的关键信息，如需查找更早的长期记忆请使用search_diary工具。",
         parameters = mapOf(
             "type" to "object",
             "properties" to mapOf(
-                "query" to mapOf("type" to "string", "description" to "搜索关键词，如「喜欢吃什么」「生日」「工作」等")
+                "query" to mapOf("type" to "string", "description" to "搜索关键词，如「喜欢吃什么」「约定」「工作」等")
             ),
             "required" to listOf("query")
         )
@@ -160,6 +160,31 @@ class SearchMemoryPlugin : ToolPlugin {
         val query = args.optString("query", "")
         if (query.isBlank()) return "错误：请提供搜索关键词"
         return onSearchMemory?.invoke(query, 5) ?: "记忆搜索功能未初始化"
+    }
+}
+
+class SearchDiaryPlugin : ToolPlugin {
+    override val name = "search_diary"
+    override val description = "搜索用户的日记记录（长期记忆）"
+    var onSearchDiary: ((String, Int) -> String)? = null
+    override fun getDefinition() = ToolDefinition(
+        name = "search_diary",
+        description = "搜索用户的日记记录，这是用户的长期记忆。当你需要回忆用户过去几天的经历、心情变化、重要事件时调用此工具。日记包含每日总结、情绪记录和关键事件。可以多次调用不同query来获取更完整的信息。",
+        parameters = mapOf(
+            "type" to "object",
+            "properties" to mapOf(
+                "query" to mapOf("type" to "string", "description" to "搜索关键词，如「上周的心情」「最近开心的事」「关于工作的记录」等"),
+                "top_k" to mapOf("type" to "integer", "description" to "返回结果数量，默认3")
+            ),
+            "required" to listOf("query")
+        )
+    )
+    override fun execute(arguments: String): String {
+        val args = JSONObject(arguments)
+        val query = args.optString("query", "")
+        if (query.isBlank()) return "错误：请提供搜索关键词"
+        val topK = args.optInt("top_k", 3).coerceIn(1, 10)
+        return onSearchDiary?.invoke(query, topK) ?: "日记搜索功能未初始化"
     }
 }
 

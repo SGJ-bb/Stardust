@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="  日记与后台"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#8899dd"
+        android:letterSpacing="0.05"
+        android:layout_marginBottom="10dp" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_settings_card">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="开机自启"
+                    android:textSize="15sp"
+                    android:textColor="#d0d0e0" />
+
+                <Switch
+                    android:id="@+id/switch_auto_start"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:trackTint="#667eea"
+                    android:thumbTint="#c4b5fd" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="14dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="后台运行"
+                    android:textSize="15sp"
+                    android:textColor="#d0d0e0" />
+
+                <Switch
+                    android:id="@+id/switch_background_running"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:trackTint="#667eea"
+                    android:thumbTint="#c4b5fd" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#2a2a4a"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="日记触发模式"
+                android:textSize="14sp"
+                android:textColor="#c4b5fd"
+                android:layout_marginBottom="8dp" />
+
+            <RadioGroup
+                android:id="@+id/radio_diary_trigger"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/radio_diary_manual"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="手动触发"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea"
+                    android:paddingStart="4dp"
+                    android:paddingBottom="6dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_diary_50msg"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="每50条消息"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea"
+                    android:paddingStart="4dp"
+                    android:paddingBottom="6dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_diary_hourly"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="每小时"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea"
+                    android:paddingStart="4dp"
+                    android:paddingBottom="6dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_diary_2h"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="每2小时"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea"
+                    android:paddingStart="4dp"
+                    android:paddingBottom="6dp" />
+
+                <RadioButton
+                    android:id="@+id/radio_diary_10pm"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="每晚10点"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea"
+                    android:paddingStart="4dp" />
+            </RadioGroup>
+        </LinearLayout>
+    </FrameLayout>
+
+</LinearLayout>

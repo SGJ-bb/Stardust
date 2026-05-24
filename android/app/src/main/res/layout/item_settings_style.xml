@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="  交互风格"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#8899dd"
+        android:letterSpacing="0.05"
+        android:layout_marginBottom="10dp" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_settings_card">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="唠叨频率"
+                android:textSize="14sp"
+                android:textColor="#c4b5fd"
+                android:layout_marginBottom="8dp" />
+
+            <RadioGroup
+                android:id="@+id/radio_nag_frequency"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <RadioButton
+                    android:id="@+id/radio_off"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="关闭"
+                    android:textSize="13sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea" />
+
+                <RadioButton
+                    android:id="@+id/radio_low"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="低"
+                    android:textSize="13sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea" />
+
+                <RadioButton
+                    android:id="@+id/radio_medium"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="中"
+                    android:textSize="13sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea" />
+
+                <RadioButton
+                    android:id="@+id/radio_high"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="高"
+                    android:textSize="13sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea" />
+            </RadioGroup>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#2a2a4a"
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="角色语言风格"
+                android:textSize="14sp"
+                android:textColor="#c4b5fd"
+                android:layout_marginBottom="8dp" />
+
+            <RadioGroup
+                android:id="@+id/radio_language_style"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/radio_normal"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="普通"
+                    android:textSize="13sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea" />
+
+                <RadioButton
+                    android:id="@+id/radio_tsundere"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="傲娇"
+                    android:textSize="13sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea" />
+
+                <RadioButton
+                    android:id="@+id/radio_cute"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="可爱"
+                    android:textSize="13sp"
+                    android:textColor="#d0d0e0"
+                    android:buttonTint="#667eea" />
+            </RadioGroup>
+        </LinearLayout>
+    </FrameLayout>
+
+</LinearLayout>

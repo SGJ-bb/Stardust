@@ -53,7 +53,7 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
             Log.d(TAG, "Index built: ${chunks.size} chunks")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "buildIndex failed: ${e.message}")
+            com.aicompanion.util.AppLogger.e(TAG, "buildIndex failed: ${e.message}", e)
             false
         }
     }
@@ -66,7 +66,7 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
             val results = store.search(queryVec, topK, RagConfig.minSimilarity)
             results.map { (entry, _) -> entry.text }
         } catch (e: Exception) {
-            Log.e(TAG, "retrieve failed: ${e.message}")
+            com.aicompanion.util.AppLogger.e(TAG, "retrieve failed: ${e.message}", e)
             emptyList()
         }
     }
@@ -76,8 +76,8 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
         return try {
             val queryVec = embedder.embedSingleSync(query)
             store.search(queryVec, topK, RagConfig.minSimilarity).map { (entry, _) -> entry.text }
-        } catch (_: Exception) {
-            emptyList()
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.e(TAG, "RAG同步检索失败: ${e.message}", e); emptyList()
         }
     }
 

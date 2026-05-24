@@ -1,6 +1,8 @@
 package com.aicompanion.moments
 
 import android.content.Context
+import com.aicompanion.memory.GlobalMemoryPool
+import com.aicompanion.memory.MemoryEntry
 import com.aicompanion.network.ApiClient
 import com.aicompanion.util.AppLogger
 import kotlinx.coroutines.Dispatchers
@@ -140,13 +142,19 @@ class MomentsManager(private val context: Context) {
         personaName: String,
         personaPrompt: String,
         momentContent: String,
-        commentContent: String
+        commentContent: String,
+        personaId: String = ""
     ): String? {
         if (apiClient == null) return null
         return try {
+            val globalPool = if (personaId.isNotBlank()) GlobalMemoryPool(context, personaId) else null
+            val globalBlock = globalPool?.getGlobalBlock() ?: ""
             val systemPrompt = buildString {
                 append("你是「$personaName」。\n")
                 append(personaPrompt)
+                if (globalBlock.isNotBlank()) {
+                    append("\n$globalBlock\n")
+                }
                 append("\n你发了一条动态：「$momentContent」\n")
                 append("用户评论了：「$commentContent」\n")
                 append("请回复评论，1-2句话，语气自然。\n")
@@ -166,13 +174,19 @@ class MomentsManager(private val context: Context) {
         apiClient: ApiClient?,
         personaName: String,
         personaPrompt: String,
-        momentContent: String
+        momentContent: String,
+        personaId: String = ""
     ): String? {
         if (apiClient == null) return null
         return try {
+            val globalPool = if (personaId.isNotBlank()) GlobalMemoryPool(context, personaId) else null
+            val globalBlock = globalPool?.getGlobalBlock() ?: ""
             val systemPrompt = buildString {
                 append("你是「$personaName」。\n")
                 append(personaPrompt)
+                if (globalBlock.isNotBlank()) {
+                    append("\n$globalBlock\n")
+                }
                 append("\n用户发了一条动态：「$momentContent」\n")
                 append("请评论用户的动态，1-2句话，语气自然。\n")
                 append("可以回应、吐槽、关心、开玩笑等，像朋友评论朋友圈一样。\n")
@@ -191,5 +205,17 @@ class MomentsManager(private val context: Context) {
     fun deleteMoment(momentId: String) {
         moments.removeAll { it.id == momentId }
         saveIndex()
+    }
+
+    fun saveInteractionToGlobalMemory(personaId: String, userAction: String, aiResponse: String) {
+        if (personaId.isBlank()) return
+        val pool = GlobalMemoryPool(context, personaId)
+        pool.addFromScene("moments", listOf(
+            MemoryEntry(
+                content = "动态互动：$userAction",
+                category = "动态",
+                isGlobal = true
+            )
+        ))
     }
 }

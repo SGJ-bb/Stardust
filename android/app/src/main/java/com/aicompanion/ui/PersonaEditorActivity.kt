@@ -24,6 +24,7 @@ class PersonaEditorActivity : Activity() {
     private var etUserAbilities: EditText? = null
     private var tvDiscoveredLabel: TextView? = null
     private var containerDiscovered: LinearLayout? = null
+    private var switchPersonalityEvolution: com.google.android.material.switchmaterial.SwitchMaterial? = null
     private var nicknameManager: NicknameManager? = null
     private var personaId: String = "default"
 
@@ -73,6 +74,7 @@ class PersonaEditorActivity : Activity() {
         etUserAbilities = findViewById(R.id.et_user_abilities)
         tvDiscoveredLabel = findViewById(R.id.tv_discovered_label)
         containerDiscovered = findViewById(R.id.container_discovered_nicknames)
+        switchPersonalityEvolution = findViewById(R.id.switch_personality_evolution)
     }
 
     private fun getPersonaPrefs() = getSharedPreferences("persona_data_$personaId", MODE_PRIVATE)
@@ -97,8 +99,9 @@ class PersonaEditorActivity : Activity() {
             etWorldRelationship?.setText(prefs.getString("world_relationship", defaultPersona["world_relationship"]))
             etWorldRules?.setText(prefs.getString("world_rules", defaultPersona["world_rules"]))
             etUserNickname?.setText(prefs.getString("user_nickname", ""))
-            etUserIdentity?.setText(prefs.getString("user_identity", ""))
-            etUserAbilities?.setText(prefs.getString("user_abilities", ""))
+            etUserIdentity?.setText(getSharedPreferences("app_prefs", MODE_PRIVATE).getString("global_user_identity", ""))
+            etUserAbilities?.setText(getSharedPreferences("app_prefs", MODE_PRIVATE).getString("global_user_abilities", ""))
+            switchPersonalityEvolution?.isChecked = prefs.getBoolean("personality_evolution_enabled", true)
         } else {
             val prefs = getPersonaPrefs()
             etPersonaName?.setText(prefs.getString("persona_name", defaultPersona["persona_name"]))
@@ -113,8 +116,9 @@ class PersonaEditorActivity : Activity() {
             etWorldRelationship?.setText(prefs.getString("world_relationship", defaultPersona["world_relationship"]))
             etWorldRules?.setText(prefs.getString("world_rules", defaultPersona["world_rules"]))
             etUserNickname?.setText(prefs.getString("user_nickname", ""))
-            etUserIdentity?.setText(prefs.getString("user_identity", ""))
-            etUserAbilities?.setText(prefs.getString("user_abilities", ""))
+            etUserIdentity?.setText(getSharedPreferences("app_prefs", MODE_PRIVATE).getString("global_user_identity", ""))
+            etUserAbilities?.setText(getSharedPreferences("app_prefs", MODE_PRIVATE).getString("global_user_abilities", ""))
+            switchPersonalityEvolution?.isChecked = prefs.getBoolean("personality_evolution_enabled", true)
         }
     }
 
@@ -167,8 +171,14 @@ class PersonaEditorActivity : Activity() {
             putString("world_relationship", worldRelationship)
             putString("world_rules", worldRules)
             putString("user_nickname", nickname)
-            putString("user_identity", userIdentity)
-            putString("user_abilities", userAbilities)
+            putBoolean("personality_evolution_enabled", switchPersonalityEvolution?.isChecked ?: true)
+            apply()
+        }
+
+        val globalPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        globalPrefs.edit().apply {
+            putString("global_user_identity", userIdentity)
+            putString("global_user_abilities", userAbilities)
             apply()
         }
 

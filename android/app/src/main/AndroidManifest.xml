@@ -21,6 +21,7 @@
     <application
         android:name=".CompanionApp"
         android:allowBackup="false"
+        android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
@@ -94,6 +95,18 @@
             android:parentActivityName=".ui.MainActivity" />
 
         <activity
+            android:name=".ui.ChatHistoryActivity"
+            android:label="聊天记录"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.PhoneCallActivity"
+            android:label="语音通话"
+            android:screenOrientation="portrait"
+            android:showOnLockScreen="true"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+
+        <activity
             android:name=".ui.AchievementActivity"
             android:label="成就殿堂"
             android:parentActivityName=".ui.MainActivity" />
@@ -146,6 +159,20 @@
             android:label="虚拟世界"
             android:parentActivityName=".ui.SettingsActivity"
             android:theme="@style/Theme.Companion" />
+
+        <activity
+            android:name="com.aicompanion.ilink.WechatBindActivity"
+            android:label="微信连接"
+            android:theme="@style/Theme.Companion" />
+
+        <service
+            android:name="com.aicompanion.ilink.IlinkPollingService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="微信iLink消息轮询监听服务" />
+        </service>
 
         <service
             android:name=".services.OverlayService"

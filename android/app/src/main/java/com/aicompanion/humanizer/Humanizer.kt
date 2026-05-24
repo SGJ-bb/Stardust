@@ -1,6 +1,7 @@
 package com.aicompanion.humanizer
 
 import kotlin.random.Random
+import com.aicompanion.util.AppLogger
 
 class Humanizer {
 
@@ -36,7 +37,10 @@ class Humanizer {
     fun humanize(rawText: String, isComplexQuestion: Boolean = false): List<HumanizedChunk> {
         val chunks = mutableListOf<HumanizedChunk>()
 
-        if (rawText.isBlank()) return chunks
+        if (rawText.isBlank()) {
+            AppLogger.w("Humanizer", "humanize: blank input, len=${rawText.length}")
+            return chunks
+        }
 
         // Step 1: Parse out <pause=Xms> tags
         val (processedText, pauseSegments) = parsePauseTags(rawText)
@@ -86,6 +90,10 @@ class Humanizer {
             chunks.add(HumanizedChunk(idle, 1500L + Random.nextLong(800)))
         }
 
+        if (chunks.isEmpty()) {
+            AppLogger.w("Humanizer", "humanize: empty result, rawLen=${rawText.length}")
+        }
+
         return chunks
     }
 
@@ -121,7 +129,10 @@ class Humanizer {
             return merged
         }
 
-        if (result.isEmpty()) result.add(text)
+        if (result.isEmpty()) {
+            AppLogger.w("Humanizer", "splitSentences: empty, textLen=${text.length}")
+            result.add(text)
+        }
         return result
     }
 

@@ -3,11 +3,9 @@ package com.aicompanion.emotion
 import com.aicompanion.network.ApiClient
 import com.aicompanion.util.AppLogger
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 data class EmotionParams(
     val temperatureOffset: Float = 0f,
@@ -42,10 +40,7 @@ class EmotionAnalyzer(private val apiClient: ApiClient) {
         private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = ApiClient.sharedClient
 
     fun analyzeEmotion(
         personaName: String,

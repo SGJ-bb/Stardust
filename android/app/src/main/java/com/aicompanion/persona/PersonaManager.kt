@@ -72,13 +72,38 @@ class PersonaManager(private val context: Context) {
             return
         }
         try {
-            val json = JSONObject(indexFile.readText())
+            val text = indexFile.readText()
+            val json = JSONObject(text)
             val arr = json.optJSONArray("personas") ?: return
             for (i in 0 until arr.length()) {
                 personas.add(Persona.fromJson(arr.getJSONObject(i)))
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "load failed: ${e.message}")
+            AppLogger.e(TAG, "load failed, attempting backup: ${e.message}")
+            val backup = File(personaDir, "personas_index.bak")
+            if (backup.exists()) {
+                try {
+                    val text = backup.readText()
+                    val json = JSONObject(text)
+                    val arr = json.optJSONArray("personas") ?: return
+                    for (i in 0 until arr.length()) {
+                        personas.add(Persona.fromJson(arr.getJSONObject(i)))
+                    }
+                    save()
+                    AppLogger.d(TAG, "restored from backup")
+                    return
+                } catch (e2: Exception) {
+                    AppLogger.e(TAG, "backup restore also failed: ${e2.message}")
+                }
+            }
+            personas.add(Persona(
+                id = "default",
+                name = "星尘",
+                prompt = "你叫星尘，性格活泼、有点小傲娇，喜欢和主人聊天。",
+                isDefault = true,
+                createdAt = System.currentTimeMillis()
+            ))
+            save()
         }
     }
 
@@ -88,6 +113,10 @@ class PersonaManager(private val context: Context) {
                 put("personas", JSONArray().apply {
                     personas.forEach { put(it.toJson()) }
                 })
+            }
+            val backup = File(personaDir, "personas_index.bak")
+            if (indexFile.exists()) {
+                try { indexFile.copyTo(backup, overwrite = true) } catch (_: Exception) {}
             }
             indexFile.writeText(json.toString())
         } catch (e: Exception) {
@@ -150,4 +179,110 @@ class PersonaManager(private val context: Context) {
     fun getChatPrefsName(personaId: String): String = "$CHAT_PREFS_PREFIX$personaId"
 
     fun getPersonaDir(personaId: String): File = File(personaDir, personaId).apply { mkdirs() }
+
+    private val EXPORT_SAFE_KEYS = setOf(
+        "persona_name", "persona_desc", "persona_greeting", "persona_personality",
+        "persona_speech_style", "persona_catchphrases", "persona_appearance",
+        "persona_preferences", "persona_avatar_path", "world_setting",
+        "world_relationship", "world_rules", "user_nickname",
+        "personality_evolution_enabled"
+    )
+
+    private val GLOBAL_EXPORT_SAFE_KEYS = setOf(
+        "global_user_identity", "global_user_abilities", "active_persona_id"
+    )
+
+    fun exportAllPersonas(): String = exportPersonas(personas)
+
+    fun exportPersonas(selected: List<Persona>): String {
+        val json = JSONObject().apply {
+            put("export_version", 1)
+            put("export_time", System.currentTimeMillis())
+            val arr = JSONArray()
+            for (p in selected) {
+                val pObj = p.toJson()
+                val prefs = context.getSharedPreferences("persona_data_${p.id}", Context.MODE_PRIVATE)
+                val extObj = JSONObject()
+                for ((key, value) in prefs.all) {
+                    if (key !in EXPORT_SAFE_KEYS) continue
+                    if (value is String) extObj.put(key, value)
+                    else if (value is Int) extObj.put(key, value)
+                    else if (value is Boolean) extObj.put(key, value)
+                    else if (value is Float) extObj.put(key, value)
+                    else if (value is Long) extObj.put(key, value)
+                }
+                pObj.put("extended_data", extObj)
+                arr.put(pObj)
+            }
+            put("personas", arr)
+            val globalPrefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+            val globalObj = JSONObject()
+            for ((key, value) in globalPrefs.all) {
+                if (key !in GLOBAL_EXPORT_SAFE_KEYS) continue
+                if (value is String) globalObj.put(key, value)
+            }
+            put("global_prefs", globalObj)
+        }
+        return json.toString(2)
+    }
+
+    data class ImportResult(val imported: Int, val skipped: Int, val errors: List<String>)
+
+    fun importPersonas(jsonStr: String): ImportResult {
+        val errors = mutableListOf<String>()
+        var imported = 0
+        var skipped = 0
+        try {
+            val root = JSONObject(jsonStr)
+            val arr = root.optJSONArray("personas") ?: return ImportResult(0, 0, listOf("无效格式"))
+            for (i in 0 until arr.length()) {
+                try {
+                    val pObj = arr.getJSONObject(i)
+                    val persona = Persona.fromJson(pObj)
+                    if (persona.name.isBlank()) {
+                        skipped++
+                        continue
+                    }
+                    val existing = getPersona(persona.id)
+                    if (existing != null) {
+                        updatePersona(persona.id) { persona }
+                    } else {
+                        addPersona(persona)
+                    }
+                    val extObj = pObj.optJSONObject("extended_data")
+                    if (extObj != null) {
+                        val prefs = context.getSharedPreferences("persona_data_${persona.id}", Context.MODE_PRIVATE)
+                        val editor = prefs.edit()
+                        val keys = extObj.keys()
+                        while (keys.hasNext()) {
+                            val key = keys.next()
+                            val value = extObj.get(key)
+                            when (value) {
+                                is String -> editor.putString(key, value)
+                                is Int -> editor.putInt(key, value)
+                                is Boolean -> editor.putBoolean(key, value)
+                                is Float -> editor.putFloat(key, value)
+                                is Long -> editor.putLong(key, value)
+                            }
+                        }
+                        editor.apply()
+                    }
+                    imported++
+                } catch (e: Exception) {
+                    errors.add("第${i + 1}条导入失败: ${e.message}")
+                }
+            }
+            val globalObj = root.optJSONObject("global_prefs")
+            if (globalObj != null) {
+                val globalPrefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                val editor = globalPrefs.edit()
+                if (globalObj.has("global_user_identity")) editor.putString("global_user_identity", globalObj.getString("global_user_identity"))
+                if (globalObj.has("global_user_abilities")) editor.putString("global_user_abilities", globalObj.getString("global_user_abilities"))
+                editor.apply()
+            }
+        } catch (e: Exception) {
+            errors.add("JSON解析失败: ${e.message}")
+        }
+        return ImportResult(imported, skipped, errors)
+    }
 }

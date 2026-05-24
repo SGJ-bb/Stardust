@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "initialized_at": "2026-05-22T21:17:00+08:00",
+  "mode": "warm-start",
+  "mode_reason": "已发布多条视频，账号流量~700，有实绩数据但未形成体系化校准",
+  "content_form": "douyin-tech-showcase",
+  "content_form_label": "抖音技能展示/项目宣传视频",
+  "platform": "douyin",
+  "user_profile": {
+    "identity": "大一学生，一个月从零学会编程，独立开发AI伴侣App",
+    "strengths": ["执行力极强", "学习速度极快", "有真实项目可展示", "二次元圈层认知"],
+    "current_traffic": 700,
+    "traffic_unit": "per_video_avg",
+    "existing_content_types": ["项目宣传视频", "二次元爱好剪辑"],
+    "target": "用技能和能力吸引流量，突破当前流量瓶颈"
+  },
+  "rubric_version": "v0-douyin-tech",
+  "rubric_source": "adapted from opinion-video-zero + douyin-tech-showcase custom",
+  "buffer": {
+    "shot_not_published": 0,
+    "max_buffer": 3
+  },
+  "calibration_pool": {
+    "total_samples": 0,
+    "min_for_bump": 5,
+    "retro_window_days": 3
+  },
+  "paths": {
+    "rubric": "rubric_notes.md",
+    "workflow": "WORKFLOW.md",
+    "status": "STATUS.md",
+    "benchmark": "benchmark.md",
+    "audience": "audience.md",
+    "candidates": "candidates.md",
+    "scripts": "scripts/",
+    "predictions": "predictions/",
+    "videos": "videos/",
+    "samples": "samples/",
+    "cache": ".cheat-cache/"
+  },
+  "hooks": {
+    "prediction_immutability": true,
+    "session_start_report": true,
+    "meta_logging": true
+  },
+  "last_activity": "2026-05-22T21:17:00+08:00"
+}

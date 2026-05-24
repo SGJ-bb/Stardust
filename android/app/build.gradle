@@ -68,6 +68,8 @@ dependencies {
     implementation 'com.google.mlkit:text-recognition:16.0.0'
     implementation 'com.google.mlkit:text-recognition-chinese:16.0.0'
     
+    implementation 'com.google.zxing:core:3.5.2'
+    
     // Live2D Cubism SDK - 需要手动下载aar文件放入libs目录
     // implementation files('libs/live2d.aar')
     
