@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.RadioGroup
+import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.Switch
@@ -26,14 +27,19 @@ import com.aicompanion.settings.SettingsManager
 import com.aicompanion.settings.LanguageStyle
 import com.aicompanion.settings.NagFrequency
 import com.aicompanion.settings.ProviderProfile
+import com.aicompanion.settings.ServicePresets
 import com.aicompanion.diary.DiaryManager
 import com.aicompanion.models.Emotion
 import com.aicompanion.theme.ThemeManager
 import com.aicompanion.wakeup.WakeUpScheduler
 import com.aicompanion.virtualworld.VirtualWorldManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.lifecycle.lifecycleScope
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.*
 
 class SettingsActivity : AppCompatActivity() {
@@ -50,6 +56,15 @@ class SettingsActivity : AppCompatActivity() {
     private var btnViewLog: com.google.android.material.button.MaterialButton? = null
     private var btnStartOverlay: com.google.android.material.button.MaterialButton? = null
     private var btnTestChatApi: com.google.android.material.button.MaterialButton? = null
+    private var btnTestTts: com.google.android.material.button.MaterialButton? = null
+    private var tvTtsTestResult: TextView? = null
+    private var btnTestAsr: com.google.android.material.button.MaterialButton? = null
+    private var tvAsrTestResult: TextView? = null
+    private var btnTestImageGen: com.google.android.material.button.MaterialButton? = null
+    private var ivImageGenPreview: ImageView? = null
+    private var tvImageGenTestResult: TextView? = null
+    private var btnTestImageRecog: com.google.android.material.button.MaterialButton? = null
+    private var tvImageRecogTestResult: TextView? = null
     private var seekOverlaySize: SeekBar? = null
     private var tvOverlaySizeValue: TextView? = null
     private var radioNagFrequency: RadioGroup? = null
@@ -57,18 +72,34 @@ class SettingsActivity : AppCompatActivity() {
 
     private var spinnerApiProvider: Spinner? = null
     private var tvApiProviderHint: TextView? = null
+    private var spinnerTtsProvider: Spinner? = null
+    private var spinnerAsrProvider: Spinner? = null
+    private var spinnerImageGenProvider: Spinner? = null
+    private var spinnerImageRecogProvider: Spinner? = null
+    private var isTtsProviderInitialized = false
+    private var isAsrProviderInitialized = false
+    private var isImageGenProviderInitialized = false
+    private var isImageRecogProviderInitialized = false
     private var etChatApiUrl: TextView? = null
     private var etChatApiKey: TextView? = null
     private var etChatModel: TextView? = null
     private var etScreenApiUrl: TextView? = null
     private var etScreenModel: TextView? = null
     private var etAsrApiUrl: TextView? = null
+    private var etAsrApiKey: TextView? = null
+    private var etAsrModel: TextView? = null
     private var etTtsApiUrl: TextView? = null
+    private var etTtsApiKey: TextView? = null
     private var etTtsModel: TextView? = null
+    private var etTtsVoiceName: TextView? = null
     private var etUserId: TextView? = null
+    private var spinnerUserGender: Spinner? = null
+    private var etUserBirthday: TextView? = null
+    private var etUserAppearance: TextView? = null
 
     private var switchScreenRecognition: Switch? = null
     private var switchSimpleScreenMode: Switch? = null
+    private var switchChatModelVision: Switch? = null
     private var switchVoiceRecognition: Switch? = null
     private var switchTts: Switch? = null
     private var spinnerTtsEngine: Spinner? = null
@@ -95,6 +126,11 @@ class SettingsActivity : AppCompatActivity() {
     private var tilSearchEngineId: View? = null
 
     private var isSpinnerInitialized = false
+
+    private val ttsKnownDefaults = setOf("tts-1", "tts-1-hd", "cosyvoice-v1", "s2-pro", "FunAudioLLM/CosyVoice2-0.5B")
+    private val asrKnownDefaults = setOf("whisper-1", "FunAudioLLM/SenseVoiceSmall", "sensevoice-v1")
+    private val imageGenKnownDefaults = setOf("dall-e-3", "Kwai-Kolors/Kolors", "kling-v3-image-generation", "cogview-4-250304")
+    private val imageRecogKnownDefaults = setOf("gpt-4o", "qwen-vl-max", "glm-4v-flash", "Qwen/Qwen2-VL-7B-Instruct")
 
     private var seekTemp: SeekBar? = null
     private var tvTemp: TextView? = null
@@ -125,6 +161,8 @@ class SettingsActivity : AppCompatActivity() {
     private var btnVirtualWorld: com.google.android.material.button.MaterialButton? = null
     private var etImageApiUrl: com.google.android.material.textfield.TextInputEditText? = null
     private var etImageApiKey: com.google.android.material.textfield.TextInputEditText? = null
+    private var etImageApiSecretKey: com.google.android.material.textfield.TextInputEditText? = null
+    private var tvImageKeyHint: TextView? = null
     private var etImageModel: com.google.android.material.textfield.TextInputEditText? = null
 
     @Suppress("UNCHECKED_CAST")
@@ -143,6 +181,9 @@ class SettingsActivity : AppCompatActivity() {
 
         try {
             settingsManager = SettingsManager(this)
+
+            com.aicompanion.util.AppLogger.enabled = settingsManager?.appLoggingEnabled ?: true
+            com.aicompanion.util.AppLogger.debugVerbose = settingsManager?.appDebugVerbose ?: false
 
             setupRecyclerView()
 
@@ -199,6 +240,71 @@ class SettingsActivity : AppCompatActivity() {
             loadedItemTypes.add(type)
             loadSettingsForType(view, type)
             setupListenersForType(view, type)
+        } else {
+            refreshValuesForType(view, type)
+        }
+    }
+
+    private fun refreshValuesForType(view: View, type: Int) {
+        val sm = settingsManager ?: return
+        when (type) {
+            SettingsAdapter.TYPE_ASR -> {
+                view.findViewById<Switch>(R.id.switch_voice_recognition)?.isChecked = sm.voiceRecognitionEnabled
+                val asrUrl = view.findViewById<TextView>(R.id.et_asr_api_url)
+                if (asrUrl?.hasFocus() != true) asrUrl?.text = sm.asrApiUrl
+                val asrKey = view.findViewById<TextView>(R.id.et_asr_api_key)
+                if (asrKey?.hasFocus() != true) asrKey?.text = sm.asrApiKey
+                val asrModel = view.findViewById<TextView>(R.id.et_asr_model)
+                if (asrModel?.hasFocus() != true) asrModel?.text = sm.asrModel
+            }
+            SettingsAdapter.TYPE_TTS -> {
+                view.findViewById<Switch>(R.id.switch_tts)?.isChecked = sm.ttsEnabled
+                val ttsUrl = view.findViewById<TextView>(R.id.et_tts_api_url)
+                if (ttsUrl?.hasFocus() != true) ttsUrl?.text = sm.ttsApiUrl
+                val ttsKey = view.findViewById<TextView>(R.id.et_tts_api_key)
+                if (ttsKey?.hasFocus() != true) ttsKey?.text = sm.ttsApiKey
+                val ttsModel = view.findViewById<TextView>(R.id.et_tts_model)
+                if (ttsModel?.hasFocus() != true) ttsModel?.text = sm.ttsModel
+                val ttsVoice = view.findViewById<TextView>(R.id.et_tts_voice_name)
+                if (ttsVoice?.hasFocus() != true) ttsVoice?.text = sm.ttsVoiceName
+                view.findViewById<Switch>(R.id.switch_emotion_analysis)?.isChecked = sm.emotionAnalysisEnabled
+                updateTtsVisibility(sm.ttsEngineMode)
+            }
+            SettingsAdapter.TYPE_SCREEN -> {
+                view.findViewById<Switch>(R.id.switch_screen_recognition)?.isChecked = sm.screenRecognitionEnabled
+                val screenUrl = view.findViewById<TextView>(R.id.et_screen_api_url)
+                if (screenUrl?.hasFocus() != true) screenUrl?.text = sm.screenApiUrl
+                val screenModel = view.findViewById<TextView>(R.id.et_screen_model)
+                if (screenModel?.hasFocus() != true) screenModel?.text = sm.screenModel
+                view.findViewById<Switch>(R.id.switch_simple_screen_mode)?.isChecked = sm.simpleScreenMode
+                view.findViewById<Switch>(R.id.switch_chat_model_vision)?.isChecked = sm.useChatModelForVision
+            }
+            SettingsAdapter.TYPE_LLM -> {
+                val chatUrl = view.findViewById<TextView>(R.id.et_chat_api_url)
+                if (chatUrl?.hasFocus() != true) chatUrl?.text = sm.chatApiUrl
+                val chatKey = view.findViewById<TextView>(R.id.et_chat_api_key)
+                if (chatKey?.hasFocus() != true) chatKey?.text = sm.chatApiKey
+                val chatModel = view.findViewById<TextView>(R.id.et_chat_model)
+                if (chatModel?.hasFocus() != true) chatModel?.text = sm.chatModel
+            }
+            SettingsAdapter.TYPE_USER -> {
+                val userId = view.findViewById<TextView>(R.id.et_user_id)
+                if (userId?.hasFocus() != true) userId?.text = sm.userId
+                val userBday = view.findViewById<TextView>(R.id.et_user_birthday)
+                if (userBday?.hasFocus() != true) userBday?.text = sm.userBirthday
+                val userAppr = view.findViewById<TextView>(R.id.et_user_appearance)
+                if (userAppr?.hasFocus() != true) userAppr?.text = sm.userAppearance
+                view.findViewById<Switch>(R.id.switch_offline_mode)?.isChecked = sm.offlineMode
+            }
+            SettingsAdapter.TYPE_SEARCH -> {
+                view.findViewById<Switch>(R.id.switch_search_enabled)?.isChecked = sm.searchEnabled
+                val searchUrl = view.findViewById<TextView>(R.id.et_search_api_url)
+                if (searchUrl?.hasFocus() != true) searchUrl?.text = sm.searchApiUrl
+                val searchKey = view.findViewById<TextView>(R.id.et_search_api_key)
+                if (searchKey?.hasFocus() != true) searchKey?.text = sm.searchApiKey
+                val searchEngine = view.findViewById<TextView>(R.id.et_search_engine_id)
+                if (searchEngine?.hasFocus() != true) searchEngine?.text = sm.searchEngineId
+            }
         }
     }
 
@@ -255,23 +361,40 @@ class SettingsActivity : AppCompatActivity() {
                 etScreenApiUrl = view.findViewById(R.id.et_screen_api_url)
                 etScreenModel = view.findViewById(R.id.et_screen_model)
                 switchSimpleScreenMode = view.findViewById(R.id.switch_simple_screen_mode)
+                switchChatModelVision = view.findViewById(R.id.switch_chat_model_vision)
+                spinnerImageRecogProvider = view.findViewById(R.id.spinner_image_recog_provider)
+                btnTestImageRecog = view.findViewById(R.id.btn_test_image_recog)
+                tvImageRecogTestResult = view.findViewById(R.id.tv_image_recog_test_result)
             }
             SettingsAdapter.TYPE_ASR -> {
                 switchVoiceRecognition = view.findViewById(R.id.switch_voice_recognition)
                 etAsrApiUrl = view.findViewById(R.id.et_asr_api_url)
+                etAsrApiKey = view.findViewById(R.id.et_asr_api_key)
+                etAsrModel = view.findViewById(R.id.et_asr_model)
+                spinnerAsrProvider = view.findViewById(R.id.spinner_asr_provider)
+                btnTestAsr = view.findViewById(R.id.btn_test_asr)
+                tvAsrTestResult = view.findViewById(R.id.tv_asr_test_result)
             }
             SettingsAdapter.TYPE_TTS -> {
                 switchTts = view.findViewById(R.id.switch_tts)
                 etTtsApiUrl = view.findViewById(R.id.et_tts_api_url)
+                etTtsApiKey = view.findViewById(R.id.et_tts_api_key)
                 etTtsModel = view.findViewById(R.id.et_tts_model)
+                etTtsVoiceName = view.findViewById(R.id.et_tts_voice_name)
                 switchEmotionAnalysis = view.findViewById(R.id.switch_emotion_analysis)
                 spinnerTtsEngine = view.findViewById(R.id.spinner_tts_engine)
                 spinnerEdgeVoice = view.findViewById(R.id.spinner_edge_voice)
                 layoutEdgeVoice = view.findViewById(R.id.layout_edge_voice)
                 layoutCloudTts = view.findViewById(R.id.layout_cloud_tts)
+                spinnerTtsProvider = view.findViewById(R.id.spinner_tts_provider)
+                btnTestTts = view.findViewById(R.id.btn_test_tts)
+                tvTtsTestResult = view.findViewById(R.id.tv_tts_test_result)
             }
             SettingsAdapter.TYPE_USER -> {
                 etUserId = view.findViewById(R.id.et_user_id)
+                spinnerUserGender = view.findViewById(R.id.spinner_user_gender)
+                etUserBirthday = view.findViewById(R.id.et_user_birthday)
+                etUserAppearance = view.findViewById(R.id.et_user_appearance)
                 switchOfflineMode = view.findViewById(R.id.switch_offline_mode)
                 btnWechatBind = view.findViewById(R.id.btn_wechat_bind)
                 tvWechatStatus = view.findViewById(R.id.tv_wechat_status)
@@ -290,7 +413,13 @@ class SettingsActivity : AppCompatActivity() {
                 btnVirtualWorld = view.findViewById(R.id.btn_virtual_world)
                 etImageApiUrl = view.findViewById(R.id.et_image_api_url)
                 etImageApiKey = view.findViewById(R.id.et_image_api_key)
+                etImageApiSecretKey = view.findViewById(R.id.et_image_api_secret_key)
+                tvImageKeyHint = view.findViewById(R.id.tv_image_key_hint)
                 etImageModel = view.findViewById(R.id.et_image_model)
+                spinnerImageGenProvider = view.findViewById(R.id.spinner_image_gen_provider)
+                btnTestImageGen = view.findViewById(R.id.btn_test_image_gen)
+                ivImageGenPreview = view.findViewById(R.id.iv_image_gen_preview)
+                tvImageGenTestResult = view.findViewById(R.id.tv_image_gen_test_result)
             }
             SettingsAdapter.TYPE_SAFETY -> {
                 switchSafetyMode = view.findViewById(R.id.switch_safety_mode)
@@ -333,21 +462,33 @@ class SettingsActivity : AppCompatActivity() {
                 etScreenApiUrl?.text = sm.screenApiUrl
                 etScreenModel?.text = sm.screenModel
                 switchSimpleScreenMode?.isChecked = sm.simpleScreenMode
+                switchChatModelVision?.isChecked = sm.useChatModelForVision
+                setupImageRecogProviderSpinner()
             }
             SettingsAdapter.TYPE_ASR -> {
                 switchVoiceRecognition?.isChecked = sm.voiceRecognitionEnabled
                 etAsrApiUrl?.text = sm.asrApiUrl
+                etAsrApiKey?.text = sm.asrApiKey
+                etAsrModel?.text = sm.asrModel
+                setupAsrProviderSpinner()
             }
             SettingsAdapter.TYPE_TTS -> {
                 switchTts?.isChecked = sm.ttsEnabled
                 etTtsApiUrl?.text = sm.ttsApiUrl
+                etTtsApiKey?.text = sm.ttsApiKey
                 etTtsModel?.text = sm.ttsModel
+                etTtsVoiceName?.text = sm.ttsVoiceName
                 setupTtsEngine(sm)
                 setupTtsParams()
+                setupTtsProviderSpinner()
                 switchEmotionAnalysis?.isChecked = sm.emotionAnalysisEnabled
             }
             SettingsAdapter.TYPE_USER -> {
                 etUserId?.text = sm.userId
+                setupGenderSpinner(sm)
+                etUserBirthday?.text = sm.userBirthday
+                etUserAppearance?.text = sm.userAppearance
+                setupBirthdayPicker()
                 switchOfflineMode?.isChecked = sm.offlineMode
                 updateWechatStatus()
             }
@@ -371,7 +512,14 @@ class SettingsActivity : AppCompatActivity() {
                 switchVirtualWorld?.isChecked = vwManager.isEnabled
                 etImageApiUrl?.setText(vwManager.imageApiUrl)
                 etImageApiKey?.setText(vwManager.imageApiKey)
+                etImageApiSecretKey?.setText(vwManager.imageApiSecretKey)
                 etImageModel?.setText(vwManager.imageModel)
+                setupImageGenProviderSpinner()
+                val currentImageProvider = settingsManager?.imageGenProvider ?: "custom"
+                if (currentImageProvider == "aliyun_kling") {
+                    tvImageKeyHint?.visibility = View.VISIBLE
+                    findSettingsView<com.google.android.material.textfield.TextInputLayout>(R.id.layout_image_api_secret_key)?.visibility = View.VISIBLE
+                }
             }
             SettingsAdapter.TYPE_SAFETY -> {
                 switchSafetyMode?.isChecked = com.aicompanion.safety.ContentSafetyFilter.isEnabled(this)
@@ -403,7 +551,39 @@ class SettingsActivity : AppCompatActivity() {
         when (type) {
             SettingsAdapter.TYPE_APPEARANCE -> {
                 btnChangeTheme?.setOnClickListener { showThemePicker() }
-                btnViewLog?.setOnClickListener { showLive2DLog() }
+                btnViewLog?.setOnClickListener {
+                    val logs = com.aicompanion.util.AppLogger.getRecentLogs(200)
+                    if (logs.isBlank()) {
+                        android.app.AlertDialog.Builder(this)
+                            .setTitle("应用日志")
+                            .setMessage("暂无日志记录")
+                            .setPositiveButton("确定", null)
+                            .show()
+                        return@setOnClickListener
+                    }
+                    val scrollView = android.widget.ScrollView(this)
+                    val tv = android.widget.TextView(this).apply {
+                        text = logs
+                        textSize = 11f
+                        setPadding(24, 16, 24, 16)
+                        setTextIsSelectable(true)
+                    }
+                    scrollView.addView(tv)
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("应用日志 (最近200条)")
+                        .setView(scrollView)
+                        .setPositiveButton("关闭", null)
+                        .setNeutralButton("复制全部") { _, _ ->
+                            val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("logs", logs))
+                            android.widget.Toast.makeText(this, "日志已复制到剪贴板", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        .setNegativeButton("清空") { _, _ ->
+                            com.aicompanion.util.AppLogger.clear()
+                            android.widget.Toast.makeText(this, "日志已清空", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        .show()
+                }
                 btnModelManager?.setOnClickListener {
                     try {
                         startActivity(Intent(this, ModelManagerActivity::class.java))
@@ -484,6 +664,15 @@ class SettingsActivity : AppCompatActivity() {
                 btnTestChatApi?.setOnClickListener { testChatApi() }
                 setupEndpointAutoComplete()
             }
+            SettingsAdapter.TYPE_TTS -> {
+                btnTestTts?.setOnClickListener { testTtsApi() }
+            }
+            SettingsAdapter.TYPE_ASR -> {
+                btnTestAsr?.setOnClickListener { testAsrApi() }
+            }
+            SettingsAdapter.TYPE_SCREEN -> {
+                btnTestImageRecog?.setOnClickListener { testImageRecogApi() }
+            }
             SettingsAdapter.TYPE_AI_FEATURES -> {
                 switchWakeEnabled?.setOnCheckedChangeListener { _, _ ->
                     startActivity(Intent(this, com.aicompanion.wakeup.WakeUpActivity::class.java))
@@ -526,6 +715,7 @@ class SettingsActivity : AppCompatActivity() {
                         Toast.makeText(this, "无法打开虚拟世界: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
+                btnTestImageGen?.setOnClickListener { testImageGenApi() }
             }
             SettingsAdapter.TYPE_SAFETY -> {
                 switchSafetyMode?.setOnCheckedChangeListener { _, isChecked ->
@@ -590,6 +780,51 @@ class SettingsActivity : AppCompatActivity() {
             tvWechatStatus?.text = "未绑定"
             tvWechatStatus?.setTextColor(0xFF667788.toInt())
             btnWechatBind?.text = "绑定微信"
+        }
+    }
+
+    private fun setupGenderSpinner(sm: SettingsManager) {
+        val genders = arrayOf("未选择", "男", "女")
+        val adapter = ArrayAdapter(this, R.layout.spinner_item_dark, genders)
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_dark)
+        spinnerUserGender?.adapter = adapter
+
+        val saved = sm.userGender
+        val idx = when (saved) {
+            "male" -> 1; "female" -> 2; else -> 0
+        }
+        spinnerUserGender?.setSelection(idx)
+
+        spinnerUserGender?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                sm.userGender = when (position) {
+                    1 -> "male"; 2 -> "female"; else -> ""
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    private fun setupBirthdayPicker() {
+        etUserBirthday?.setOnClickListener {
+            val cal = java.util.Calendar.getInstance()
+            val currentText = etUserBirthday?.text?.toString() ?: ""
+            if (currentText.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+                val parts = currentText.split("-")
+                cal.set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt())
+            }
+            android.app.DatePickerDialog(
+                this,
+                R.style.ThemeOverlay_Companion_DatePicker,
+                { _, year, month, day ->
+                    val dateStr = String.format("%04d-%02d-%02d", year, month + 1, day)
+                    etUserBirthday?.text = dateStr
+                    settingsManager?.userBirthday = dateStr
+                },
+                cal.get(java.util.Calendar.YEAR),
+                cal.get(java.util.Calendar.MONTH),
+                cal.get(java.util.Calendar.DAY_OF_MONTH)
+            ).show()
         }
     }
 
@@ -769,6 +1004,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun testChatApi() {
+        saveSettings()
         val url = etChatApiUrl?.text?.toString()?.trim() ?: ""
         val key = etChatApiKey?.text?.toString()?.trim() ?: ""
         val model = etChatModel?.text?.toString()?.trim() ?: ""
@@ -786,52 +1022,440 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun testTtsApi() {
+        val sm = settingsManager ?: return
+        val url = etTtsApiUrl?.text?.toString()?.trim() ?: ""
+        val key = etTtsApiKey?.text?.toString()?.trim() ?: ""
+        val model = etTtsModel?.text?.toString()?.trim() ?: ""
+        val voice = etTtsVoiceName?.text?.toString()?.trim() ?: ""
+        if (url.isBlank() || key.isBlank()) {
+            tvTtsTestResult?.text = "请先填写API地址和Key"
+            tvTtsTestResult?.setTextColor(0xFFF44336.toInt())
+            tvTtsTestResult?.visibility = View.VISIBLE
+            return
+        }
+        btnTestTts?.isEnabled = false
+        btnTestTts?.text = "测试中..."
+        tvTtsTestResult?.visibility = View.GONE
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                com.aicompanion.util.AppLogger.i("TTS_TEST", "开始测试TTS: url=$url, model=$model, voice=$voice")
+                val preset = com.aicompanion.settings.ServicePresets.findTtsPreset(sm.ttsProvider)
+                val formatType = preset.formatType
+                val jsonBody = com.aicompanion.network.ProviderAdapter.buildTtsRequest(formatType, model, "你好，我是星尘，很高兴认识你！", voice)
+                val headers = com.aicompanion.network.ProviderAdapter.buildTtsHeaders(formatType, key, model)
+                val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
+                val requestBuilder = okhttp3.Request.Builder().url(url).post(requestBody)
+                headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val response = client.newCall(requestBuilder.build()).execute()
+                if (!response.isSuccessful) {
+                    val errBody = response.body?.string()?.take(300) ?: "无响应体"
+                    com.aicompanion.util.AppLogger.e("TTS_TEST", "TTS测试失败: HTTP ${response.code}, body=$errBody")
+                    withContext(Dispatchers.Main) {
+                        tvTtsTestResult?.text = "失败: HTTP ${response.code} - ${errBody.take(100)}"
+                        tvTtsTestResult?.setTextColor(0xFFF44336.toInt())
+                        tvTtsTestResult?.visibility = View.VISIBLE
+                        btnTestTts?.isEnabled = true
+                        btnTestTts?.text = "测试语音合成"
+                    }
+                    return@launch
+                }
+                val contentType = response.header("Content-Type", "")
+                val bodyBytes = response.body?.bytes()
+                if (bodyBytes == null || bodyBytes.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        tvTtsTestResult?.text = "失败: 响应为空"
+                        tvTtsTestResult?.setTextColor(0xFFF44336.toInt())
+                        tvTtsTestResult?.visibility = View.VISIBLE
+                        btnTestTts?.isEnabled = true
+                        btnTestTts?.text = "测试语音合成"
+                    }
+                    return@launch
+                }
+                if (contentType?.contains("audio") == true || bodyBytes.size > 1000) {
+                    val tempFile = java.io.File(cacheDir, "tts_test_${System.currentTimeMillis()}.mp3")
+                    tempFile.writeBytes(bodyBytes)
+                    com.aicompanion.util.AppLogger.i("TTS_TEST", "TTS测试成功: 音频大小=${bodyBytes.size}字节, 保存至=${tempFile.absolutePath}")
+                    withContext(Dispatchers.Main) {
+                        tvTtsTestResult?.text = "成功! 音频大小: ${bodyBytes.size / 1024}KB"
+                        tvTtsTestResult?.setTextColor(0xFF4CAF50.toInt())
+                        tvTtsTestResult?.visibility = View.VISIBLE
+                        btnTestTts?.isEnabled = true
+                        btnTestTts?.text = "测试语音合成"
+                        try {
+                            val mp = android.media.MediaPlayer()
+                            mp.setDataSource(tempFile.absolutePath)
+                            mp.prepare()
+                            mp.start()
+                            mp.setOnCompletionListener { mp.release() }
+                        } catch (_: Exception) {}
+                    }
+                } else {
+                    val bodyStr = String(bodyBytes, Charsets.UTF_8).take(200)
+                    withContext(Dispatchers.Main) {
+                        tvTtsTestResult?.text = "响应非音频格式: $bodyStr"
+                        tvTtsTestResult?.setTextColor(0xFFFF9800.toInt())
+                        tvTtsTestResult?.visibility = View.VISIBLE
+                        btnTestTts?.isEnabled = true
+                        btnTestTts?.text = "测试语音合成"
+                    }
+                }
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e("TTS_TEST", "TTS测试异常: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    tvTtsTestResult?.text = "异常: ${e.message?.take(100)}"
+                    tvTtsTestResult?.setTextColor(0xFFF44336.toInt())
+                    tvTtsTestResult?.visibility = View.VISIBLE
+                    btnTestTts?.isEnabled = true
+                    btnTestTts?.text = "测试语音合成"
+                }
+            }
+        }
+    }
+
+    private fun testAsrApi() {
+        val sm = settingsManager ?: return
+        val url = etAsrApiUrl?.text?.toString()?.trim() ?: ""
+        val key = etAsrApiKey?.text?.toString()?.trim() ?: ""
+        val model = etAsrModel?.text?.toString()?.trim() ?: ""
+        if (url.isBlank() || key.isBlank()) {
+            tvAsrTestResult?.text = "请先填写API地址和Key"
+            tvAsrTestResult?.setTextColor(0xFFF44336.toInt())
+            tvAsrTestResult?.visibility = View.VISIBLE
+            return
+        }
+        btnTestAsr?.isEnabled = false
+        btnTestAsr?.text = "录音中(3秒)..."
+        tvAsrTestResult?.visibility = View.GONE
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 1001)
+                    withContext(Dispatchers.Main) {
+                        tvAsrTestResult?.text = "需要录音权限，请授权后重试"
+                        tvAsrTestResult?.setTextColor(0xFFFF9800.toInt())
+                        tvAsrTestResult?.visibility = View.VISIBLE
+                        btnTestAsr?.isEnabled = true
+                        btnTestAsr?.text = "测试语音识别"
+                    }
+                    return@launch
+                }
+                com.aicompanion.util.AppLogger.i("ASR_TEST", "开始录音测试ASR")
+                val recorder = android.media.MediaRecorder()
+                val tempAudio = java.io.File(cacheDir, "asr_test_${System.currentTimeMillis()}.mp4")
+                recorder.setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                recorder.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                recorder.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                recorder.setOutputFile(tempAudio.absolutePath)
+                recorder.prepare()
+                recorder.start()
+                withContext(Dispatchers.Main) { btnTestAsr?.text = "录音中(3秒)..." }
+                delay(3000)
+                recorder.stop()
+                recorder.release()
+                com.aicompanion.util.AppLogger.i("ASR_TEST", "录音完成, 文件大小=${tempAudio.length()}字节")
+                withContext(Dispatchers.Main) { btnTestAsr?.text = "识别中..." }
+                val preset = com.aicompanion.settings.ServicePresets.findAsrPreset(sm.asrProvider)
+                val formatType = preset.formatType
+                val fields = com.aicompanion.network.ProviderAdapter.buildAsrRequestFields(formatType, model)
+                val audioBytes = tempAudio.readBytes()
+                val audioBody = audioBytes.toRequestBody("audio/mp4".toMediaType())
+                val multipartBuilder = okhttp3.MultipartBody.Builder()
+                    .setType(okhttp3.MultipartBody.FORM)
+                    .addFormDataPart("file", "audio.mp4", audioBody)
+                fields.forEach { (k, v) -> multipartBuilder.addFormDataPart(k, v) }
+                val requestBuilder = okhttp3.Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer $key")
+                    .post(multipartBuilder.build())
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val response = client.newCall(requestBuilder.build()).execute()
+                if (!response.isSuccessful) {
+                    val errBody = response.body?.string()?.take(300) ?: "无响应体"
+                    com.aicompanion.util.AppLogger.e("ASR_TEST", "ASR测试失败: HTTP ${response.code}, body=$errBody")
+                    withContext(Dispatchers.Main) {
+                        tvAsrTestResult?.text = "失败: HTTP ${response.code} - ${errBody.take(100)}"
+                        tvAsrTestResult?.setTextColor(0xFFF44336.toInt())
+                        tvAsrTestResult?.visibility = View.VISIBLE
+                        btnTestAsr?.isEnabled = true
+                        btnTestAsr?.text = "测试语音识别"
+                    }
+                    return@launch
+                }
+                val bodyStr = response.body?.string() ?: ""
+                val result = com.aicompanion.network.ProviderAdapter.parseAsrResponse(formatType, bodyStr)
+                com.aicompanion.util.AppLogger.i("ASR_TEST", "ASR测试成功: result=$result")
+                withContext(Dispatchers.Main) {
+                    if (result.isNotBlank()) {
+                        tvAsrTestResult?.text = "识别结果: $result"
+                        tvAsrTestResult?.setTextColor(0xFF4CAF50.toInt())
+                    } else {
+                        tvAsrTestResult?.text = "识别结果为空(可能未检测到语音)"
+                        tvAsrTestResult?.setTextColor(0xFFFF9800.toInt())
+                    }
+                    tvAsrTestResult?.visibility = View.VISIBLE
+                    btnTestAsr?.isEnabled = true
+                    btnTestAsr?.text = "测试语音识别"
+                }
+                tempAudio.delete()
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e("ASR_TEST", "ASR测试异常: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    tvAsrTestResult?.text = "异常: ${e.message?.take(100)}"
+                    tvAsrTestResult?.setTextColor(0xFFF44336.toInt())
+                    tvAsrTestResult?.visibility = View.VISIBLE
+                    btnTestAsr?.isEnabled = true
+                    btnTestAsr?.text = "测试语音识别"
+                }
+            }
+        }
+    }
+
+    private fun testImageGenApi() {
+        val sm = settingsManager ?: return
+        val url = etImageApiUrl?.text?.toString()?.trim() ?: ""
+        val key = etImageApiKey?.text?.toString()?.trim() ?: ""
+        val secretKey = etImageApiSecretKey?.text?.toString()?.trim() ?: ""
+        val model = etImageModel?.text?.toString()?.trim() ?: ""
+        if (url.isBlank() || key.isBlank()) {
+            tvImageGenTestResult?.text = "请先填写API地址和Key"
+            tvImageGenTestResult?.setTextColor(0xFFF44336.toInt())
+            tvImageGenTestResult?.visibility = View.VISIBLE
+            return
+        }
+        btnTestImageGen?.isEnabled = false
+        btnTestImageGen?.text = "生成中(可能需要30-60秒)..."
+        tvImageGenTestResult?.visibility = View.GONE
+        ivImageGenPreview?.visibility = View.GONE
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                com.aicompanion.util.AppLogger.i("IMAGE_GEN_TEST", "开始测试图片生成: url=$url, model=$model")
+                val preset = com.aicompanion.settings.ServicePresets.findImageGenPreset(sm.imageGenProvider)
+                val formatType = if (sm.imageGenProvider == "custom") {
+                    when {
+                        url.contains("dashscope", ignoreCase = true) || url.contains("aliyuncs", ignoreCase = true) -> com.aicompanion.network.ProviderAdapter.FORMAT_ALIYUN_ASYNC
+                        url.contains("siliconflow", ignoreCase = true) -> com.aicompanion.network.ProviderAdapter.FORMAT_SILICONFLOW
+                        else -> "openai"
+                    }
+                } else {
+                    preset.formatType
+                }
+                val jsonBody = com.aicompanion.network.ProviderAdapter.buildImageRequest(formatType, model, "一只可爱的猫咪坐在窗台上", 1, "1024x1024")
+                val headers = com.aicompanion.network.ProviderAdapter.buildImageHeaders(formatType, key, secretKey)
+                val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
+                val requestBuilder = okhttp3.Request.Builder().url(url).post(requestBody)
+                headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+                    .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val response = client.newCall(requestBuilder.build()).execute()
+                if (!response.isSuccessful) {
+                    val errBody = response.body?.string()?.take(300) ?: "无响应体"
+                    com.aicompanion.util.AppLogger.e("IMAGE_GEN_TEST", "图片生成测试失败: HTTP ${response.code}, body=$errBody")
+                    withContext(Dispatchers.Main) {
+                        tvImageGenTestResult?.text = "失败: HTTP ${response.code} - ${errBody.take(100)}"
+                        tvImageGenTestResult?.setTextColor(0xFFF44336.toInt())
+                        tvImageGenTestResult?.visibility = View.VISIBLE
+                        btnTestImageGen?.isEnabled = true
+                        btnTestImageGen?.text = "测试图片生成"
+                    }
+                    return@launch
+                }
+                val bodyStr = response.body?.string() ?: ""
+                val imageUrl = com.aicompanion.network.ProviderAdapter.parseImageResponse(formatType, bodyStr, url, key, secretKey)
+                if (imageUrl.isNullOrBlank()) {
+                    com.aicompanion.util.AppLogger.e("IMAGE_GEN_TEST", "图片生成测试失败: 无法解析图片URL, body=${bodyStr.take(200)}")
+                    withContext(Dispatchers.Main) {
+                        tvImageGenTestResult?.text = "失败: 无法解析图片URL"
+                        tvImageGenTestResult?.setTextColor(0xFFF44336.toInt())
+                        tvImageGenTestResult?.visibility = View.VISIBLE
+                        btnTestImageGen?.isEnabled = true
+                        btnTestImageGen?.text = "测试图片生成"
+                    }
+                    return@launch
+                }
+                com.aicompanion.util.AppLogger.i("IMAGE_GEN_TEST", "图片生成成功: imageUrl=${imageUrl.take(100)}")
+                val downloadClient = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val isLocalFile = imageUrl.startsWith("/") || imageUrl.startsWith("file://")
+                val bitmap = if (isLocalFile) {
+                    android.graphics.BitmapFactory.decodeFile(imageUrl)
+                } else {
+                    val dlRequest = okhttp3.Request.Builder().url(imageUrl)
+                    if (key.isNotBlank() && !imageUrl.contains("dashscope", ignoreCase = true) && !imageUrl.contains("aliyuncs", ignoreCase = true)) {
+                        dlRequest.addHeader("Authorization", "Bearer $key")
+                    }
+                    val dlResponse = downloadClient.newCall(dlRequest.build()).execute()
+                    val bmpBytes = dlResponse.body?.bytes()
+                    if (bmpBytes != null) android.graphics.BitmapFactory.decodeByteArray(bmpBytes, 0, bmpBytes.size) else null
+                }
+                withContext(Dispatchers.Main) {
+                    if (bitmap != null) {
+                        ivImageGenPreview?.setImageBitmap(bitmap)
+                        ivImageGenPreview?.visibility = View.VISIBLE
+                        tvImageGenTestResult?.text = "成功! 图片已生成"
+                        tvImageGenTestResult?.setTextColor(0xFF4CAF50.toInt())
+                    } else {
+                        tvImageGenTestResult?.text = "图片URL已获取但下载失败"
+                        tvImageGenTestResult?.setTextColor(0xFFFF9800.toInt())
+                    }
+                    tvImageGenTestResult?.visibility = View.VISIBLE
+                    btnTestImageGen?.isEnabled = true
+                    btnTestImageGen?.text = "测试图片生成"
+                }
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e("IMAGE_GEN_TEST", "图片生成测试异常: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    tvImageGenTestResult?.text = "异常: ${e.message?.take(100)}"
+                    tvImageGenTestResult?.setTextColor(0xFFF44336.toInt())
+                    tvImageGenTestResult?.visibility = View.VISIBLE
+                    btnTestImageGen?.isEnabled = true
+                    btnTestImageGen?.text = "测试图片生成"
+                }
+            }
+        }
+    }
+
+    private fun testImageRecogApi() {
+        val sm = settingsManager ?: return
+        val url = etScreenApiUrl?.text?.toString()?.trim() ?: ""
+        val model = etScreenModel?.text?.toString()?.trim() ?: ""
+        val key = sm.screenApiKey ?: ""
+        if (url.isBlank() || key.isBlank()) {
+            tvImageRecogTestResult?.text = "请先填写API地址和Key(在屏幕识别设置中)"
+            tvImageRecogTestResult?.setTextColor(0xFFF44336.toInt())
+            tvImageRecogTestResult?.visibility = View.VISIBLE
+            return
+        }
+        btnTestImageRecog?.isEnabled = false
+        btnTestImageRecog?.text = "识别中..."
+        tvImageRecogTestResult?.visibility = View.GONE
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                com.aicompanion.util.AppLogger.i("IMAGE_RECOG_TEST", "开始测试图片识别: url=$url, model=$model")
+                val screenshot = android.graphics.Bitmap.createBitmap(200, 200, android.graphics.Bitmap.Config.ARGB_8888)
+                val canvas = android.graphics.Canvas(screenshot)
+                canvas.drawColor(android.graphics.Color.parseColor("#4A90D9"))
+                val paint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.WHITE
+                    textSize = 40f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }
+                canvas.drawText("Test", 50f, 110f, paint)
+                val stream = java.io.ByteArrayOutputStream()
+                screenshot.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, stream)
+                screenshot.recycle()
+                val base64 = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
+                val dataUrl = "data:image/jpeg;base64,$base64"
+                val messages = org.json.JSONArray().apply {
+                    put(org.json.JSONObject().apply {
+                        put("role", "user")
+                        put("content", org.json.JSONArray().apply {
+                            put(org.json.JSONObject().apply {
+                                put("type", "text")
+                                put("text", "请简要描述这张图片的内容")
+                            })
+                            put(org.json.JSONObject().apply {
+                                put("type", "image_url")
+                                put("image_url", org.json.JSONObject().apply {
+                                    put("url", dataUrl)
+                                })
+                            })
+                        })
+                    })
+                }
+                val jsonBody = org.json.JSONObject().apply {
+                    put("model", model)
+                    put("messages", messages)
+                    put("max_tokens", 200)
+                }
+                val requestBuilder = okhttp3.Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer $key")
+                    .addHeader("Content-Type", "application/json")
+                    .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val response = client.newCall(requestBuilder.build()).execute()
+                if (!response.isSuccessful) {
+                    val errBody = response.body?.string()?.take(300) ?: "无响应体"
+                    com.aicompanion.util.AppLogger.e("IMAGE_RECOG_TEST", "图片识别测试失败: HTTP ${response.code}, body=$errBody")
+                    withContext(Dispatchers.Main) {
+                        tvImageRecogTestResult?.text = "失败: HTTP ${response.code} - ${errBody.take(100)}"
+                        tvImageRecogTestResult?.setTextColor(0xFFF44336.toInt())
+                        tvImageRecogTestResult?.visibility = View.VISIBLE
+                        btnTestImageRecog?.isEnabled = true
+                        btnTestImageRecog?.text = "测试图片识别"
+                    }
+                    return@launch
+                }
+                val bodyStr = response.body?.string() ?: ""
+                val resultJson = org.json.JSONObject(bodyStr)
+                val result = resultJson.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content", "") ?: ""
+                com.aicompanion.util.AppLogger.i("IMAGE_RECOG_TEST", "图片识别测试成功: result=${result.take(100)}")
+                withContext(Dispatchers.Main) {
+                    if (result.isNotBlank()) {
+                        tvImageRecogTestResult?.text = "识别结果: $result"
+                        tvImageRecogTestResult?.setTextColor(0xFF4CAF50.toInt())
+                    } else {
+                        tvImageRecogTestResult?.text = "识别结果为空"
+                        tvImageRecogTestResult?.setTextColor(0xFFFF9800.toInt())
+                    }
+                    tvImageRecogTestResult?.visibility = View.VISIBLE
+                    btnTestImageRecog?.isEnabled = true
+                    btnTestImageRecog?.text = "测试图片识别"
+                }
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e("IMAGE_RECOG_TEST", "图片识别测试异常: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    tvImageRecogTestResult?.text = "异常: ${e.message?.take(100)}"
+                    tvImageRecogTestResult?.setTextColor(0xFFF44336.toInt())
+                    tvImageRecogTestResult?.visibility = View.VISIBLE
+                    btnTestImageRecog?.isEnabled = true
+                    btnTestImageRecog?.text = "测试图片识别"
+                }
+            }
+        }
+    }
+
     private fun setupSpinner() {
-        val providers = arrayOf("自定义", "OpenAI", "阿里云百炼", "智谱AI", "MiniMax", "月之暗面", "n1n", "DeepSeek", "硅基流动", "OpenRouter", "通义千问")
+        val presets = ServicePresets.llmPresets
+        val providers = ServicePresets.getLlmDisplayNames()
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, providers)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerApiProvider?.adapter = adapter
 
         val savedProvider = settingsManager?.apiProvider ?: "custom"
-        val savedIndex = when (savedProvider) {
-            "openai" -> 1; "aliyun" -> 2; "zhipu" -> 3; "minimax" -> 4
-            "moonshot" -> 5; "n1n" -> 6; "deepseek" -> 7; "siliconflow" -> 8; "openrouter" -> 9
-            "qwen" -> 10
-            else -> 0
-        }
-        spinnerApiProvider?.setSelection(savedIndex)
+        spinnerApiProvider?.setSelection(ServicePresets.getLlmIndex(savedProvider))
 
         spinnerApiProvider?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
-                val (providerId, url, model) = when (position) {
-                    1 -> Triple("openai", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini")
-                    2 -> Triple("aliyun", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-plus")
-                    3 -> Triple("zhipu", "https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4-flash")
-                    4 -> Triple("minimax", "https://api.minimax.chat/v1/text/chatcompletion_v2", "MiniMax-Text-01")
-                    5 -> Triple("moonshot", "https://api.moonshot.cn/v1/chat/completions", "moonshot-v1-8k")
-                    6 -> Triple("n1n", "https://api.n1n.ai/v1/chat/completions", "gpt-4o-mini")
-                    7 -> Triple("deepseek", "https://api.deepseek.com/v1/chat/completions", "deepseek-v4-flash")
-                    8 -> Triple("siliconflow", "https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen2.5-7B-Instruct")
-                    9 -> Triple("openrouter", "https://openrouter.ai/api/v1/chat/completions", "google/gemini-2.0-flash-001")
-                    10 -> Triple("qwen", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-max")
-                    else -> Triple("custom", "", "")
-                }
-                if (isSpinnerInitialized && url.isNotEmpty()) {
-                    etChatApiUrl?.setText(url)
+                val preset = presets[position]
+                if (isSpinnerInitialized && preset.url.isNotEmpty()) {
+                    etChatApiUrl?.setText(preset.url)
                     val currentModel = etChatModel?.text?.toString()?.trim() ?: ""
-                    val knownDefaults = setOf(
-                        "gpt-4o-mini", "qwen-plus", "qwen-max", "glm-4-flash",
-                        "MiniMax-Text-01", "moonshot-v1-8k", "deepseek-chat", "deepseek-v4-flash",
-                        "Qwen/Qwen2.5-7B-Instruct", "google/gemini-2.0-flash-001"
-                    )
+                    val knownDefaults = ServicePresets.getLlmKnownDefaults()
                     if (currentModel.isEmpty() || currentModel in knownDefaults) {
-                        etChatModel?.setText(model)
+                        etChatModel?.setText(preset.defaultModel)
                     }
-                    tvApiProviderHint?.text = "已自动填充 ${providers[position]} 配置"
+                    tvApiProviderHint?.text = "已自动填充 ${preset.displayName} 配置"
                     tvApiProviderHint?.visibility = android.view.View.VISIBLE
                 }
-                settingsManager?.apiProvider = providerId
-                updateParamsForProvider(providerId)
+                settingsManager?.apiProvider = preset.id
+                updateParamsForProvider(preset.id)
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -1102,6 +1726,10 @@ class SettingsActivity : AppCompatActivity() {
                 layoutEdgeVoice?.visibility = View.GONE
                 layoutCloudTts?.visibility = View.VISIBLE
             }
+            com.aicompanion.voice.TtsManager.ENGINE_AUTO -> {
+                layoutEdgeVoice?.visibility = View.VISIBLE
+                layoutCloudTts?.visibility = View.VISIBLE
+            }
             else -> {
                 layoutEdgeVoice?.visibility = View.GONE
                 layoutCloudTts?.visibility = View.GONE
@@ -1224,18 +1852,50 @@ class SettingsActivity : AppCompatActivity() {
     private fun saveSettings() {
         val sm = settingsManager ?: return
 
+        currentFocus?.let { focused ->
+            if (focused is TextView) {
+                when (focused.id) {
+                    R.id.et_chat_api_url -> sm.chatApiUrl = focused.text?.toString() ?: sm.chatApiUrl
+                    R.id.et_chat_api_key -> sm.chatApiKey = focused.text?.toString() ?: sm.chatApiKey
+                    R.id.et_chat_model -> sm.chatModel = focused.text?.toString() ?: sm.chatModel
+                    R.id.et_screen_api_url -> sm.screenApiUrl = focused.text?.toString() ?: sm.screenApiUrl
+                    R.id.et_screen_model -> sm.screenModel = focused.text?.toString() ?: sm.screenModel
+                    R.id.et_asr_api_url -> sm.asrApiUrl = focused.text?.toString() ?: sm.asrApiUrl
+                    R.id.et_asr_api_key -> sm.asrApiKey = focused.text?.toString() ?: sm.asrApiKey
+                    R.id.et_asr_model -> sm.asrModel = focused.text?.toString() ?: sm.asrModel
+                    R.id.et_tts_api_url -> sm.ttsApiUrl = focused.text?.toString() ?: sm.ttsApiUrl
+                    R.id.et_tts_api_key -> sm.ttsApiKey = focused.text?.toString() ?: sm.ttsApiKey
+                    R.id.et_tts_model -> sm.ttsModel = focused.text?.toString() ?: sm.ttsModel
+                    R.id.et_tts_voice_name -> sm.ttsVoiceName = focused.text?.toString() ?: sm.ttsVoiceName
+                    R.id.et_user_id -> sm.userId = focused.text?.toString() ?: sm.userId
+                    R.id.et_user_birthday -> sm.userBirthday = focused.text?.toString() ?: sm.userBirthday
+                    R.id.et_user_appearance -> sm.userAppearance = focused.text?.toString() ?: sm.userAppearance
+                    R.id.et_search_api_url -> sm.searchApiUrl = focused.text?.toString() ?: sm.searchApiUrl
+                    R.id.et_search_api_key -> sm.searchApiKey = focused.text?.toString() ?: sm.searchApiKey
+                    R.id.et_search_engine_id -> sm.searchEngineId = focused.text?.toString() ?: sm.searchEngineId
+                }
+            }
+        }
+
         sm.chatApiUrl = findSettingsView<TextView>(R.id.et_chat_api_url)?.text?.toString() ?: sm.chatApiUrl
         sm.chatApiKey = findSettingsView<TextView>(R.id.et_chat_api_key)?.text?.toString() ?: sm.chatApiKey
         sm.chatModel = findSettingsView<TextView>(R.id.et_chat_model)?.text?.toString() ?: sm.chatModel
         sm.screenApiUrl = findSettingsView<TextView>(R.id.et_screen_api_url)?.text?.toString() ?: sm.screenApiUrl
         sm.screenModel = findSettingsView<TextView>(R.id.et_screen_model)?.text?.toString() ?: sm.screenModel
         sm.asrApiUrl = findSettingsView<TextView>(R.id.et_asr_api_url)?.text?.toString() ?: sm.asrApiUrl
+        sm.asrApiKey = findSettingsView<TextView>(R.id.et_asr_api_key)?.text?.toString() ?: sm.asrApiKey
+        sm.asrModel = findSettingsView<TextView>(R.id.et_asr_model)?.text?.toString() ?: sm.asrModel
         sm.ttsApiUrl = findSettingsView<TextView>(R.id.et_tts_api_url)?.text?.toString() ?: sm.ttsApiUrl
+        sm.ttsApiKey = findSettingsView<TextView>(R.id.et_tts_api_key)?.text?.toString() ?: sm.ttsApiKey
         sm.ttsModel = findSettingsView<TextView>(R.id.et_tts_model)?.text?.toString() ?: sm.ttsModel
+        sm.ttsVoiceName = findSettingsView<TextView>(R.id.et_tts_voice_name)?.text?.toString() ?: sm.ttsVoiceName
         sm.userId = findSettingsView<TextView>(R.id.et_user_id)?.text?.toString() ?: sm.userId
+        sm.userBirthday = findSettingsView<TextView>(R.id.et_user_birthday)?.text?.toString() ?: sm.userBirthday
+        sm.userAppearance = findSettingsView<TextView>(R.id.et_user_appearance)?.text?.toString() ?: sm.userAppearance
 
         sm.screenRecognitionEnabled = findSettingsView<Switch>(R.id.switch_screen_recognition)?.isChecked ?: sm.screenRecognitionEnabled
         sm.simpleScreenMode = findSettingsView<Switch>(R.id.switch_simple_screen_mode)?.isChecked ?: sm.simpleScreenMode
+        sm.useChatModelForVision = findSettingsView<Switch>(R.id.switch_chat_model_vision)?.isChecked ?: sm.useChatModelForVision
         sm.voiceRecognitionEnabled = findSettingsView<Switch>(R.id.switch_voice_recognition)?.isChecked ?: sm.voiceRecognitionEnabled
         sm.ttsEnabled = findSettingsView<Switch>(R.id.switch_tts)?.isChecked ?: sm.ttsEnabled
         sm.offlineMode = findSettingsView<Switch>(R.id.switch_offline_mode)?.isChecked ?: sm.offlineMode
@@ -1277,9 +1937,140 @@ class SettingsActivity : AppCompatActivity() {
         val vwMgr = VirtualWorldManager(this)
         vwMgr.imageApiUrl = findSettingsView<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_url)?.text?.toString() ?: vwMgr.imageApiUrl
         vwMgr.imageApiKey = findSettingsView<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_key)?.text?.toString() ?: vwMgr.imageApiKey
+        vwMgr.imageApiSecretKey = findSettingsView<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_api_secret_key)?.text?.toString() ?: vwMgr.imageApiSecretKey
         vwMgr.imageModel = findSettingsView<com.google.android.material.textfield.TextInputEditText>(R.id.et_image_model)?.text?.toString() ?: vwMgr.imageModel
 
         sm.emotionAnalysisEnabled = findSettingsView<Switch>(R.id.switch_emotion_analysis)?.isChecked ?: sm.emotionAnalysisEnabled
+
+        com.aicompanion.util.AppLogger.enabled = sm.appLoggingEnabled
+        com.aicompanion.util.AppLogger.debugVerbose = sm.appDebugVerbose
+    }
+
+    private fun setupTtsProviderSpinner() {
+        val presets = ServicePresets.ttsPresets
+        val names = presets.map { it.displayName }.toTypedArray()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, names)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerTtsProvider?.adapter = adapter
+
+        val savedId = settingsManager?.ttsProvider ?: "custom"
+        spinnerTtsProvider?.setSelection(ServicePresets.getTtsIndex(savedId))
+
+        spinnerTtsProvider?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val preset = presets[position]
+                if (isTtsProviderInitialized) {
+                    if (preset.url.isNotEmpty()) {
+                        etTtsApiUrl?.setText(preset.url)
+                        val currentModel = etTtsModel?.text?.toString()?.trim() ?: ""
+                        if (currentModel.isEmpty() || currentModel in ttsKnownDefaults) {
+                            etTtsModel?.setText(preset.defaultModel)
+                        }
+                        val currentVoice = etTtsVoiceName?.text?.toString()?.trim() ?: ""
+                        if (currentVoice.isEmpty() || currentVoice in setOf("alloy", "echo", "fable", "onyx", "nova", "shimmer", "longxiaochun", "default", "FunAudioLLM/CosyVoice2-0.5B:alex")) {
+                            if (preset.defaultVoice.isNotEmpty()) etTtsVoiceName?.setText(preset.defaultVoice)
+                        }
+                    }
+                }
+                settingsManager?.ttsProvider = preset.id
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        spinnerTtsProvider?.post { isTtsProviderInitialized = true }
+    }
+
+    private fun setupAsrProviderSpinner() {
+        val presets = ServicePresets.asrPresets
+        val names = presets.map { it.displayName }.toTypedArray()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, names)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerAsrProvider?.adapter = adapter
+
+        val savedId = settingsManager?.asrProvider ?: "custom"
+        spinnerAsrProvider?.setSelection(ServicePresets.getAsrIndex(savedId))
+
+        spinnerAsrProvider?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val preset = presets[position]
+                if (isAsrProviderInitialized) {
+                    if (preset.url.isNotEmpty()) {
+                        etAsrApiUrl?.setText(preset.url)
+                        val currentModel = etAsrModel?.text?.toString()?.trim() ?: ""
+                        if (currentModel.isEmpty() || currentModel in asrKnownDefaults) {
+                            etAsrModel?.setText(preset.defaultModel)
+                        }
+                    }
+                }
+                settingsManager?.asrProvider = preset.id
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        spinnerAsrProvider?.post { isAsrProviderInitialized = true }
+    }
+
+    private fun setupImageGenProviderSpinner() {
+        val presets = ServicePresets.imageGenPresets
+        val names = presets.map { it.displayName }.toTypedArray()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, names)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerImageGenProvider?.adapter = adapter
+
+        val savedId = settingsManager?.imageGenProvider ?: "custom"
+        spinnerImageGenProvider?.setSelection(ServicePresets.getImageGenIndex(savedId))
+
+        spinnerImageGenProvider?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val preset = presets[position]
+                if (isImageGenProviderInitialized) {
+                    if (preset.url.isNotEmpty()) {
+                        etImageApiUrl?.setText(preset.url)
+                        val currentModel = etImageModel?.text?.toString()?.trim() ?: ""
+                        if (currentModel.isEmpty() || currentModel in imageGenKnownDefaults) {
+                            etImageModel?.setText(preset.defaultModel)
+                        }
+                    }
+                }
+                settingsManager?.imageGenProvider = preset.id
+                if (preset.id == "aliyun_kling") {
+                    tvImageKeyHint?.visibility = View.VISIBLE
+                    findSettingsView<com.google.android.material.textfield.TextInputLayout>(R.id.layout_image_api_secret_key)?.visibility = View.VISIBLE
+                } else {
+                    tvImageKeyHint?.visibility = View.GONE
+                    findSettingsView<com.google.android.material.textfield.TextInputLayout>(R.id.layout_image_api_secret_key)?.visibility = View.GONE
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        spinnerImageGenProvider?.post { isImageGenProviderInitialized = true }
+    }
+
+    private fun setupImageRecogProviderSpinner() {
+        val presets = ServicePresets.imageRecogPresets
+        val names = presets.map { it.displayName }.toTypedArray()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, names)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerImageRecogProvider?.adapter = adapter
+
+        val savedId = settingsManager?.imageRecogProvider ?: "custom"
+        spinnerImageRecogProvider?.setSelection(ServicePresets.getImageRecogIndex(savedId))
+
+        spinnerImageRecogProvider?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val preset = presets[position]
+                if (isImageRecogProviderInitialized) {
+                    if (preset.url.isNotEmpty()) {
+                        etScreenApiUrl?.setText(preset.url)
+                        val currentModel = etScreenModel?.text?.toString()?.trim() ?: ""
+                        if (currentModel.isEmpty() || currentModel in imageRecogKnownDefaults) {
+                            etScreenModel?.setText(preset.defaultModel)
+                        }
+                    }
+                }
+                settingsManager?.imageRecogProvider = preset.id
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        spinnerImageRecogProvider?.post { isImageRecogProviderInitialized = true }
     }
 
     private fun setupSearchSpinner() {

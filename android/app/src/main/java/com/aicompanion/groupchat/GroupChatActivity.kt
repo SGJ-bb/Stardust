@@ -215,7 +215,8 @@ class GroupChatActivity : AppCompatActivity() {
             AnimeUtils.pulse(it)
             try {
                 val intent = Intent(this, com.aicompanion.ui.PhoneCallActivity::class.java)
-                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_PERSONA_ID, "")
+                val firstPersonaId = group.memberPersonaIds.firstOrNull() ?: ""
+                intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_PERSONA_ID, firstPersonaId)
                 intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_PERSONA_NAME, group.name)
                 intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_SCOPE, "group")
                 intent.putExtra(com.aicompanion.ui.PhoneCallActivity.EXTRA_SCOPE_ID, groupId)

@@ -10,20 +10,23 @@ import com.aicompanion.settings.ScheduledWake
 
 class SettingsManager(context: Context) {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences(
+    private val appContext: Context = context.applicationContext
+
+    private val prefs: SharedPreferences = appContext.getSharedPreferences(
         "companion_settings",
         Context.MODE_PRIVATE
     )
 
+    @Volatile
     private var securePrefsAvailable = true
 
     private val securePrefs: SharedPreferences by lazy {
         try {
-            val masterKey = MasterKey.Builder(context)
+            val masterKey = MasterKey.Builder(appContext)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
             EncryptedSharedPreferences.create(
-                context,
+                appContext,
                 "companion_secure_prefs",
                 masterKey,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
@@ -32,7 +35,7 @@ class SettingsManager(context: Context) {
         } catch (e: Exception) {
             securePrefsAvailable = false
             com.aicompanion.util.AppLogger.e("SettingsManager", "EncryptedSharedPreferences unavailable: ${e.message}")
-            context.getSharedPreferences("companion_secure_fallback", Context.MODE_PRIVATE)
+            appContext.getSharedPreferences("companion_secure_fallback", Context.MODE_PRIVATE)
         }
     }
 
@@ -96,6 +99,22 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("api_provider", "custom") ?: "custom"
         set(value) { prefs.edit().putString("api_provider", value).apply() }
 
+    var ttsProvider: String
+        get() = prefs.getString("tts_provider", "custom") ?: "custom"
+        set(value) { prefs.edit().putString("tts_provider", value).apply() }
+
+    var asrProvider: String
+        get() = prefs.getString("asr_provider", "custom") ?: "custom"
+        set(value) { prefs.edit().putString("asr_provider", value).apply() }
+
+    var imageGenProvider: String
+        get() = prefs.getString("image_gen_provider", "custom") ?: "custom"
+        set(value) { prefs.edit().putString("image_gen_provider", value).apply() }
+
+    var imageRecogProvider: String
+        get() = prefs.getString("image_recog_provider", "custom") ?: "custom"
+        set(value) { prefs.edit().putString("image_recog_provider", value).apply() }
+
     var screenApiUrl: String
         get() = prefs.getString("screen_api_url", "") ?: ""
         set(value) { prefs.edit().putString("screen_api_url", value).apply() }
@@ -115,6 +134,10 @@ class SettingsManager(context: Context) {
     var useLocalOcr: Boolean
         get() = prefs.getBoolean("use_local_ocr", true)
         set(value) { prefs.edit().putBoolean("use_local_ocr", value).apply() }
+
+    var useChatModelForVision: Boolean
+        get() = prefs.getBoolean("use_chat_model_for_vision", true)
+        set(value) { prefs.edit().putBoolean("use_chat_model_for_vision", value).apply() }
 
     var ttsApiUrl: String
         get() = prefs.getString("tts_api_url", "") ?: ""
@@ -165,6 +188,10 @@ class SettingsManager(context: Context) {
         get() = securePrefs.getString("tts_api_key", "") ?: ""
         set(value) { securePrefs.edit().putString("tts_api_key", value).apply() }
 
+    var ttsVoiceName: String
+        get() = prefs.getString("tts_voice_name", "") ?: ""
+        set(value) { prefs.edit().putString("tts_voice_name", value).apply() }
+
     var llmTemperature: Float
         get() = prefs.getFloat("llm_temperature", 1.05f)
         set(value) { prefs.edit().putFloat("llm_temperature", value.coerceIn(0f, 2f)).apply() }
@@ -185,7 +212,7 @@ class SettingsManager(context: Context) {
         get() = prefs.getInt("llm_max_tokens", 500)
         set(value) {
             val limit = ProviderProfile.getMaxTokensLimit(apiProvider)
-            prefs.edit().putInt("llm_max_tokens", value.coerceIn(50, limit)).apply()
+            prefs.edit().putInt("llm_max_tokens", value.coerceIn(100, limit)).apply()
         }
 
     var contextTurns: Int
@@ -204,9 +231,17 @@ class SettingsManager(context: Context) {
         get() = prefs.getFloat("tts_rate", 1.0f)
         set(value) { prefs.edit().putFloat("tts_rate", value.coerceIn(0.5f, 2.0f)).apply() }
 
+    var appLoggingEnabled: Boolean
+        get() = prefs.getBoolean("app_logging_enabled", true)
+        set(value) = prefs.edit().putBoolean("app_logging_enabled", value).apply()
+
+    var appDebugVerbose: Boolean
+        get() = prefs.getBoolean("app_debug_verbose", false)
+        set(value) = prefs.edit().putBoolean("app_debug_verbose", value).apply()
+
     var emotionAnalysisEnabled: Boolean
         get() = prefs.getBoolean("emotion_analysis_enabled", false)
-        set(value) { prefs.edit().putBoolean("emotion_analysis_enabled", value).apply() }
+        set(value) = prefs.edit().putBoolean("emotion_analysis_enabled", value).apply()
 
     var llmEmotionAnalysisEnabled: Boolean
         get() = emotionAnalysisEnabled || prefs.getBoolean("llm_emotion_analysis_enabled", true)
@@ -256,7 +291,7 @@ class SettingsManager(context: Context) {
             return try {
                 when (value.uppercase()) {
                     "TURNS_75" -> DiaryTriggerMode.MSG_50
-                    "DAILY_10PM_AND_TURNS_75" -> DiaryTriggerMode.DAILY_10PM
+                    "DAILY_10PM_AND_TURNS_75" -> DiaryTriggerMode.MSG_50
                     else -> DiaryTriggerMode.valueOf(value.uppercase())
                 }
             } catch (e: Exception) {
@@ -302,6 +337,22 @@ class SettingsManager(context: Context) {
         set(value) {
             prefs.edit().putString("user_id", value).apply()
         }
+
+    var userGender: String
+        get() = prefs.getString("user_gender", "") ?: ""
+        set(value) { prefs.edit().putString("user_gender", value).apply() }
+
+    var userBirthday: String
+        get() = prefs.getString("user_birthday", "") ?: ""
+        set(value) { prefs.edit().putString("user_birthday", value).apply() }
+
+    var userAppearance: String
+        get() = prefs.getString("user_appearance", "") ?: ""
+        set(value) { prefs.edit().putString("user_appearance", value).apply() }
+
+    var onboardingCompleted: Boolean
+        get() = prefs.getBoolean("onboarding_completed", false)
+        set(value) { prefs.edit().putBoolean("onboarding_completed", value).apply() }
 
     var chatBackground: String
         get() = prefs.getString("chat_background", "") ?: ""
@@ -394,6 +445,9 @@ class SettingsManager(context: Context) {
 
     fun clearAllData() {
         prefs.edit().clear().apply()
+        try {
+            securePrefs.edit().clear().apply()
+        } catch (_: Exception) {}
     }
 
     private fun generateUserId(): String {

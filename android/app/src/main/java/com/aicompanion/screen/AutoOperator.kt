@@ -58,7 +58,8 @@ class AutoOperator {
                 "notifications" -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
                 "recents" -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
                 "wait" -> {
-                    try { Thread.sleep(action.durationMs.toLong()) } catch (_: Exception) {}
+                    val safeDuration = action.durationMs.coerceIn(100, 10000)
+                    try { Thread.sleep(safeDuration.toLong()) } catch (_: Exception) {}
                     true
                 }
                 else -> {

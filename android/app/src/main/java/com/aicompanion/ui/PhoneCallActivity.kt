@@ -7,6 +7,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
@@ -48,6 +52,7 @@ class PhoneCallActivity : AppCompatActivity() {
     private lateinit var voiceManager: VoiceManager
     private lateinit var ttsManager: TtsManager
     private lateinit var asrManager: LocalAsrManager
+    private lateinit var audioManager: AudioManager
 
     private var personaId = ""
     private var personaName = ""
@@ -61,6 +66,10 @@ class PhoneCallActivity : AppCompatActivity() {
     private var callStartTime = 0L
     private var hasAudioPermission = false
     private var asrErrorCount = 0
+    private var silenceCount = 0
+    private var silenceRunnable: Runnable? = null
+    private val SILENCE_TIMEOUT_MS = 8000L
+    private val MAX_SILENCE_COUNT = 3
 
     private var ivAvatar: ImageView? = null
     private var tvName: TextView? = null
@@ -79,6 +88,18 @@ class PhoneCallActivity : AppCompatActivity() {
     private var isMuted = false
     private var isSpeakerOn = true
 
+    private var ttsCompletionRunnable: Runnable? = null
+
+    @Volatile
+    private var isDestroyedFlag = false
+
+    @Volatile
+    private var isHandlingSilence = false
+
+    private var audioFocusRequest: Any? = null
+
+    private val callHistory = java.util.concurrent.CopyOnWriteArrayList<Pair<String, Boolean>>()
+
     private val durationRunnable = object : Runnable {
         override fun run() {
             if (isCallActive) {
@@ -96,8 +117,15 @@ class PhoneCallActivity : AppCompatActivity() {
 
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
 
         personaId = intent.getStringExtra(EXTRA_PERSONA_ID) ?: ""
         personaName = intent.getStringExtra(EXTRA_PERSONA_NAME) ?: "星尘"
@@ -109,10 +137,11 @@ class PhoneCallActivity : AppCompatActivity() {
         voiceManager = VoiceManager(this)
         ttsManager = TtsManager(this)
         asrManager = LocalAsrManager(this)
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
 
         if (personaId.isBlank()) {
             personaId = getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default") ?: "default"
-            scopeId = personaId
+            if (scopeId.isBlank()) scopeId = personaId
         }
 
         if (personaName == "星尘" && personaId.isNotBlank()) {
@@ -124,12 +153,18 @@ class PhoneCallActivity : AppCompatActivity() {
 
         asrManager.setListener(object : com.aicompanion.voice.AsrListener {
             override fun onPartialResult(text: String) {
+                cancelSilenceTimer()
+                silenceCount = 0
                 tvTranscript?.text = "你: $text"
             }
             override fun onFinalResult(text: String) {
+                cancelSilenceTimer()
                 isListening = false
                 asrErrorCount = 0
-                if (isCallActive) processUserSpeech(text)
+                if (isHandlingSilence) {
+                    isHandlingSilence = false
+                }
+                if (isCallActive && text.isNotBlank()) processUserSpeech(text)
             }
             override fun onError(error: String) {
                 isListening = false
@@ -497,11 +532,103 @@ class PhoneCallActivity : AppCompatActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
+    private fun requestAudioFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+                val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .setAudioAttributes(audioAttributes)
+                    .setOnAudioFocusChangeListener { focusChange ->
+                        when (focusChange) {
+                            AudioManager.AUDIOFOCUS_LOSS,
+                            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                                if (isCallActive) {
+                                    if (isAiSpeaking) {
+                                        cancelTtsCompletionRunnable()
+                                        voiceManager.setOnUtteranceCompleteListener(null)
+                                        ttsManager.stopPlayback()
+                                        voiceManager.stopSpeaking()
+                                        isAiSpeaking = false
+                                    }
+                                    if (isListening) {
+                                        asrManager.cancel()
+                                        isListening = false
+                                    }
+                                }
+                            }
+                            AudioManager.AUDIOFOCUS_GAIN -> {
+                                if (isCallActive && !isAiSpeaking && !isMuted && hasAudioPermission) {
+                                    startListeningCycle()
+                                }
+                            }
+                        }
+                    }
+                    .build()
+                audioFocusRequest = focusRequest
+                audioManager.requestAudioFocus(focusRequest)
+            } else {
+                audioManager.requestAudioFocus(
+                    { focusChange ->
+                        when (focusChange) {
+                            AudioManager.AUDIOFOCUS_LOSS,
+                            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                                if (isCallActive) {
+                                    if (isAiSpeaking) {
+                                        cancelTtsCompletionRunnable()
+                                        voiceManager.setOnUtteranceCompleteListener(null)
+                                        ttsManager.stopPlayback()
+                                        voiceManager.stopSpeaking()
+                                        isAiSpeaking = false
+                                    }
+                                    if (isListening) {
+                                        asrManager.cancel()
+                                        isListening = false
+                                    }
+                                }
+                            }
+                            AudioManager.AUDIOFOCUS_GAIN -> {
+                                if (isCallActive && !isAiSpeaking && !isMuted && hasAudioPermission) {
+                                    startListeningCycle()
+                                }
+                            }
+                        }
+                    },
+                    AudioManager.STREAM_VOICE_CALL,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                )
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "requestAudioFocus: ${e.message}")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun abandonAudioFocus() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                (audioFocusRequest as? AudioFocusRequest)?.let {
+                    audioManager.abandonAudioFocusRequest(it)
+                }
+            } else {
+                audioManager.abandonAudioFocus(null)
+            }
+        } catch (_: Exception) {}
+        audioFocusRequest = null
+    }
+
     private fun startCall() {
         isCallActive = true
         callStartTime = System.currentTimeMillis()
         tvDuration?.post(durationRunnable)
         tvStatus?.text = "通话中"
+
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isSpeakerphoneOn = isSpeakerOn
+        requestAudioFocus()
 
         ivAvatar?.animate()?.scaleX(1.05f)?.scaleY(1.05f)?.setDuration(600)?.withEndAction {
             ivAvatar?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(400)?.start()
@@ -518,7 +645,7 @@ class PhoneCallActivity : AppCompatActivity() {
                 val greeting = withContext(Dispatchers.IO) {
                     callLlm("用户给你打了电话，请简短地打个招呼回应，就像接电话一样自然。不要超过两句话。")
                 }
-                if (greeting.isNotBlank()) {
+                if (greeting.isNotBlank() && isCallActive) {
                     tvTranscript?.text = "$personaName: $greeting"
                     speakAi(greeting)
                 }
@@ -530,18 +657,77 @@ class PhoneCallActivity : AppCompatActivity() {
         }
     }
 
+    private fun startSilenceTimer() {
+        cancelSilenceTimer()
+        val runnable = Runnable {
+            if (isCallActive && isListening && !isAiSpeaking && !isMuted) {
+                silenceCount++
+                if (silenceCount <= MAX_SILENCE_COUNT) {
+                    handleSilence()
+                }
+            }
+        }
+        silenceRunnable = runnable
+        tvDuration?.postDelayed(runnable, SILENCE_TIMEOUT_MS)
+    }
+
+    private fun cancelSilenceTimer() {
+        silenceRunnable?.let { tvDuration?.removeCallbacks(it) }
+        silenceRunnable = null
+    }
+
+    private fun handleSilence() {
+        if (!isCallActive || isAiSpeaking) return
+        isHandlingSilence = true
+        isListening = false
+        asrManager.stopListening()
+        val prompts = listOf(
+            "用户沉默了一会儿，你主动说点什么来打破沉默，要简短自然，就像打电话时对方不说话你会说的那种话。一句话就好。",
+            "用户还是没有说话，再试着说点什么，可以问个问题引导对方说话。一句话就好。",
+            "用户似乎在想事情，温柔地说一句表示理解的话。一句话就好。"
+        )
+        val prompt = prompts[(silenceCount - 1).coerceIn(0, prompts.size - 1)]
+        tvStatus?.text = "$personaName 正在说话..."
+        waveformView?.setMode(VoiceWaveformView.MODE_AI_SPEAKING)
+        startPulseAnimation()
+        lifecycleScope.launch {
+            try {
+                val reply = withContext(Dispatchers.IO) { callLlm(prompt) }
+                if (reply.isNotBlank() && isCallActive) {
+                    tvTranscript?.text = "$personaName: $reply"
+                    isHandlingSilence = false
+                    speakAi(reply)
+                } else if (isCallActive) {
+                    startListeningCycle()
+                }
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "handleSilence: ${e.message}")
+                if (isCallActive) startListeningCycle()
+            }
+        }
+    }
+
     private fun startListeningCycle() {
         if (!isCallActive || isAiSpeaking || isMuted || !hasAudioPermission) return
 
         isListening = true
         waveformView?.setMode(VoiceWaveformView.MODE_LISTENING)
         asrManager.startListening()
+        startSilenceTimer()
     }
 
     private fun processUserSpeech(userText: String) {
         if (!isCallActive) return
 
+        if (userText.isBlank()) {
+            tvStatus?.text = "通话中"
+            waveformView?.setMode(VoiceWaveformView.MODE_IDLE)
+            startListeningCycle()
+            return
+        }
+
         tvTranscript?.text = "你: $userText"
+        silenceCount = 0
         tvStatus?.text = "$personaName 正在说话..."
         waveformView?.setMode(VoiceWaveformView.MODE_AI_SPEAKING)
         startPulseAnimation()
@@ -586,13 +772,22 @@ class PhoneCallActivity : AppCompatActivity() {
                         if (persona.personality.isNotBlank()) append("\n你的性格：${persona.personality}")
                     }
                 }
+                val history = callHistory.takeLast(10).map { (text, isUser) ->
+                    isUser to text
+                }
                 val response = client.sendChat(
                     userId = "phone_user", message = userText,
                     personaName = pName, personaPrompt = pPrompt,
                     emotion = "NEUTRAL", action = "IDLE",
-                    memories = emptyList(), appCategory = "phone_call"
+                    memories = emptyList(), appCategory = "phone_call",
+                    chatHistory = history
                 )
-                response?.text?.replace(Regex("\\[\\[emotion:\\w+\\]\\]", RegexOption.IGNORE_CASE), "")?.trim() ?: ""
+                val replyText = response?.text?.replace(Regex("\\[\\[emotion:\\w+\\]\\]", RegexOption.IGNORE_CASE), "")?.trim() ?: ""
+                if (replyText.isNotBlank()) {
+                    callHistory.add(userText to true)
+                    callHistory.add(replyText to false)
+                }
+                replyText
             } catch (e: Exception) {
                 AppLogger.e(TAG, "callLlm: ${e.message}")
                 ""
@@ -606,42 +801,111 @@ class PhoneCallActivity : AppCompatActivity() {
         tvStatus?.text = "$personaName 正在说话..."
         startPulseAnimation()
 
+        cancelTtsCompletionRunnable()
+
+        val persona = try { personaManager.getPersona(personaId) } catch (_: Exception) { null }
+        val personaVoice = persona?.ttsVoice?.takeIf { it.isNotBlank() }
+        val personaPitch = persona?.ttsPitch?.takeIf { it != 0f }
+        val personaRate = persona?.ttsRate?.takeIf { it != 0f }
+
         val engineMode = ttsManager.engineMode
-        if (engineMode == TtsManager.ENGINE_LOCAL || !ttsManager.isCloudConfigured) {
-            voiceManager.speak(text, Emotion.NEUTRAL)
-            waitForLocalTtsCompletion(text)
+        val useLocalTts = engineMode == TtsManager.ENGINE_LOCAL ||
+            (engineMode != TtsManager.ENGINE_EDGE && !ttsManager.isCloudConfigured)
+
+        if (useLocalTts) {
+            val pitchOffset = (personaPitch ?: 0f) - settingsManager.ttsPitch
+            val rateOffset = (personaRate ?: 0f) - settingsManager.ttsRate
+            voiceManager.speak(text, Emotion.NEUTRAL, pitchOffset, rateOffset)
+            scheduleLocalTtsCompletion(text)
             return
         }
 
         lifecycleScope.launch {
             try {
-                val result = withContext(Dispatchers.IO) { ttsManager.synthesize(text) }
+                val overrideVoice = personaVoice
+                val result = withContext(Dispatchers.IO) {
+                    ttsManager.synthesizeWithVoice(text, overrideVoice)
+                }
+                if (isFinishing || isDestroyedFlag) return@launch
                 if (result.success && (result.audioPath != null || result.audioUrl != null)) {
                     withContext(Dispatchers.Main) {
-                        ttsManager.playAudio(result.audioPath, result.audioUrl) { onAiSpeechComplete() }
+                        if (!isFinishing && !isDestroyedFlag && isCallActive) {
+                            ttsManager.playAudio(result.audioPath, result.audioUrl) {
+                                if (!isFinishing && !isDestroyedFlag && isCallActive) {
+                                    onAiSpeechComplete()
+                                }
+                            }
+                            scheduleCloudTtsCompletion()
+                        }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        voiceManager.speak(text)
-                        waitForLocalTtsCompletion(text)
+                        if (!isFinishing && !isDestroyedFlag && isCallActive) {
+                            val pitchOffset = (personaPitch ?: 0f) - settingsManager.ttsPitch
+                            val rateOffset = (personaRate ?: 0f) - settingsManager.ttsRate
+                            voiceManager.speak(text, Emotion.NEUTRAL, pitchOffset, rateOffset)
+                            scheduleLocalTtsCompletion(text)
+                        }
                     }
                 }
             } catch (e: Exception) {
                 AppLogger.e(TAG, "speakAi: ${e.message}")
-                voiceManager.speak(text)
-                waitForLocalTtsCompletion(text)
+                if (!isFinishing && !isDestroyedFlag && isCallActive) {
+                    voiceManager.speak(text)
+                    scheduleLocalTtsCompletion(text)
+                }
             }
         }
     }
 
-    private fun waitForLocalTtsCompletion(text: String) {
-        val estimatedMs = (text.length * 200L).coerceIn(1500, 10000)
-        tvStatus?.postDelayed({ onAiSpeechComplete() }, estimatedMs)
+    private fun cancelTtsCompletionRunnable() {
+        ttsCompletionRunnable?.let { tvDuration?.removeCallbacks(it) }
+        ttsCompletionRunnable = null
+    }
+
+    private fun scheduleLocalTtsCompletion(text: String) {
+        cancelTtsCompletionRunnable()
+        try {
+            voiceManager.setOnUtteranceCompleteListener {
+                if (isCallActive && isAiSpeaking && !isFinishing && !isDestroyedFlag) {
+                    tvDuration?.post {
+                        if (isCallActive && !isFinishing && !isDestroyedFlag) {
+                            onAiSpeechComplete()
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "OnUtteranceProgressListener not supported, fallback to estimation")
+        }
+        val estimatedMs = (text.length * 200L).coerceIn(2000, 30000)
+        val runnable = Runnable {
+            if (isCallActive && isAiSpeaking && !isFinishing && !isDestroyedFlag) {
+                onAiSpeechComplete()
+            }
+        }
+        ttsCompletionRunnable = runnable
+        tvDuration?.postDelayed(runnable, estimatedMs)
+    }
+
+    private fun scheduleCloudTtsCompletion() {
+        cancelTtsCompletionRunnable()
+        val runnable = Runnable {
+            if (isCallActive && isAiSpeaking && !isFinishing && !isDestroyedFlag) {
+                ttsManager.stopPlayback()
+                onAiSpeechComplete()
+            }
+        }
+        ttsCompletionRunnable = runnable
+        tvDuration?.postDelayed(runnable, 30000)
     }
 
     private fun onAiSpeechComplete() {
-        if (!isCallActive) return
+        if (!isCallActive || !isAiSpeaking) return
+        cancelTtsCompletionRunnable()
+        voiceManager.setOnUtteranceCompleteListener(null)
         isAiSpeaking = false
+        silenceCount = 0
         tvStatus?.text = "通话中"
         stopPulseAnimation()
         waveformView?.setMode(VoiceWaveformView.MODE_IDLE)
@@ -726,6 +990,7 @@ class PhoneCallActivity : AppCompatActivity() {
 
     private fun toggleSpeaker() {
         isSpeakerOn = !isSpeakerOn
+        audioManager.isSpeakerphoneOn = isSpeakerOn
         val btnLayout = btnSpeaker as? LinearLayout ?: return
         val iconTv = btnLayout.getChildAt(0) as? TextView ?: return
         val labelTv = btnLayout.getChildAt(1) as? TextView ?: return
@@ -743,26 +1008,58 @@ class PhoneCallActivity : AppCompatActivity() {
         isCallActive = false
         isAiSpeaking = false
         isListening = false
+        isHandlingSilence = false
 
+        cancelSilenceTimer()
+        cancelTtsCompletionRunnable()
         asrManager.cancel()
         asrManager.cleanup()
-        voiceManager.speak("")
+        voiceManager.stopSpeaking()
         ttsManager.stopPlayback()
 
+        try {
+            audioManager.isSpeakerphoneOn = false
+            audioManager.mode = AudioManager.MODE_NORMAL
+        } catch (_: Exception) {}
+
+        abandonAudioFocus()
         stopPulseAnimation()
         waveformView?.setMode(VoiceWaveformView.MODE_IDLE)
         tvStatus?.text = "通话结束"
-        tvStatus?.removeCallbacks(durationRunnable)
+        tvDuration?.removeCallbacks(durationRunnable)
 
         tvStatus?.postDelayed({ finish() }, 800)
     }
 
+    override fun onStop() {
+        super.onStop()
+        if (isCallActive) {
+            asrManager.cancel()
+            isListening = false
+        }
+    }
+
+    override fun onRestart() {
+        super.onRestart()
+        if (isCallActive && !isAiSpeaking && !isMuted && hasAudioPermission) {
+            startListeningCycle()
+        }
+    }
+
     override fun onDestroy() {
         isCallActive = false
+        isDestroyedFlag = true
+        cancelSilenceTimer()
+        cancelTtsCompletionRunnable()
         asrManager.cleanup()
         voiceManager.cleanup()
         ttsManager.cleanup()
         stopPulseAnimation()
+        try {
+            audioManager.isSpeakerphoneOn = false
+            audioManager.mode = AudioManager.MODE_NORMAL
+        } catch (_: Exception) {}
+        abandonAudioFocus()
         super.onDestroy()
     }
 
@@ -784,10 +1081,23 @@ class PhoneCallActivity : AppCompatActivity() {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val barWidth = 3f * resources.displayMetrics.density
         private val barGap = 2f * resources.displayMetrics.density
+        private var isAnimating = false
 
         fun setMode(m: Int) {
+            val changed = mode != m
             mode = m
-            invalidate()
+            if (changed) {
+                val shouldAnimate = m == MODE_LISTENING || m == MODE_AI_SPEAKING
+                if (shouldAnimate && !isAnimating) {
+                    isAnimating = true
+                    invalidate()
+                } else if (!shouldAnimate) {
+                    isAnimating = false
+                    invalidate()
+                } else {
+                    invalidate()
+                }
+            }
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -798,7 +1108,9 @@ class PhoneCallActivity : AppCompatActivity() {
             val startX = (w - totalWidth) / 2f
             val centerY = h / 2f
 
-            phase += 0.08f
+            if (isAnimating) {
+                phase += 0.08f
+            }
 
             for (i in 0 until barCount) {
                 val x = startX + i * (barWidth + barGap)
@@ -843,10 +1155,8 @@ class PhoneCallActivity : AppCompatActivity() {
                 canvas.drawRoundRect(rect, barWidth / 2, barWidth / 2, paint)
             }
 
-            if (mode != MODE_IDLE || mode == MODE_MUTED) {
+            if (isAnimating) {
                 postInvalidateDelayed(30)
-            } else {
-                postInvalidateDelayed(80)
             }
         }
     }

@@ -69,7 +69,7 @@ class MomentsManager(private val context: Context) {
     fun addMoment(moment: Moment): Moment {
         moments.add(moment)
         saveIndex()
-        AppLogger.d(TAG, "Moment added by ${moment.author}: ${moment.content.take(20)}")
+        AppLogger.w(TAG, "Moment added by ${moment.author}: ${moment.content.take(20)}")
         return moment
     }
 
@@ -77,7 +77,7 @@ class MomentsManager(private val context: Context) {
         val moment = moments.find { it.id == momentId } ?: return null
         moment.comments.add(comment)
         saveIndex()
-        AppLogger.d(TAG, "Comment added by ${comment.author} on moment $momentId")
+        //AppLogger.d(TAG, "Comment added by ${comment.author} on moment $momentId")
         return comment
     }
 
@@ -86,12 +86,12 @@ class MomentsManager(private val context: Context) {
             if (affectionLevel >= level && level !in triggeredLevels) {
                 triggeredLevels.add(level)
                 saveIndex()
-                AppLogger.d(TAG, "AI moment triggered by affection level: $level")
+                //AppLogger.d(TAG, "AI moment triggered by affection level: $level")
                 return true
             }
         }
         if (Math.random() < RANDOM_CHANCE) {
-            AppLogger.d(TAG, "AI moment triggered randomly")
+            //AppLogger.d(TAG, "AI moment triggered randomly")
             return true
         }
         return false
@@ -104,7 +104,10 @@ class MomentsManager(private val context: Context) {
         affectionLevel: Int,
         personaId: String = ""
     ): Moment? {
-        if (apiClient == null) return null
+        if (apiClient == null) {
+            AppLogger.w(TAG, "generateAiMoment: apiClient为null")
+            return null
+        }
         return try {
             val systemPrompt = buildString {
                 append("你是「$personaName」，一个可爱的AI桌宠。\n")
@@ -121,7 +124,11 @@ class MomentsManager(private val context: Context) {
                 apiClient.sendSimplePrompt(systemPrompt, "发一条动态吧")
             }
             val content = response?.text
-            if (content.isNullOrBlank()) return null
+            if (content.isNullOrBlank()) {
+                AppLogger.w(TAG, "generateAiMoment: LLM回复为空")
+                return null
+            }
+            AppLogger.w(TAG, "generateAiMoment: 成功, content=${content.take(50)}")
             val moment = Moment(
                 id = UUID.randomUUID().toString(),
                 author = "ai",
@@ -163,7 +170,9 @@ class MomentsManager(private val context: Context) {
             val response = withContext(Dispatchers.IO) {
                 apiClient.sendSimplePrompt(systemPrompt, "回复评论")
             }
-            response?.text?.trim()
+            val result = response?.text?.trim()
+            AppLogger.w(TAG, "generateAiReply: result=${result?.take(50) ?: "null"}")
+            result
         } catch (e: Exception) {
             AppLogger.e(TAG, "generateAiReply failed: ${e.message}")
             null
@@ -177,7 +186,10 @@ class MomentsManager(private val context: Context) {
         momentContent: String,
         personaId: String = ""
     ): String? {
-        if (apiClient == null) return null
+        if (apiClient == null) {
+            AppLogger.w(TAG, "generateAiCommentOnUserMoment: apiClient为null")
+            return null
+        }
         return try {
             val globalPool = if (personaId.isNotBlank()) GlobalMemoryPool(context, personaId) else null
             val globalBlock = globalPool?.getGlobalBlock() ?: ""
@@ -195,7 +207,9 @@ class MomentsManager(private val context: Context) {
             val response = withContext(Dispatchers.IO) {
                 apiClient.sendSimplePrompt(systemPrompt, "评论动态")
             }
-            response?.text?.trim()
+            val result = response?.text?.trim()
+            AppLogger.w(TAG, "generateAiCommentOnUserMoment: result=${result?.take(50) ?: "null"}")
+            result
         } catch (e: Exception) {
             AppLogger.e(TAG, "generateAiCommentOnUserMoment failed: ${e.message}")
             null

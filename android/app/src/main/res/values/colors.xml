@@ -56,4 +56,45 @@
 
     <color name="ripple_light">#1affffff</color>
     <color name="ripple_accent">#1ac4b5fd</color>
+
+    <color name="color_primary">#667eea</color>
+    <color name="color_primary_light">#c4b5fd</color>
+    <color name="color_secondary">#9c7cff</color>
+    <color name="color_text_chat_primary">#e0e0f0</color>
+    <color name="color_text_chat_secondary">#8899bb</color>
+    <color name="color_text_input">#d0d0e0</color>
+    <color name="color_text_hint">#667788</color>
+    <color name="color_text_title">#e8e8f0</color>
+    <color name="color_text_label">#8899cc</color>
+    <color name="color_section_header">#8899dd</color>
+    <color name="color_text_link">#aabbdd</color>
+    <color name="color_card_dark">#1a1a3e</color>
+    <color name="color_card_dark_alt">#1a1a2e</color>
+    <color name="color_card_selected">#1e1e44</color>
+    <color name="color_stroke_dark">#2a2a5a</color>
+    <color name="color_stroke_medium">#3a3a6e</color>
+    <color name="color_divider_dark">#2a2a4a</color>
+    <color name="color_background_github">#0d1117</color>
+    <color name="color_surface_github">#161b22</color>
+    <color name="color_success_green">#07c160</color>
+    <color name="color_danger">#cc3344</color>
+    <color name="color_error_red">#ff5252</color>
+    <color name="color_link_blue">#60a5fa</color>
+    <color name="color_accent_teal">#64ffda</color>
+    <color name="color_accent_orange">#ffb347</color>
+    <color name="color_white_alpha_67">#ffffffaa</color>
+    <color name="color_white_alpha_20">#33ffffff</color>
+    <color name="color_white_alpha_13">#22ffffff</color>
+    <color name="color_dark_alpha_80">#cc0a0a1a</color>
+    <color name="color_primary_alpha_20">#33c4b5fd</color>
+    <color name="color_card_dark_alpha">#cc1a1a3e</color>
+    <color name="color_main_bg_alpha">#b316162a</color>
+    <color name="color_input_bg_variant">#1e1e3a</color>
+    <color name="color_toolbar_bg">#16162a</color>
+    <color name="color_text_gray">#888888</color>
+    <color name="color_text_disabled">#aaaaaa</color>
+    <color name="color_text_light_gray">#e8e8e8</color>
+    <color name="color_emotion_label">#667eea</color>
+    <color name="color_material_green">#4caf50</color>
+    <color name="color_material_red">#e53935</color>
 </resources>

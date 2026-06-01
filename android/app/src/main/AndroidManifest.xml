@@ -107,6 +107,11 @@
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 
         <activity
+            android:name=".ui.BedtimeRadioActivity"
+            android:label="星尘电台"
+            android:theme="@style/Theme.Companion" />
+
+        <activity
             android:name=".ui.AchievementActivity"
             android:label="成就殿堂"
             android:parentActivityName=".ui.MainActivity" />
@@ -163,6 +168,18 @@
         <activity
             android:name="com.aicompanion.ilink.WechatBindActivity"
             android:label="微信连接"
+            android:theme="@style/Theme.Companion" />
+        <activity
+            android:name="com.aicompanion.album.MemorialAlbumActivity"
+            android:label="纪念相册"
+            android:theme="@style/Theme.Companion" />
+        <activity
+            android:name="com.aicompanion.calendar.CalendarActivity"
+            android:label="日历"
+            android:theme="@style/Theme.Companion" />
+        <activity
+            android:name="com.aicompanion.ui.TimeCapsuleActivity"
+            android:label="时光胶囊"
             android:theme="@style/Theme.Companion" />
 
         <service

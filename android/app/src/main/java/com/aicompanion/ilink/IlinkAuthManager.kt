@@ -50,11 +50,11 @@ class IlinkAuthManager(private val context: Context) {
             putBoolean(KEY_BOUND, true)
             apply()
         }
-        AppLogger.i(TAG, "Binding saved: botId=${status.ilinkBotId}, userId=${status.ilinkUserId}")
+        //AppLogger.i(TAG, "Binding saved: botId=${status.ilinkBotId}, userId=${status.ilinkUserId}")
     }
 
     fun clearBinding() {
         prefs.edit().clear().apply()
-        AppLogger.i(TAG, "Binding cleared")
+        //AppLogger.i(TAG, "Binding cleared")
     }
 }

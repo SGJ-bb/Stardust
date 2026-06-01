@@ -390,8 +390,8 @@ class HomeActivity : AppCompatActivity() {
 
         if (spinnerGender != null) {
             val genderOptions = arrayOf("未设定", "男", "女")
-            val genderAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, genderOptions)
-            genderAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            val genderAdapter = android.widget.ArrayAdapter(this, R.layout.spinner_item_dark, genderOptions)
+            genderAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_dark)
             spinnerGender.adapter = genderAdapter
             val savedGender = getSharedPreferences("app_prefs", MODE_PRIVATE).getString("user_gender", "") ?: ""
             val genderIndex = when (savedGender) {
@@ -665,8 +665,9 @@ class HomeActivity : AppCompatActivity() {
             com.aicompanion.anim.AnimeUtils.pulse(it)
             if (persona.id == "default") {
                 Toast.makeText(this@HomeActivity, "默认角色不可删除", Toast.LENGTH_SHORT).show()
+            } else if (!personaManager.deletePersona(persona.id)) {
+                Toast.makeText(this@HomeActivity, "无法删除当前使用的角色", Toast.LENGTH_SHORT).show()
             } else {
-                personaManager.deletePersona(persona.id)
                 refreshList()
                 sheet.dismiss()
             }
@@ -793,6 +794,7 @@ class HomeActivity : AppCompatActivity() {
                 personaManager.setActivePersona(persona.id)
                 val intent = Intent(this@HomeActivity, MainActivity::class.java).apply {
                     putExtra("persona_id", persona.id)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 }
                 startActivity(intent)
             }

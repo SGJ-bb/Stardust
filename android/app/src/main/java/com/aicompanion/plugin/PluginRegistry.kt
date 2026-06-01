@@ -2,11 +2,13 @@ package com.aicompanion.plugin
 
 import com.aicompanion.models.ToolDefinition
 import com.aicompanion.util.AppLogger
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 object PluginRegistry {
     private const val TAG = "PluginRegistry"
-    private val plugins = mutableMapOf<String, ToolPlugin>()
-    private val listeners = mutableListOf<(String, Boolean) -> Unit>()
+    private val plugins = ConcurrentHashMap<String, ToolPlugin>()
+    private val listeners = CopyOnWriteArrayList<(String, Boolean) -> Unit>()
 
     fun register(plugin: ToolPlugin) {
         plugins[plugin.name] = plugin
@@ -30,7 +32,7 @@ object PluginRegistry {
     fun getEnabledDefinitions(): List<ToolDefinition> =
         plugins.values.filter { it.isEnabled() }.map { it.getDefinition() }
 
-    fun executePlugin(name: String, arguments: String): String {
+    suspend fun executePlugin(name: String, arguments: String): String {
         val plugin = plugins[name]
         return if (plugin != null && plugin.isEnabled()) {
             plugin.execute(arguments)

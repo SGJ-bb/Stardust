@@ -11,6 +11,7 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -36,8 +37,21 @@ data class BubbleSkin(
     val aiStrokeWidth: Float = 0f,
     val aiAlpha: Int = 255,
     val userImageAsset: String? = null,
-    val aiImageAsset: String? = null
-)
+    val aiImageAsset: String? = null,
+    val userTextColor: Int = Color.WHITE,
+    val aiTextColor: Int = Color.parseColor("#E0E0E0")
+) {
+    companion object {
+        fun calculateTextColor(bgColor: Int): Int {
+            val r = Color.red(bgColor) / 255f
+            val g = Color.green(bgColor) / 255f
+            val b = Color.blue(bgColor) / 255f
+            val luminance = 0.299f * r + 0.587f * g + 0.114f * b
+            val alpha = Color.alpha(bgColor) / 255f
+            return if (alpha < 0.5f || luminance > 0.55f) Color.parseColor("#1A1A2E") else Color.WHITE
+        }
+    }
+}
 
 data class AvatarFrame(
     val id: String,
@@ -80,7 +94,9 @@ object BubbleSkinManager {
             userBgColor = Color.parseColor("#ff6b9d"),
             userCornerRadius = 18f,
             aiBgColor = Color.parseColor("#BB4a2a3a"),
-            aiCornerRadius = 18f
+            aiCornerRadius = 18f,
+            userTextColor = Color.WHITE,
+            aiTextColor = Color.parseColor("#E0E0E0")
         ),
         BubbleSkin(
             id = "glass", name = "毛玻璃",
@@ -92,7 +108,9 @@ object BubbleSkinManager {
             aiCornerRadius = 20f,
             aiStrokeColor = Color.parseColor("#33667eea"),
             aiStrokeWidth = 1f,
-            aiAlpha = 200
+            aiAlpha = 200,
+            userTextColor = Color.WHITE,
+            aiTextColor = Color.parseColor("#E0E0E0")
         ),
         BubbleSkin(
             id = "neon", name = "霓虹",
@@ -103,7 +121,9 @@ object BubbleSkinManager {
             aiBgColor = Color.parseColor("#1a1a2e"),
             aiCornerRadius = 16f,
             aiStrokeColor = Color.parseColor("#667eea"),
-            aiStrokeWidth = 1.5f
+            aiStrokeWidth = 1.5f,
+            userTextColor = Color.WHITE,
+            aiTextColor = Color.WHITE
         ),
         BubbleSkin(
             id = "candy", name = "糖果",
@@ -113,7 +133,9 @@ object BubbleSkinManager {
             aiBgColor = Color.parseColor("#BBE8DAEF"),
             aiCornerRadius = 22f,
             aiStrokeColor = Color.parseColor("#D4A5FF"),
-            aiStrokeWidth = 1f
+            aiStrokeWidth = 1f,
+            userTextColor = Color.parseColor("#1A1A2E"),
+            aiTextColor = Color.parseColor("#1A1A2E")
         ),
         BubbleSkin(
             id = "mint", name = "薄荷",
@@ -122,7 +144,9 @@ object BubbleSkinManager {
             aiBgColor = Color.parseColor("#BB1a2e2e"),
             aiCornerRadius = 14f,
             aiStrokeColor = Color.parseColor("#2ECC71"),
-            aiStrokeWidth = 0.5f
+            aiStrokeWidth = 0.5f,
+            userTextColor = Color.WHITE,
+            aiTextColor = Color.parseColor("#E0E0E0")
         )
     )
 
@@ -335,87 +359,117 @@ object BubbleSkinManager {
     }
 
     fun createStretchableDrawable(bitmap: Bitmap): Drawable {
-        return object : Drawable() {
-            private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                isFilterBitmap = true
-            }
+        return StretchableBubbleDrawable(bitmap)
+    }
 
-            override fun draw(canvas: Canvas) {
-                val bounds = bounds
-                val bw = bitmap.width
-                val bh = bitmap.height
+    class StretchableBubbleDrawable(private val bitmap: Bitmap) : Drawable() {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        private val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        private val shaderBitmap: Bitmap
 
-                val cornerW = bw / 3
-                val cornerH = bh / 3
-
-                val left = bounds.left
-                val top = bounds.top
-                val right = bounds.right
-                val bottom = bounds.bottom
-
-                val centerW = right - left - 2 * cornerW
-                val centerH = bottom - top - 2 * cornerH
-
-                canvas.drawBitmap(bitmap,
-                    Rect(0, 0, cornerW, cornerH),
-                    Rect(left, top, left + cornerW, top + cornerH),
-                    paint)
-
-                if (centerW > 0) {
-                    canvas.drawBitmap(bitmap,
-                        Rect(cornerW, 0, bw - cornerW, cornerH),
-                        Rect(left + cornerW, top, right - cornerW, top + cornerH),
-                        paint)
-                }
-
-                canvas.drawBitmap(bitmap,
-                    Rect(bw - cornerW, 0, bw, cornerH),
-                    Rect(right - cornerW, top, right, top + cornerH),
-                    paint)
-
-                if (centerH > 0) {
-                    canvas.drawBitmap(bitmap,
-                        Rect(0, cornerH, cornerW, bh - cornerH),
-                        Rect(left, top + cornerH, left + cornerW, bottom - cornerH),
-                        paint)
-                }
-
-                if (centerW > 0 && centerH > 0) {
-                    canvas.drawBitmap(bitmap,
-                        Rect(cornerW, cornerH, bw - cornerW, bh - cornerH),
-                        Rect(left + cornerW, top + cornerH, right - cornerW, bottom - cornerH),
-                        paint)
-                }
-
-                if (centerH > 0) {
-                    canvas.drawBitmap(bitmap,
-                        Rect(bw - cornerW, cornerH, bw, bh - cornerH),
-                        Rect(right - cornerW, top + cornerH, right, bottom - cornerH),
-                        paint)
-                }
-
-                canvas.drawBitmap(bitmap,
-                    Rect(0, bh - cornerH, cornerW, bh),
-                    Rect(left, bottom - cornerH, left + cornerW, bottom),
-                    paint)
-
-                if (centerW > 0) {
-                    canvas.drawBitmap(bitmap,
-                        Rect(cornerW, bh - cornerH, bw - cornerW, bh),
-                        Rect(left + cornerW, bottom - cornerH, right - cornerW, bottom),
-                        paint)
-                }
-
-                canvas.drawBitmap(bitmap,
-                    Rect(bw - cornerW, bh - cornerH, bw, bh),
-                    Rect(right - cornerW, bottom - cornerH, right, bottom),
-                    paint)
-            }
-
-            override fun setAlpha(alpha: Int) { paint.alpha = alpha }
-            override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter }
-            override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+        init {
+            val w = bitmap.width
+            val h = bitmap.height
+            val tileSize = (Math.min(w, h) / 3).coerceAtLeast(1)
+            val cx = w / 2
+            val cy = h / 2
+            val halfTile = tileSize / 2
+            shaderBitmap = Bitmap.createBitmap(
+                bitmap,
+                (cx - halfTile).coerceIn(0, w - tileSize),
+                (cy - halfTile).coerceIn(0, h - tileSize),
+                tileSize.coerceAtMost(w - (cx - halfTile).coerceIn(0, w - tileSize)),
+                tileSize.coerceAtMost(h - (cy - halfTile).coerceIn(0, h - tileSize))
+            )
+            tilePaint.shader = android.graphics.BitmapShader(shaderBitmap, android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT)
         }
+
+        override fun draw(canvas: Canvas) {
+            if (bitmap.isRecycled) return
+            val bounds = bounds
+            val bw = bitmap.width
+            val bh = bitmap.height
+            val left = bounds.left.toFloat()
+            val top = bounds.top.toFloat()
+            val right = bounds.right.toFloat()
+            val bottom = bounds.bottom.toFloat()
+
+            val density = canvas.density
+            val cornerDp = 14f
+            val cornerPx = (cornerDp * density / 160f).toInt().coerceAtMost(bw / 4).coerceAtMost(bh / 4)
+            val cW = cornerPx.toFloat()
+            val cH = cornerPx.toFloat()
+
+            val innerLeft = left + cW
+            val innerTop = top + cH
+            val innerRight = right - cW
+            val innerBottom = bottom - cH
+
+            if (innerRight > innerLeft && innerBottom > innerTop) {
+                canvas.drawRect(innerLeft, innerTop, innerRight, innerBottom, tilePaint)
+            }
+
+            val cWi = cornerPx
+            val cHi = cornerPx
+            canvas.drawBitmap(bitmap,
+                Rect(0, 0, cWi, cHi),
+                Rect(bounds.left, bounds.top, bounds.left + cWi, bounds.top + cHi),
+                paint)
+
+            if (right - left > 2 * cW) {
+                canvas.drawBitmap(bitmap,
+                    Rect(cWi, 0, bw - cWi, cHi),
+                    Rect(bounds.left + cWi, bounds.top, bounds.right - cWi, bounds.top + cHi),
+                    paint)
+            }
+
+            canvas.drawBitmap(bitmap,
+                Rect(bw - cWi, 0, bw, cHi),
+                Rect(bounds.right - cWi, bounds.top, bounds.right, bounds.top + cHi),
+                paint)
+
+            if (bottom - top > 2 * cH) {
+                canvas.drawBitmap(bitmap,
+                    Rect(0, cHi, cWi, bh - cHi),
+                    Rect(bounds.left, bounds.top + cHi, bounds.left + cWi, bounds.bottom - cHi),
+                    paint)
+            }
+
+            if (bottom - top > 2 * cH) {
+                canvas.drawBitmap(bitmap,
+                    Rect(bw - cWi, cHi, bw, bh - cHi),
+                    Rect(bounds.right - cWi, bounds.top + cHi, bounds.right, bounds.bottom - cHi),
+                    paint)
+            }
+
+            canvas.drawBitmap(bitmap,
+                Rect(0, bh - cHi, cWi, bh),
+                Rect(bounds.left, bounds.bottom - cHi, bounds.left + cWi, bounds.bottom),
+                paint)
+
+            if (right - left > 2 * cW) {
+                canvas.drawBitmap(bitmap,
+                    Rect(cWi, bh - cHi, bw - cWi, bh),
+                    Rect(bounds.left + cWi, bounds.bottom - cHi, bounds.right - cWi, bounds.bottom),
+                    paint)
+            }
+
+            canvas.drawBitmap(bitmap,
+                Rect(bw - cWi, bh - cHi, bw, bh),
+                Rect(bounds.right - cWi, bounds.bottom - cHi, bounds.right, bounds.bottom),
+                paint)
+        }
+
+        override fun getPadding(padding: Rect): Boolean {
+            val cornerDp = 10f
+            val px = (cornerDp * bitmap.density / 160f).toInt().coerceIn(4, 20)
+            padding.set(px, px, px, px)
+            return true
+        }
+
+        override fun setAlpha(alpha: Int) { paint.alpha = alpha; tilePaint.alpha = alpha }
+        override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter; tilePaint.colorFilter = colorFilter }
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
     }
 
     fun applyAvatarFrame(cardView: com.google.android.material.card.MaterialCardView, frame: AvatarFrame) {
@@ -474,6 +528,7 @@ object BubbleSkinManager {
     }
 
     fun maskAvatarFrameCenter(src: Bitmap, radius: Float): Bitmap {
+        if (src.isRecycled) return src
         val w = src.width
         val h = src.height
         val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)

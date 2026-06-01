@@ -595,12 +595,14 @@ class DiaryManager(private val context: Context, private val personaId: String =
     fun importFromJson(jsonContent: String): ImportResult {
         val imported = mutableListOf<String>()
         val errors = mutableListOf<String>()
+        var totalEntryCount = 0
 
         try {
             val root = JSONObject(jsonContent)
             val diariesArray = root.optJSONArray("diaries")
 
             if (diariesArray != null) {
+                totalEntryCount = diariesArray.length()
                 for (i in 0 until diariesArray.length()) {
                     try {
                         val entryJson = diariesArray.getJSONObject(i)
@@ -630,9 +632,10 @@ class DiaryManager(private val context: Context, private val personaId: String =
             errors.add("JSON解析失败: ${e.message}")
         }
 
+        val totalEntries = totalEntryCount
         return ImportResult(
             imported = imported.size,
-            skipped = (imported.size + errors.size) - imported.size,
+            skipped = totalEntries - imported.size - errors.size,
             errors = errors
         )
     }

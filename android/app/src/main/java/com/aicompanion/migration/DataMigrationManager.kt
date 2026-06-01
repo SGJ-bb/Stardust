@@ -16,7 +16,7 @@ object DataMigrationManager {
 
         if (currentVersion >= LATEST_VERSION) return
 
-        AppLogger.d(TAG, "Starting migration from v$currentVersion to v$LATEST_VERSION")
+        //AppLogger.d(TAG, "Starting migration from v$currentVersion to v$LATEST_VERSION")
 
         try {
             if (currentVersion < 1) {
@@ -27,14 +27,14 @@ object DataMigrationManager {
             }
 
             prefs.edit().putInt(KEY_CURRENT_VERSION, LATEST_VERSION).apply()
-            AppLogger.d(TAG, "Migration complete: v$currentVersion -> v$LATEST_VERSION")
+            //AppLogger.d(TAG, "Migration complete: v$currentVersion -> v$LATEST_VERSION")
         } catch (e: Exception) {
             AppLogger.e(TAG, "Migration failed: ${e.message}")
         }
     }
 
     private fun migrateV0toV1(context: Context) {
-        AppLogger.d(TAG, "Migrating v0 -> v1: persona_data separation")
+        //AppLogger.d(TAG, "Migrating v0 -> v1: persona_data separation")
 
         val oldPrefs = context.getSharedPreferences("persona_data", Context.MODE_PRIVATE)
         if (oldPrefs.getAll().isEmpty()) return
@@ -62,11 +62,11 @@ object DataMigrationManager {
         }
         newEditor.apply()
 
-        AppLogger.d(TAG, "Migrated $migrated persona fields from persona_data to persona_data_$activeId")
+        //AppLogger.d(TAG, "Migrated $migrated persona fields from persona_data to persona_data_$activeId")
     }
 
     private fun migrateV1toV2(context: Context) {
-        AppLogger.d(TAG, "Migrating v1 -> v2: memory_pool separation + wakeup sync + api key fix")
+        //AppLogger.d(TAG, "Migrating v1 -> v2: memory_pool separation + wakeup sync + api key fix")
 
         migrateMemoryPool(context)
         syncWakeupSettings(context)

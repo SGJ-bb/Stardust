@@ -26,7 +26,7 @@ class ModelDownloader(private val context: Context) {
         .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
         .build()
 
-    private val activeDownloads = mutableMapOf<String, Boolean>()
+    private val activeDownloads = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
     suspend fun downloadModel(
         modelInfo: ModelInfo,
@@ -46,10 +46,11 @@ class ModelDownloader(private val context: Context) {
 
             if (!response.isSuccessful) {
                 AppLogger.e(TAG, "downloadModel: HTTP ${response.code}")
+                response.close()
                 return@withContext false
             }
 
-            val body = response.body ?: return@withContext false
+            val body = response.body ?: run { response.close(); return@withContext false }
             val totalBytes = body.contentLength()
             val modelsDir = File(context.getDir("models", Context.MODE_PRIVATE), modelInfo.fileName)
 
@@ -109,6 +110,10 @@ class ModelDownloader(private val context: Context) {
             return@withContext true
         } catch (e: Exception) {
             AppLogger.e(TAG, "downloadModel failed: ${e.message}")
+            try {
+                val modelsDir = File(context.getDir("models", Context.MODE_PRIVATE), modelInfo.fileName)
+                if (modelsDir.exists()) modelsDir.delete()
+            } catch (_: Exception) {}
             return@withContext false
         } finally {
             activeDownloads.remove(modelInfo.id)

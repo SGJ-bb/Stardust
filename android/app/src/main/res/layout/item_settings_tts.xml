@@ -105,6 +105,30 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="10dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="TTS 厂商"
+                        android:textSize="15sp"
+                        android:textColor="#d0d0e0" />
+
+                    <Spinner
+                        android:id="@+id/spinner_tts_provider"
+                        android:layout_width="180dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_spinner"
+                        android:popupBackground="#1a1a3e"
+                        android:textColor="#d0d0e0" />
+                </LinearLayout>
+
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -126,6 +150,25 @@
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:hint="TTS API Key"
+                    app:boxBackgroundColor="@android:color/transparent"
+                    app:boxStrokeColor="#667eea"
+                    app:hintTextColor="#667eea"
+                    android:layout_marginBottom="10dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_tts_api_key"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textColor="#d0d0e0"
+                        android:inputType="textPassword"
+                        android:textColorHint="#667788" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:hint="TTS 模型"
                     app:boxBackgroundColor="@android:color/transparent"
                     app:boxStrokeColor="#667eea"
@@ -140,6 +183,44 @@
                         android:textColor="#d0d0e0"
                         android:textColorHint="#667788" />
                 </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="音色名称 (Voice Name)"
+                    app:boxBackgroundColor="@android:color/transparent"
+                    app:boxStrokeColor="#667eea"
+                    app:hintTextColor="#667eea"
+                    android:layout_marginBottom="10dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_tts_voice_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textColor="#d0d0e0"
+                        android:textColorHint="#667788" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_test_tts"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="8dp"
+                    android:text="测试语音合成"
+                    android:textColor="#667eea"
+                    app:cornerRadius="10dp"
+                    app:strokeColor="#667eea" />
+
+                <TextView
+                    android:id="@+id/tv_tts_test_result"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#4CAF50"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <View

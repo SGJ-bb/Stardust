@@ -146,7 +146,8 @@ class SessionManager(private val context: Context) {
             if (sessions.isNotEmpty()) {
                 currentSession = sessions.first()
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "loadSessions error: ${e.message}")
             sessions.clear()
         }
     }

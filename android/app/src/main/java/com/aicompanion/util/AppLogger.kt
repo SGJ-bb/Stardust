@@ -22,12 +22,14 @@ object AppLogger {
     @Volatile
     var debugVerbose: Boolean = false
 
-    private var dCount = 0
+    private var dCount = java.util.concurrent.atomic.AtomicInteger(0)
     private const val D_SAMPLE_RATE = 5
 
     private var logFile: File? = null
+    private val writerLock = Any()
+    @Volatile
     private var fileWriter: FileWriter? = null
-    private var pendingCount = 0
+    private var pendingCount = java.util.concurrent.atomic.AtomicInteger(0)
 
     fun init(context: Context) {
         try {
@@ -53,8 +55,7 @@ object AppLogger {
     fun d(tag: String, msg: String) {
         if (!enabled) return
         if (!debugVerbose && !isDebug) {
-            dCount++
-            if (dCount % D_SAMPLE_RATE != 0) return
+            if (dCount.incrementAndGet() % D_SAMPLE_RATE != 0) return
         }
         val safe = sanitize(msg)
         val line = "[${dateFmt.format(Date())}] D/$tag: $safe"
@@ -113,13 +114,14 @@ object AppLogger {
 
     private fun persistLine(line: String) {
         try {
-            val writer = fileWriter ?: return
-            writer.write(line)
-            writer.write("\n")
-            pendingCount++
-            if (pendingCount >= FLUSH_INTERVAL) {
-                writer.flush()
-                pendingCount = 0
+            synchronized(writerLock) {
+                val writer = fileWriter ?: return
+                writer.write(line)
+                writer.write("\n")
+                if (pendingCount.incrementAndGet() >= FLUSH_INTERVAL) {
+                    writer.flush()
+                    pendingCount.set(0)
+                }
             }
         } catch (_: Exception) {
         }
@@ -148,40 +150,47 @@ object AppLogger {
         synchronized(logs) {
             logs.clear()
         }
-        try {
-            fileWriter?.flush()
-            fileWriter?.close()
-            logFile?.delete()
-            fileWriter = logFile?.let { FileWriter(it, false) }
-        } catch (_: Exception) {
+        synchronized(writerLock) {
+            try {
+                fileWriter?.flush()
+                fileWriter?.close()
+                logFile?.delete()
+                fileWriter = logFile?.let { FileWriter(it, false) }
+            } catch (_: Exception) {
+            }
+            pendingCount.set(0)
         }
-        pendingCount = 0
     }
 
     fun flush() {
-        try {
-            fileWriter?.flush()
-            pendingCount = 0
-        } catch (_: Exception) {
+        synchronized(writerLock) {
+            try {
+                fileWriter?.flush()
+                pendingCount.set(0)
+            } catch (_: Exception) {
+            }
         }
     }
 
     fun trimLogFile() {
-        try {
-            val file = logFile ?: return
-            if (!file.exists()) return
-            if (file.length() < 512 * 1024) return
-            val lines = file.readLines()
-            val kept = lines.takeLast(MAX_LOGS)
-            fileWriter?.flush()
-            fileWriter?.close()
-            file.writeText(kept.joinToString("\n"))
-            fileWriter = FileWriter(file, true)
-            synchronized(logs) {
-                logs.clear()
-                logs.addAll(kept)
+        synchronized(writerLock) {
+            try {
+                val file = logFile ?: return
+                if (!file.exists()) return
+                if (file.length() < 512 * 1024) return
+                val lines = file.readLines()
+                val kept = lines.takeLast(MAX_LOGS)
+                fileWriter?.flush()
+                fileWriter?.close()
+                file.writeText(kept.joinToString("\n"))
+                fileWriter = FileWriter(file, true)
+                pendingCount.set(0)
+                synchronized(logs) {
+                    logs.clear()
+                    logs.addAll(kept)
+                }
+            } catch (_: Exception) {
             }
-        } catch (_: Exception) {
         }
     }
 }

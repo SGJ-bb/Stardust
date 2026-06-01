@@ -1,7 +1,9 @@
 import json
 import time
 import logging
+import asyncio
 from typing import Optional, Dict, Any
+from datetime import datetime, timedelta
 from openai import AsyncOpenAI
 from app.core.config import settings
 from app.models.schemas import (
@@ -21,10 +23,20 @@ class LLMService:
         )
         self.memory_service = MemoryService()
         self.prompt_builder = PromptBuilder()
-        self._request_count = {}
+        self._request_count: Dict[str, int] = {}
+        self._last_reset_date: str = datetime.now().strftime("%Y-%m-%d")
+        self._reset_task: Optional[asyncio.Task] = None
+
+    def _maybe_reset_daily(self):
+        today = datetime.now().strftime("%Y-%m-%d")
+        if today != self._last_reset_date:
+            self._request_count.clear()
+            self._last_reset_date = today
 
     async def generate_response(self, request: ChatRequest) -> ChatResponse:
         start_time = time.time()
+
+        self._maybe_reset_daily()
 
         if not self._check_rate_limit(request.user_id):
             return ChatResponse(
@@ -58,10 +70,20 @@ class LLMService:
             content = response.choices[0].message.content
             parsed = json.loads(content)
 
+            try:
+                emotion = EmotionEnum(parsed.get("emotion", "neutral"))
+            except ValueError:
+                emotion = EmotionEnum.NEUTRAL
+
+            try:
+                action = ActionEnum(parsed.get("action", "idle"))
+            except ValueError:
+                action = ActionEnum.IDLE
+
             return ChatResponse(
                 text=parsed.get("text", "..."),
-                emotion=EmotionEnum(parsed.get("emotion", "neutral")),
-                action=ActionEnum(parsed.get("action", "idle")),
+                emotion=emotion,
+                action=action,
                 response_time_ms=(time.time() - start_time) * 1000
             )
 

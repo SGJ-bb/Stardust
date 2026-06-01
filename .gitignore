@@ -38,6 +38,16 @@ env/
 # Environment
 .env
 config/.env
+**/api_key.txt
+**/apikey.txt
+**/secret*
+**/credentials*
+**/*.key
+**/*.pem
+
+# Sensitive patterns
+**/secrets/
+**/private/
 
 # IDE
 .vscode/

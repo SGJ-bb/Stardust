@@ -71,7 +71,7 @@ class LocalModelManager(private val context: Context) {
     private var ocrModelAvailable = false
     private var useChineseOcr = true
 
-    fun isOcrModelAvailable(): Boolean = ocrModelAvailable || true
+    fun isOcrModelAvailable(): Boolean = ocrModelAvailable
 
     private var loadedModelId: String? = null
     private var deviceProfile: DeviceProfile? = null
@@ -167,7 +167,71 @@ class LocalModelManager(private val context: Context) {
             return null
         }
         AppLogger.d(TAG, "analyzeCurrentScreen: captured bitmap ${bitmap.width}x${bitmap.height}")
-        return analyzeScreen(bitmap)
+        val sm = com.aicompanion.settings.SettingsManager(context)
+        return if (sm.useChatModelForVision && com.aicompanion.settings.ProviderProfile.supportsVision(sm.apiProvider)) {
+            analyzeScreenWithVisionModel(bitmap)
+        } else {
+            analyzeScreen(bitmap)
+        }
+    }
+
+    suspend fun analyzeScreenWithVisionModel(bitmap: Bitmap): ScreenAnalysisResult = withContext(Dispatchers.IO) {
+        if (bitmap.isRecycled || bitmap.width <= 0 || bitmap.height <= 0) {
+            return@withContext ScreenAnalysisResult()
+        }
+        try {
+            val sm = com.aicompanion.settings.SettingsManager(context)
+            if (!com.aicompanion.settings.ProviderProfile.supportsVision(sm.apiProvider)) {
+                return@withContext analyzeScreen(bitmap)
+            }
+            if (!sm.useChatModelForVision) {
+                return@withContext analyzeScreen(bitmap)
+            }
+            val maxDim = 1280
+            val scale = minOf(maxDim.toFloat() / bitmap.width, maxDim.toFloat() / bitmap.height, 1f)
+            val scaledBitmap = if (scale < 1f) {
+                android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+            } else {
+                bitmap
+            }
+            val stream = java.io.ByteArrayOutputStream()
+            scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, stream)
+            if (scaledBitmap !== bitmap) scaledBitmap.recycle()
+            val base64 = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
+            val dataUrl = "data:image/jpeg;base64,$base64"
+
+            val client = com.aicompanion.network.ApiClient(
+                sm.chatApiUrl, sm.chatApiKey, sm.chatModel,
+                0.3f, 0.9f, 0f, 0f, 300, sm.apiProvider
+            )
+            val response = client.sendChat(
+                userId = "screen_vision",
+                message = "请详细描述这个屏幕截图的内容。包括：1)屏幕上有哪些文字 2)这是什么应用 3)有哪些可点击的按钮或元素。用简洁的列表格式回答。",
+                personaName = "assistant",
+                personaPrompt = "你是一个屏幕内容分析助手，请准确描述屏幕截图中的内容。",
+                emotion = "NEUTRAL",
+                action = "IDLE",
+                memories = emptyList(),
+                appCategory = "unknown",
+                imageUrls = listOf(dataUrl)
+            )
+            val visionText = response?.text?.trim() ?: ""
+            if (visionText.isBlank()) {
+                return@withContext analyzeScreen(bitmap)
+            }
+            ScreenAnalysisResult(
+                ocrText = visionText,
+                sceneClassification = emptyList(),
+                uiElements = emptyList(),
+                combinedDescription = visionText.take(500)
+            )
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.e(TAG, "analyzeScreenWithVisionModel failed: ${e.message}")
+            analyzeScreen(bitmap)
+        } catch (e: OutOfMemoryError) {
+            com.aicompanion.util.AppLogger.e(TAG, "analyzeScreenWithVisionModel OOM: ${e.message}")
+            analyzeScreen(bitmap)
+        }
     }
 
     suspend fun performOcr(bitmap: Bitmap): String = withContext(Dispatchers.Default) {
@@ -209,34 +273,37 @@ class LocalModelManager(private val context: Context) {
         suspendCancellableCoroutine { continuation ->
             val image = InputImage.fromBitmap(bitmap, 0)
             val recognizer = if (useChineseOcr) chineseRecognizer else latinRecognizer
-            recognizer.process(image)
+            val task = recognizer.process(image)
                 .addOnSuccessListener { visionText ->
-                    val blocks = visionText.textBlocks
-                    if (blocks.isEmpty()) {
-                        AppLogger.d(TAG, "OCR: no text blocks found (chinese=$useChineseOcr)")
-                        continuation.resume("")
-                        return@addOnSuccessListener
+                    if (continuation.isActive) {
+                        val blocks = visionText.textBlocks
+                        if (blocks.isEmpty()) {
+                            AppLogger.d(TAG, "OCR: no text blocks found (chinese=$useChineseOcr)")
+                            continuation.resume("")
+                        } else {
+                            val text = blocks.joinToString("\n") { block -> block.text }
+                            AppLogger.d(TAG, "OCR: found ${blocks.size} text blocks, ${text.length} chars (chinese=$useChineseOcr)")
+                            continuation.resume(text)
+                        }
                     }
-                    val text = blocks.joinToString("\n") { block ->
-                        block.text
-                    }
-                    AppLogger.d(TAG, "OCR: found ${blocks.size} text blocks, ${text.length} chars (chinese=$useChineseOcr)")
-                    continuation.resume(text)
                 }
                 .addOnFailureListener { e ->
-                    val errorMsg = when {
-                        e.message?.contains("ML Kit") == true -> "ML Kit模型未就绪，请确保网络连接后重试"
-                        e.message?.contains("download") == true -> "OCR模型下载失败，请检查网络连接"
-                        e.message?.contains("buffer") == true -> "图像数据处理异常"
-                        else -> "OCR识别失败: ${e.javaClass.simpleName}: ${e.message}"
+                    if (continuation.isActive) {
+                        val errorMsg = when {
+                            e.message?.contains("ML Kit") == true -> "ML Kit模型未就绪，请确保网络连接后重试"
+                            e.message?.contains("download") == true -> "OCR模型下载失败，请检查网络连接"
+                            e.message?.contains("buffer") == true -> "图像数据处理异常"
+                            else -> "OCR识别失败: ${e.javaClass.simpleName}: ${e.message}"
+                        }
+                        AppLogger.e(TAG, "OCR failure (chinese=$useChineseOcr): $errorMsg")
+                        if (useChineseOcr && (e.message?.contains("download") == true || e.message?.contains("ML Kit") == true || e.message?.contains("model") == true)) {
+                            useChineseOcr = false
+                            AppLogger.w(TAG, "Chinese OCR model unavailable, falling back to Latin OCR")
+                        }
+                        continuation.resume("")
                     }
-                    AppLogger.e(TAG, "OCR failure (chinese=$useChineseOcr): $errorMsg")
-                    if (useChineseOcr && (e.message?.contains("download") == true || e.message?.contains("ML Kit") == true || e.message?.contains("model") == true)) {
-                        useChineseOcr = false
-                        AppLogger.w(TAG, "Chinese OCR model unavailable, falling back to Latin OCR")
-                    }
-                    continuation.resume("")
                 }
+            continuation.invokeOnCancellation { }
         }
     }
 
@@ -262,5 +329,7 @@ class LocalModelManager(private val context: Context) {
         tfliteRunner.close()
         screenCapture.stopCapture()
         loadedModelId = null
+        try { chineseRecognizer.close() } catch (_: Exception) {}
+        try { latinRecognizer.close() } catch (_: Exception) {}
     }
 }

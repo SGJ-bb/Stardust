@@ -1,25 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="4dp"
-    android:gravity="end">
+    android:padding="4dp">
 
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+    <FrameLayout
+        android:id="@+id/frame_user_avatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:id="@+id/iv_user_avatar_chat"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_avatar_default_user" />
+    </FrameLayout>
 
     <FrameLayout
         android:id="@+id/bubble_user"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp"
         android:background="@drawable/bg_message_user"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
         android:paddingTop="10dp"
-        android:paddingBottom="10dp">
+        android:paddingBottom="10dp"
+        app:layout_constrainedWidth="true"
+        app:layout_constraintHorizontal_bias="1"
+        app:layout_constraintTop_toTopOf="@id/frame_user_avatar"
+        app:layout_constraintEnd_toStartOf="@id/frame_user_avatar"
+        app:layout_constraintStart_toStartOf="parent">
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -31,8 +49,17 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="10sp"
-                android:textColor="#ffffffaa"
+                android:textColor="@color/color_white_alpha_67"
                 android:layout_marginBottom="2dp"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/iv_sticker"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:scaleType="centerCrop"
+                android:padding="0dp"
+                android:contentDescription="贴纸图片"
                 android:visibility="gone" />
 
             <TextView
@@ -49,7 +76,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="10sp"
-                android:textColor="#ffffffaa"
+                android:textColor="@color/color_white_alpha_67"
                 android:layout_marginTop="4dp"
                 android:gravity="end" />
         </LinearLayout>
@@ -67,22 +94,4 @@
             android:visibility="gone" />
     </FrameLayout>
 
-    <FrameLayout
-        android:id="@+id/frame_user_avatar"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="6dp"
-        android:layout_gravity="bottom"
-        android:clipChildren="false"
-        android:clipToPadding="false">
-
-        <ImageView
-            android:id="@+id/iv_user_avatar_chat"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_gravity="center"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_avatar_default_user" />
-    </FrameLayout>
-
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

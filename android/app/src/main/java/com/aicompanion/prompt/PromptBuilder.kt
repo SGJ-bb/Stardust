@@ -5,9 +5,13 @@ import com.aicompanion.persona.PersonaManager
 
 object PromptBuilder {
 
+    @Volatile
     private var cachedIdentity: IdentityBlock? = null
+    @Volatile
     private var cachedIdentityPersonaId: String? = null
+    @Volatile
     private var cachedCoreRules: String? = null
+    @Volatile
     private var cachedCoreRulesEmotion: Boolean? = null
 
     private const val CORE_RULES = "\n【规则】\n" +
@@ -64,6 +68,10 @@ object PromptBuilder {
             "male" -> "男性"; "female" -> "女性"; else -> ""
         }
 
+        val sm = com.aicompanion.settings.SettingsManager(context)
+        val userBirthday = sm.userBirthday
+        val userAppearance = sm.userAppearance
+
         val result = IdentityBlock(
             name = name,
             personality = personality,
@@ -74,7 +82,9 @@ object PromptBuilder {
             userAbilities = userAbilities,
             userPersonalityDef = userPersonalityDef,
             aiSummarizedPersonality = aiSummarizedPersonality,
-            userGenderLabel = userGenderLabel
+            userGenderLabel = userGenderLabel,
+            userBirthday = userBirthday,
+            userAppearance = userAppearance
         )
         cachedIdentity = result
         cachedIdentityPersonaId = personaId
@@ -112,6 +122,8 @@ object PromptBuilder {
             if (identity.userIdentity.isNotBlank()) append("\n用户身份：${identity.userIdentity}。你必须认知并尊重用户的身份。")
             if (identity.userAbilities.isNotBlank()) append("\n用户能力/技能：${identity.userAbilities}。用户拥有这些能力，你的反应和互动必须完全体现这些能力带来的影响，100%承认并围绕这些能力展开互动。")
             if (identity.userGenderLabel.isNotBlank()) append("\n用户性别：${identity.userGenderLabel}。")
+            if (identity.userBirthday.isNotBlank()) append("\n用户生日：${identity.userBirthday}。如果今天是用户生日，请送上温暖的生日祝福。")
+            if (identity.userAppearance.isNotBlank()) append("\n用户外貌：${identity.userAppearance}。你可以根据这个外貌描述来想象和用户在一起的画面。")
             val effectivePersonality = identity.userPersonalityDef.ifBlank { identity.aiSummarizedPersonality }
             if (effectivePersonality.isNotBlank()) append("\n用户性格：$effectivePersonality。你必须根据这个性格来理解和回应用户，让互动更贴合用户个性。")
         }
@@ -123,6 +135,11 @@ object PromptBuilder {
             append("\n情绪：$emotion。动作：$action。")
             if (memories.isNotEmpty()) {
                 append("\n记得：${memories.takeLast(3).joinToString("；")}")
+            }
+            val calendarBlock = com.aicompanion.calendar.CalendarManager.getCalendarContextBlock(identity.userBirthday, context)
+            if (calendarBlock.isNotBlank()) {
+                append("\n$calendarBlock")
+                append("\n如果今天是特殊节日或节气，请在回复中自然地提及并送上祝福，不要刻意生硬。")
             }
             append(getCoreRules(context))
         }
@@ -330,5 +347,7 @@ data class IdentityBlock(
     val userAbilities: String = "",
     val userPersonalityDef: String = "",
     val aiSummarizedPersonality: String = "",
-    val userGenderLabel: String = ""
+    val userGenderLabel: String = "",
+    val userBirthday: String = "",
+    val userAppearance: String = ""
 )

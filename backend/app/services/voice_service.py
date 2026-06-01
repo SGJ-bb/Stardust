@@ -2,17 +2,32 @@ import asyncio
 import logging
 import tempfile
 import os
+import hashlib
 from typing import Optional, Dict, Any
 from app.core.config import settings
 from app.models.schemas import EmotionEnum
 
 logger = logging.getLogger(__name__)
 
+MAX_CACHE_SIZE = 200
+
 
 class VoiceService:
     def __init__(self):
         self._cache_dir = tempfile.mkdtemp(prefix="voice_cache_")
-        self._cache = {}
+        self._cache: Dict[str, str] = {}
+
+    def _stable_hash(self, text: str) -> str:
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+    def _escape_ssml(self, text: str) -> str:
+        return (
+            text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&apos;")
+        )
 
     async def synthesize_speech(
         self,
@@ -21,7 +36,6 @@ class VoiceService:
         user_id: Optional[str] = None,
         use_cloud: bool = True
     ) -> Optional[str]:
-        """语音合成，返回音频文件路径"""
         cache_key = f"{user_id}_{text}_{emotion.value}"
 
         if cache_key in self._cache:
@@ -38,6 +52,14 @@ class VoiceService:
                 )
 
             if audio_path:
+                if len(self._cache) >= MAX_CACHE_SIZE:
+                    oldest_key = next(iter(self._cache))
+                    old_path = self._cache.pop(oldest_key)
+                    try:
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
+                    except OSError:
+                        pass
                 self._cache[cache_key] = audio_path
             return audio_path
 
@@ -46,7 +68,6 @@ class VoiceService:
             return None
 
     def _azure_tts_sync(self, text: str, emotion: EmotionEnum) -> Optional[str]:
-        """Azure 高质量语音合成（同步阻塞，由 asyncio.to_thread 调用）"""
         try:
             import azure.cognitiveservices.speech as speechsdk
 
@@ -56,18 +77,19 @@ class VoiceService:
             )
 
             prosody = self._get_emotion_prosody(emotion)
+            escaped_text = self._escape_ssml(text)
 
             ssml = (
                 '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">'
                 '<voice name="zh-CN-XiaoxiaoNeural">'
                 f'<prosody rate="{prosody["rate"]}" pitch="{prosody["pitch"]}">'
-                f'{text}'
+                f'{escaped_text}'
                 '</prosody>'
                 '</voice>'
                 '</speak>'
             )
 
-            audio_path = os.path.join(self._cache_dir, f"tts_{hash(text)}.wav")
+            audio_path = os.path.join(self._cache_dir, f"tts_{self._stable_hash(text)}.wav")
 
             audio_config = speechsdk.audio.AudioOutputConfig(filename=audio_path)
             synthesizer = speechsdk.SpeechSynthesizer(
@@ -88,7 +110,6 @@ class VoiceService:
             return self._local_tts_sync(text, emotion)
 
     def _local_tts_sync(self, text: str, emotion: EmotionEnum) -> Optional[str]:
-        """本地TTS（同步阻塞，由 asyncio.to_thread 调用）"""
         try:
             import pyttsx3
 
@@ -101,7 +122,7 @@ class VoiceService:
             rate_val = int(rate_str) if rate_str else 0
             engine.setProperty('rate', 180 + rate_val)
 
-            audio_path = os.path.join(self._cache_dir, f"local_tts_{hash(text)}.wav")
+            audio_path = os.path.join(self._cache_dir, f"local_tts_{self._stable_hash(text)}.wav")
             engine.save_to_file(text, audio_path)
             engine.runAndWait()
 
@@ -114,7 +135,6 @@ class VoiceService:
             return None
 
     def _get_emotion_prosody(self, emotion: EmotionEnum) -> Dict[str, str]:
-        """根据情感获取语音参数"""
         prosody_map = {
             EmotionEnum.HAPPY: {"rate": "+10%", "pitch": "+5%"},
             EmotionEnum.ANGRY: {"rate": "+20%", "pitch": "+15%"},
@@ -126,7 +146,6 @@ class VoiceService:
         return prosody_map.get(emotion, prosody_map[EmotionEnum.NEUTRAL])
 
     def clear_cache(self):
-        """清理语音缓存"""
         for key in list(self._cache.keys()):
             path = self._cache[key]
             if os.path.exists(path):

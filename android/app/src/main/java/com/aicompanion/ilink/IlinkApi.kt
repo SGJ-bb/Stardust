@@ -68,7 +68,6 @@ object IlinkApi {
             }
 
             val body = readBody(conn)
-            AppLogger.d(TAG, "getBotQrcode: response=$body")
             val json = JSONObject(body)
             if (json.optInt("ret", -1) != 0) {
                 AppLogger.e(TAG, "getBotQrcode: ret=${json.optInt("ret")}, body=$body")
@@ -77,7 +76,6 @@ object IlinkApi {
 
             val qrcode = json.optString("qrcode", "")
             val imgContent = json.optString("qrcode_img_content", "")
-            AppLogger.d(TAG, "getBotQrcode: qrcode=$qrcode, imgContent=$imgContent")
 
             QrcodeResult(
                 qrcode = qrcode,
@@ -177,7 +175,6 @@ object IlinkApi {
             }
 
             val respBody = readBody(conn)
-            AppLogger.d(TAG, "getUpdates: body_start=${respBody.take(200)}, body_end=${respBody.takeLast(200)}")
             val json = JSONObject(respBody)
 
             val errcode = json.optInt("errcode", 0)
@@ -283,6 +280,129 @@ object IlinkApi {
         }
     }
 
+    suspend fun sendImageMessage(
+        botToken: String,
+        baseUrl: String,
+        toUserId: String,
+        contextToken: String,
+        imageUrl: String,
+        imageWidth: Int = 512,
+        imageHeight: Int = 512
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$baseUrl/ilink/bot/sendmessage")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.connectTimeout = 15000
+            conn.readTimeout = 15000
+
+            buildHeaders(botToken).forEach { (k, v) ->
+                conn.setRequestProperty(k, v)
+            }
+
+            conn.doOutput = true
+            val clientId = abs(random.nextLong()).toString()
+
+            val body = JSONObject().apply {
+                put("msg", JSONObject().apply {
+                    put("from_user_id", "")
+                    put("to_user_id", toUserId)
+                    put("client_id", clientId)
+                    put("message_type", 2)
+                    put("message_state", 2)
+                    put("context_token", contextToken)
+                    put("item_list", JSONArray().put(
+                        JSONObject().apply {
+                            put("type", 2)
+                            put("image_item", JSONObject().apply {
+                                put("url", imageUrl)
+                                put("width", imageWidth)
+                                put("height", imageHeight)
+                            })
+                        }
+                    ))
+                })
+                put("base_info", buildBaseInfo())
+            }
+            DataOutputStream(conn.outputStream).use { os ->
+                os.write(body.toString().toByteArray())
+            }
+
+            val respCode = conn.responseCode
+            if (respCode != 200) {
+                AppLogger.e(TAG, "sendImageMessage: HTTP $respCode")
+                return@withContext false
+            }
+
+            val respBody = readBody(conn)
+            val json = JSONObject(respBody)
+            val ret = json.optInt("ret", -1)
+            val errcode = json.optInt("errcode", 0)
+            if (ret != 0 && errcode != 0) {
+                AppLogger.e(TAG, "sendImageMessage: ret=$ret, errcode=$errcode, body=${respBody.take(300)}")
+                return@withContext false
+            }
+            if (ret != 0 && errcode == 0) {
+                AppLogger.w(TAG, "sendImageMessage: ret=$ret but errcode=0, treating as success. body=${respBody.take(200)}")
+            }
+            AppLogger.i(TAG, "sendImageMessage: success, url=${imageUrl.take(80)}")
+            true
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "sendImageMessage: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun uploadImageToCdn(botToken: String, baseUrl: String, imageBytes: ByteArray, fileName: String = "sticker.png"): String? = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$CDN_URL/upload")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.connectTimeout = 30000
+            conn.readTimeout = 30000
+            conn.doOutput = true
+
+            buildHeaders(botToken).forEach { (k, v) ->
+                conn.setRequestProperty(k, v)
+            }
+            conn.setRequestProperty("Content-Type", "application/octet-stream")
+            conn.setRequestProperty("X-Filename", fileName)
+
+            DataOutputStream(conn.outputStream).use { os ->
+                os.write(imageBytes)
+            }
+
+            val respCode = conn.responseCode
+            if (respCode != 200) {
+                val errBody = try { readBody(conn) } catch (_: Exception) { "" }
+                AppLogger.e(TAG, "uploadImageToCdn: HTTP $respCode, body=${errBody.take(200)}")
+                return@withContext null
+            }
+
+            val respBody = readBody(conn)
+            val json = JSONObject(respBody)
+            val cdnUrl = json.optString("url", "")
+            if (cdnUrl.isNotBlank()) {
+                AppLogger.i(TAG, "uploadImageToCdn: success, url=${cdnUrl.take(80)}")
+                return@withContext cdnUrl
+            }
+
+            val ret = json.optInt("ret", -1)
+            if (ret != 0) {
+                AppLogger.e(TAG, "uploadImageToCdn: ret=$ret, body=${respBody.take(300)}")
+                return@withContext null
+            }
+
+            json.optString("cdn_url", "").ifBlank {
+                AppLogger.w(TAG, "uploadImageToCdn: no url in response, body=${respBody.take(200)}")
+                null
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "uploadImageToCdn: ${e.message}")
+            null
+        }
+    }
+
     suspend fun sendVoiceMessage(
         botToken: String,
         baseUrl: String,
@@ -349,7 +469,6 @@ object IlinkApi {
             if (ret != 0 && errcode == 0) {
                 AppLogger.w(TAG, "sendVoiceMessage: ret=$ret but errcode=0, treating as success")
             }
-            AppLogger.i(TAG, "sendVoiceMessage: success, duration=${voiceDurationMs}ms")
             true
         } catch (e: Exception) {
             AppLogger.e(TAG, "sendVoiceMessage: ${e.message}")
@@ -471,14 +590,14 @@ object IlinkApi {
 
     private fun readBody(conn: HttpURLConnection): String {
         val stream = if (conn.responseCode < 400) conn.inputStream else conn.errorStream
-        val reader = BufferedReader(InputStreamReader(stream, "UTF-8"))
-        val sb = StringBuilder()
-        var line: String?
-        while (reader.readLine().also { line = it } != null) {
-            sb.append(line)
+        return java.io.BufferedReader(java.io.InputStreamReader(stream, "UTF-8")).use { reader ->
+            val sb = StringBuilder()
+            var line: String?
+            while (reader.readLine().also { line = it } != null) {
+                sb.append(line)
+            }
+            sb.toString()
         }
-        reader.close()
-        return sb.toString()
     }
 }
 

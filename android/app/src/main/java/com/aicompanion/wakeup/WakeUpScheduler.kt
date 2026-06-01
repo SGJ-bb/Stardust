@@ -31,6 +31,11 @@ class WakeUpReceiver : BroadcastReceiver() {
             val taskManager = WakeUpTaskManager(context)
             taskManager.load()
             taskManager.scheduleAll()
+
+            if (WakeUpScheduler.isWakeupEnabled(context)) {
+                val (hour, minute) = WakeUpScheduler.getWakeupTime(context)
+                WakeUpScheduler.scheduleWakeup(context, hour, minute)
+            }
         }
     }
 

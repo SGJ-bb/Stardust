@@ -233,9 +233,10 @@ class ModelManagerActivity : Activity() {
 
     private fun getFolderName(treeUri: android.net.Uri): String {
         val path = treeUri.path ?: return "imported_model"
-        val lastSegment = path.substringAfterLast("/")
-        if (lastSegment.isNotEmpty() && lastSegment != "tree") return lastSegment
-        return "imported_model_${System.currentTimeMillis() % 10000}"
+        val raw = path.substringAfterLast("/")
+        if (raw.isEmpty() || raw == "tree") return "imported_model_${System.currentTimeMillis() % 10000}"
+        val cleanName = raw.substringAfterLast(":").replace(Regex("[\\\\/:*?\"<>|]"), "_")
+        return cleanName.ifBlank { "imported_model_${System.currentTimeMillis() % 10000}" }
     }
 
     private fun copyFilesFromTree(treeDocUri: android.net.Uri, targetDir: File): Int {
@@ -297,7 +298,7 @@ class ModelManagerActivity : Activity() {
             texturePath = "",
             physicsPath = "",
             motionPath = "",
-            version = "3",
+            version = detectModelVersion(modelJsonFile),
             sizeMB = targetDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } / 1024f / 1024f,
             isActive = true
         )
@@ -345,7 +346,7 @@ class ModelManagerActivity : Activity() {
                     texturePath = "",
                     physicsPath = "",
                     motionPath = "",
-                    version = "3",
+                    version = detectModelVersion(modelJsonFile),
                     sizeMB = targetDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } / 1024f / 1024f,
                     isActive = true
                 )
@@ -415,19 +416,25 @@ class ModelManagerActivity : Activity() {
                         }
                     }
 
-                    val parentDir = uri.path?.let { File(it).parentFile }
+                    val parentDocId = getDocumentParentId(uri)
                     var copiedCount = 0
                     for (ref in referencedFiles) {
                         val refFile = File(targetDir, ref)
                         if (!refFile.exists()) {
                             val refFileName = File(ref).name
-                            val foundInParent = parentDir?.walkTopDown()
-                                ?.filter { it.isFile && it.name == refFileName }
-                                ?.firstOrNull()
-                            if (foundInParent != null) {
+                            val foundUri = findSiblingDocument(uri, parentDocId, refFileName)
+                            if (foundUri != null) {
                                 refFile.parentFile?.mkdirs()
-                                foundInParent.copyTo(refFile, overwrite = true)
-                                copiedCount++
+                                try {
+                                    contentResolver.openInputStream(foundUri)?.use { input ->
+                                        refFile.outputStream().use { output ->
+                                            input.copyTo(output)
+                                        }
+                                    }
+                                    copiedCount++
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Failed to copy sibling file: $refFileName", e)
+                                }
                             }
                         }
                     }
@@ -451,7 +458,7 @@ class ModelManagerActivity : Activity() {
                     texturePath = "",
                     physicsPath = "",
                     motionPath = "",
-                    version = "3",
+                    version = detectModelVersion(modelJsonFile),
                     sizeMB = targetDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } / 1024f / 1024f,
                     isActive = true
                 )
@@ -536,6 +543,23 @@ class ModelManagerActivity : Activity() {
                     val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
                     prefs.edit().putString("active_model_path", modelFile.absolutePath).apply()
                     val mm = modelManager ?: continue
+                    val existingModels = mm.getAllModels()
+                    val alreadyRegistered = existingModels.any { it.modelPath == modelFile.absolutePath }
+                    if (!alreadyRegistered) {
+                        val model = Live2DModel(
+                            id = dirName,
+                            name = dirName,
+                            description = "扫描发现模型",
+                            modelPath = modelFile.absolutePath,
+                            texturePath = "",
+                            physicsPath = "",
+                            motionPath = "",
+                            version = detectModelVersion(modelFile),
+                            sizeMB = modelDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } / 1024f / 1024f,
+                            isActive = true
+                        )
+                        mm.addModel(model)
+                    }
                     mm.setActiveModel(dirName)
                     continue
                 }
@@ -566,7 +590,7 @@ class ModelManagerActivity : Activity() {
                             texturePath = "",
                             physicsPath = "",
                             motionPath = "",
-                            version = "3",
+                            version = detectModelVersion(copiedModelJson),
                             sizeMB = targetDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } / 1024f / 1024f,
                             isActive = true
                         )
@@ -612,6 +636,63 @@ class ModelManagerActivity : Activity() {
             }
         }
         return result
+    }
+
+    private fun getDocumentParentId(uri: android.net.Uri): String? {
+        return try {
+            val docId = android.provider.DocumentsContract.getDocumentId(uri)
+            val parentDocId = docId.substringBeforeLast("/")
+            if (parentDocId == docId) null else parentDocId
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun findSiblingDocument(sourceUri: android.net.Uri, parentDocId: String?, fileName: String): android.net.Uri? {
+        if (parentDocId == null) return null
+        return try {
+            val treeUri = sourceUri.let {
+                val docId = android.provider.DocumentsContract.getDocumentId(it)
+                val treeId = docId.substringBefore("/")
+                android.provider.DocumentsContract.buildTreeDocumentUri(it.authority, treeId)
+            }
+            val parentUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+            val projection = arrayOf(
+                android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME
+            )
+            contentResolver.query(parentUri, projection, null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndexOrThrow(android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                while (cursor.moveToNext()) {
+                    val name = cursor.getString(nameCol)
+                    if (name == fileName) {
+                        val siblingDocId = cursor.getString(idCol)
+                        return@use android.provider.DocumentsContract.buildDocumentUriUsingTree(treeUri, siblingDocId)
+                    }
+                }
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "findSiblingDocument failed for $fileName: ${e.message}")
+            null
+        }
+    }
+
+    private fun detectModelVersion(modelJsonFile: File): String {
+        return when {
+            modelJsonFile.name.endsWith(".model3.json") -> "Cubism 4"
+            modelJsonFile.name.endsWith(".model.json") -> "Cubism 2"
+            else -> try {
+                val json = org.json.JSONObject(modelJsonFile.readText())
+                val ver = json.optString("Version", "")
+                when {
+                    ver.startsWith("3") || ver.startsWith("4") -> "Cubism $ver"
+                    ver.isNotBlank() -> ver
+                    else -> "1.0"
+                }
+            } catch (_: Exception) { "1.0" }
+        }
     }
 
     override fun onDestroy() {

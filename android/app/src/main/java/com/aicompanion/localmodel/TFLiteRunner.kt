@@ -76,8 +76,9 @@ class TFLiteRunner {
 
         if (info.labels.isEmpty()) return emptyList()
 
+        var resized: Bitmap? = null
         try {
-            val resized = Bitmap.createScaledBitmap(bitmap, info.inputSize, info.inputSize, false)
+            resized = Bitmap.createScaledBitmap(bitmap, info.inputSize, info.inputSize, false)
             val input = convertBitmapToByteBuffer(resized, info.inputSize)
 
             val output = Array(1) { FloatArray(info.labels.size) }
@@ -93,6 +94,8 @@ class TFLiteRunner {
         } catch (e: Exception) {
             AppLogger.e(TAG, "classify failed: ${e.message}")
             return emptyList()
+        } finally {
+            resized?.recycle()
         }
     }
 
@@ -113,11 +116,12 @@ class TFLiteRunner {
     private fun loadModelFromAssets(context: Context, fileName: String): MappedByteBuffer? {
         return try {
             val assetFd = context.assets.openFd("models/$fileName")
-            val inputStream = FileInputStream(assetFd.fileDescriptor)
-            val fileChannel = inputStream.channel
-            val startOffset = assetFd.startOffset
-            val declaredLength = assetFd.declaredLength
-            fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+            FileInputStream(assetFd.fileDescriptor).use { inputStream ->
+                val fileChannel = inputStream.channel
+                val startOffset = assetFd.startOffset
+                val declaredLength = assetFd.declaredLength
+                fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+            }
         } catch (e: Exception) {
             AppLogger.e(TAG, "loadModelFromAssets failed: ${e.message}")
             null
@@ -128,9 +132,10 @@ class TFLiteRunner {
         return try {
             val file = File(context.getDir("models", Context.MODE_PRIVATE), fileName)
             if (!file.exists()) return null
-            val inputStream = FileInputStream(file)
-            val fileChannel = inputStream.channel
-            fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, file.length())
+            FileInputStream(file).use { inputStream ->
+                val fileChannel = inputStream.channel
+                fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, file.length())
+            }
         } catch (e: Exception) {
             AppLogger.e(TAG, "loadModelFromFile failed: ${e.message}")
             null

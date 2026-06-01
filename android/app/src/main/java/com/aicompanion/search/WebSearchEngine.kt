@@ -18,6 +18,11 @@ class WebSearchEngine(context: Context) {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
+    private val metaClient = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .build()
+
     fun search(query: String): SearchResult {
         val provider = settings.searchProvider
         val apiEnabled = settings.searchEnabled && provider != "duckduckgo"
@@ -83,12 +88,7 @@ class WebSearchEngine(context: Context) {
                 .get()
                 .build()
 
-            val timeoutClient = OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build()
-
-            timeoutClient.newCall(request).execute().use { response ->
+            metaClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
                 val html = response.body?.string()?.take(50000) ?: return null
 

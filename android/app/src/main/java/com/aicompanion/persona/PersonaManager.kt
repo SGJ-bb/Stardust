@@ -16,7 +16,10 @@ data class Persona(
     val personality: String = "",
     val description: String = "",
     val isDefault: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val ttsVoice: String = "",
+    val ttsPitch: Float = 0f,
+    val ttsRate: Float = 0f
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -28,6 +31,9 @@ data class Persona(
         put("description", description)
         put("isDefault", isDefault)
         put("createdAt", createdAt)
+        if (ttsVoice.isNotBlank()) put("ttsVoice", ttsVoice)
+        if (ttsPitch != 0f) put("ttsPitch", ttsPitch)
+        if (ttsRate != 0f) put("ttsRate", ttsRate)
     }
 
     companion object {
@@ -40,7 +46,10 @@ data class Persona(
             personality = obj.optString("personality", ""),
             description = obj.optString("description", ""),
             isDefault = obj.optBoolean("isDefault", false),
-            createdAt = obj.optLong("createdAt", System.currentTimeMillis())
+            createdAt = obj.optLong("createdAt", System.currentTimeMillis()),
+            ttsVoice = obj.optString("ttsVoice", ""),
+            ttsPitch = obj.optDouble("ttsPitch", 0.0).toFloat(),
+            ttsRate = obj.optDouble("ttsRate", 0.0).toFloat()
         )
     }
 }
@@ -90,7 +99,7 @@ class PersonaManager(private val context: Context) {
                         personas.add(Persona.fromJson(arr.getJSONObject(i)))
                     }
                     save()
-                    AppLogger.d(TAG, "restored from backup")
+                    //AppLogger.d(TAG, "restored from backup")
                     return
                 } catch (e2: Exception) {
                     AppLogger.e(TAG, "backup restore also failed: ${e2.message}")
@@ -139,6 +148,7 @@ class PersonaManager(private val context: Context) {
     fun setActivePersona(id: String) {
         val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
         prefs.edit().putString(ACTIVE_KEY, id).apply()
+        com.aicompanion.AppContainer.onPersonaChanged()
     }
 
     fun addPersona(persona: Persona): Persona {
@@ -157,8 +167,11 @@ class PersonaManager(private val context: Context) {
         return updated
     }
 
-    fun deletePersona(id: String) {
-        if (id == "default") return
+    fun deletePersona(id: String): Boolean {
+        if (id == "default") return false
+        val activeId = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+            .getString(ACTIVE_KEY, "default") ?: "default"
+        if (id == activeId) return false
         val persona = getPersona(id)
         if (persona?.avatarPath?.isNotBlank() == true) {
             try { File(persona.avatarPath).delete() } catch (_: Exception) {}
@@ -174,6 +187,7 @@ class PersonaManager(private val context: Context) {
         val diaryDir = File(File(context.filesDir, "diaries"), id)
         diaryDir.deleteRecursively()
         save()
+        return true
     }
 
     fun getChatPrefsName(personaId: String): String = "$CHAT_PREFS_PREFIX$personaId"

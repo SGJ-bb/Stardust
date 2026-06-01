@@ -17,21 +17,22 @@ import com.aicompanion.util.AppLogger
 class BackgroundService : android.app.Service() {
 
     private var settingsManager: SettingsManager? = null
-    private var diaryManager: DiaryManager? = null
     private var lastDiaryCheckDay = ""
 
     companion object {
         private const val NOTIFICATION_CHANNEL_ID = "background_service_channel"
         private const val NOTIFICATION_ID = 1002
         const val ACTION_STOP = "com.aicompanion.action.STOP_BACKGROUND"
+        private const val PREFS_NAME = "background_service_prefs"
+        private const val KEY_LAST_DIARY_DAY = "last_diary_check_day"
     }
 
     override fun onCreate() {
         super.onCreate()
         try {
             settingsManager = SettingsManager(this)
-            diaryManager = DiaryManager(this, getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default") ?: "default")
-            AppLogger.d("BgService", "Background service created")
+            lastDiaryCheckDay = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .getString(KEY_LAST_DIARY_DAY, "") ?: ""
         } catch (e: Exception) {
             AppLogger.e("BgService", "Failed to create background service: ${e.message}", e)
         }
@@ -40,7 +41,6 @@ class BackgroundService : android.app.Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
             val action = intent?.action
-            AppLogger.i("BgService", "onStartCommand: action=$action")
 
             if (action == ACTION_STOP) {
                 stopSelf()
@@ -52,7 +52,6 @@ class BackgroundService : android.app.Service() {
 
             checkDailyDiary()
 
-            AppLogger.d("BgService", "Background service started")
         } catch (e: Exception) {
             AppLogger.e("BgService", "Failed to start background service: ${e.message}", e)
         }
@@ -64,21 +63,22 @@ class BackgroundService : android.app.Service() {
     override fun onDestroy() {
         super.onDestroy()
         settingsManager = null
-        diaryManager = null
-        AppLogger.d("BgService", "Background service destroyed")
     }
 
     private fun checkDailyDiary() {
-        val sm = settingsManager
-        val dm = diaryManager ?: return
+        val sm = settingsManager ?: return
+        val activePersonaId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            .getString("active_persona_id", "default") ?: "default"
+        val dm = DiaryManager(this, activePersonaId)
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
         val today = sdf.format(java.util.Date())
         if (today != lastDiaryCheckDay) {
             lastDiaryCheckDay = today
-            val mode = sm?.diaryTriggerMode
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                .putString(KEY_LAST_DIARY_DAY, today).apply()
+            val mode = sm.diaryTriggerMode
             if (mode != null && mode != DiaryTriggerMode.MANUAL && mode != DiaryTriggerMode.DAILY_10PM) {
                 dm.updateOrGenerateDailyDiary(emptyList(), 50)
-                AppLogger.i("BgService", "checkDailyDiary: triggered, mode=$mode")
             } else {
                 AppLogger.w("BgService", "checkDailyDiary: skipped, mode=$mode")
             }

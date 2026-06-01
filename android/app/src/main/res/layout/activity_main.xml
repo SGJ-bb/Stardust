@@ -11,12 +11,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
-        android:src="@drawable/bg_gradient" />
+        android:src="@drawable/bg_gradient"
+        android:visibility="gone" />
 
     <FrameLayout
         android:id="@+id/ui_layer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@drawable/bg_gradient"
         android:clickable="false"
         android:focusable="false">
 
@@ -24,7 +26,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:background="#b316162a"
+            android:background="@color/color_toolbar_bg"
             android:clickable="true"
             android:focusable="true"
             app:titleTextColor="@android:color/white">
@@ -45,9 +47,9 @@
                     android:layout_marginEnd="8dp"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="0dp"
-                    app:cardBackgroundColor="#1a1a3e"
+                    app:cardBackgroundColor="@color/bg_end"
                     app:strokeWidth="1.5dp"
-                    app:strokeColor="#667eea">
+                    app:strokeColor="@color/accent_blue">
 
                     <ImageView
                         android:id="@+id/iv_ai_avatar_small"
@@ -69,7 +71,7 @@
                     android:contentDescription="更多"
                     android:scaleType="centerInside"
                     android:padding="6dp"
-                    app:tint="#c4b5fd" />
+                    app:tint="@color/accent_purple" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
@@ -98,7 +100,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="第1天"
-                            android:textColor="#c4b5fd"
+                            android:textColor="@color/accent_purple"
                             android:textSize="9sp" />
 
                         <ProgressBar
@@ -109,8 +111,20 @@
                             android:layout_marginStart="3dp"
                             android:max="100"
                             android:progress="50"
-                            android:progressTint="#ff6b9d"
-                            android:progressBackgroundTint="#33ffffff" />
+                            android:progressTint="@color/accent_pink"
+                            android:progressBackgroundTint="@color/color_white_alpha_20" />
+
+                        <TextView
+                            android:id="@+id/tv_affection_title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="@color/accent_pink"
+                            android:textSize="8sp"
+                            android:layout_marginStart="3dp"
+                            android:ellipsize="end"
+                            android:maxEms="6"
+                            android:singleLine="true" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -124,34 +138,84 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="☀️ 25°"
-                    android:textColor="#aabbdd"
+                    android:textColor="@color/color_text_link"
                     android:textSize="11sp"
                     android:layout_marginEnd="6dp"
                     android:visibility="gone" />
 
-                <ImageButton
-                    android:id="@+id/btn_moments"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_icon_button"
-                    android:src="@drawable/ic_diary"
-                    android:contentDescription="动态"
-                    android:scaleType="centerInside"
-                    android:padding="7dp"
-                    android:layout_marginEnd="4dp"
-                    app:tint="#8899bb" />
+                <HorizontalScrollView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none"
+                    android:overScrollMode="never">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <ImageButton
+                            android:id="@+id/btn_moments"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:background="@drawable/bg_icon_button"
+                            android:src="@drawable/ic_diary"
+                            android:contentDescription="动态"
+                            android:scaleType="centerInside"
+                            android:padding="7dp"
+                            android:layout_marginEnd="4dp"
+                            app:tint="@color/color_text_chat_secondary" />
+
+                        <ImageButton
+                            android:id="@+id/btn_calendar"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:background="@drawable/bg_icon_button"
+                            android:src="@drawable/ic_diary"
+                            android:contentDescription="日历"
+                            android:scaleType="centerInside"
+                            android:padding="7dp"
+                            android:layout_marginEnd="4dp"
+                            app:tint="@color/color_text_chat_secondary" />
+
+                        <ImageButton
+                            android:id="@+id/btn_album"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:background="@drawable/bg_icon_button"
+                            android:src="@android:drawable/ic_menu_gallery"
+                            android:contentDescription="纪念相册"
+                            android:scaleType="centerInside"
+                            android:padding="7dp"
+                            android:layout_marginEnd="4dp"
+                            app:tint="@color/color_text_chat_secondary" />
+
+                        <ImageButton
+                            android:id="@+id/btn_diary"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:background="@drawable/bg_icon_button"
+                            android:src="@drawable/ic_diary"
+                            android:contentDescription="日记"
+                            android:scaleType="centerInside"
+                            android:padding="7dp"
+                            android:layout_marginEnd="4dp"
+                            app:tint="@color/color_text_chat_secondary" />
+                    </LinearLayout>
+                </HorizontalScrollView>
 
                 <ImageButton
-                    android:id="@+id/btn_diary"
+                    android:id="@+id/btn_persona_switch"
                     android:layout_width="36dp"
                     android:layout_height="36dp"
                     android:background="@drawable/bg_icon_button"
-                    android:src="@drawable/ic_diary"
-                    android:contentDescription="日记"
+                    android:src="@drawable/ic_avatar_default_ai"
+                    android:contentDescription="切换角色"
                     android:scaleType="centerInside"
                     android:padding="7dp"
-                    android:layout_marginEnd="4dp"
-                    app:tint="#8899bb" />
+                    android:layout_marginStart="4dp"
+                    app:tint="@color/color_text_chat_secondary" />
 
                 <ImageButton
                     android:id="@+id/btn_settings"
@@ -162,7 +226,8 @@
                     android:contentDescription="设置"
                     android:scaleType="centerInside"
                     android:padding="7dp"
-                    app:tint="#8899bb" />
+                    android:layout_marginStart="4dp"
+                    app:tint="@color/color_text_chat_secondary" />
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
@@ -176,18 +241,15 @@
             android:paddingEnd="8dp"
             android:paddingTop="8dp"
             android:paddingBottom="48dp"
-            android:clipToPadding="false"
-            android:clickable="true"
-            android:focusable="true" />
+            android:clipToPadding="false" />
 
-        <com.aicompanion.live2d.Live2DWebView
-            android:id="@+id/live2d_view"
+        <ViewStub
+            android:id="@+id/view_stub_live2d"
+            android:layout="@layout/stub_live2d"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginTop="80dp"
-            android:layout_marginBottom="68dp"
-            android:alpha="0.9"
-            android:visibility="gone" />
+            android:layout_marginBottom="68dp" />
 
         <LinearLayout
             android:id="@+id/layout_bottom_bar"
@@ -201,7 +263,7 @@
                 android:id="@+id/scroll_predictions"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="#cc1a1a3e"
+                android:background="@color/bg_end"
                 android:paddingStart="10dp"
                 android:paddingEnd="10dp"
                 android:paddingTop="6dp"
@@ -223,7 +285,7 @@
                 android:orientation="horizontal"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="6dp"
-                android:background="#cc1a1a3e"
+                android:background="@color/color_card_dark_alpha"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical">
@@ -238,8 +300,8 @@
                 app:boxCornerRadiusTopEnd="20dp"
                 app:boxCornerRadiusBottomStart="20dp"
                 app:boxCornerRadiusBottomEnd="20dp"
-                app:boxBackgroundColor="#1e1e3a"
-                app:hintTextColor="#667788"
+                app:boxBackgroundColor="@color/color_input_bg_variant"
+                app:hintTextColor="@color/color_text_hint"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -248,8 +310,8 @@
                     android:layout_height="wrap_content"
                     android:maxLines="4"
                     android:inputType="textMultiLine"
-                    android:textColor="#e0e0f0"
-                    android:textColorHint="#556677"
+                    android:textColor="@color/color_text_chat_primary"
+                    android:textColorHint="@color/text_muted"
                     android:textSize="14sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -262,7 +324,7 @@
                 android:padding="8dp"
                 android:layout_marginStart="4dp"
                 android:background="@drawable/bg_icon_button"
-                app:tint="#c4b5fd"
+                app:tint="@color/accent_purple"
                 android:contentDescription="上传图片" />
 
             <ImageButton
@@ -274,7 +336,7 @@
                 android:padding="8dp"
                 android:layout_marginStart="4dp"
                 android:background="@drawable/bg_icon_button"
-                app:tint="#c4b5fd"
+                app:tint="@color/accent_purple"
                 android:contentDescription="表情包" />
 
             <ImageButton
@@ -286,7 +348,7 @@
                 android:padding="8dp"
                 android:layout_marginStart="4dp"
                 android:background="@drawable/bg_icon_button"
-                app:tint="#c4b5fd"
+                app:tint="@color/accent_purple"
                 android:contentDescription="语音" />
 
             <ImageButton
@@ -298,7 +360,7 @@
                 android:padding="8dp"
                 android:layout_marginStart="4dp"
                 android:background="@drawable/bg_icon_button"
-                app:tint="#c4b5fd"
+                app:tint="@color/accent_purple"
                 android:contentDescription="语音通话" />
 
             <ImageButton

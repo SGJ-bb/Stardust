@@ -7,6 +7,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.aicompanion.memory.MemoryManager
 import com.aicompanion.network.ApiClient
+import com.aicompanion.network.ProviderAdapter
 import com.aicompanion.persona.PersonaManager
 import com.aicompanion.prompt.PromptBuilder
 import com.aicompanion.settings.SettingsManager
@@ -47,6 +48,12 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
     private val downloadClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    private val imageGenClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
     private val prefs: SharedPreferences =
@@ -120,6 +127,10 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
     var imageApiKey: String
         get() = securePrefs.getString("image_api_key", "") ?: ""
         set(value) = securePrefs.edit().putString("image_api_key", value).apply()
+
+    var imageApiSecretKey: String
+        get() = securePrefs.getString("image_api_secret_key", "") ?: ""
+        set(value) = securePrefs.edit().putString("image_api_secret_key", value).apply()
 
     var imageModel: String
         get() = securePrefs.getString("image_model", "dall-e-3") ?: "dall-e-3"
@@ -316,16 +327,17 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
                 com.aicompanion.AppContainer.setImagePluginWorldId(currentWorldId)
                 client.sendChatWithToolLoop(
                     "virtual_world", "继续推演", identity.name, systemPrompt,
-                    "neutral", "idle", emptyList(), emptyList(), "", tools
-                ) { name, args ->
-                    if (name == "generate_image") {
-                        val eventId = java.util.UUID.randomUUID().toString()
-                        com.aicompanion.AppContainer.setAssociatedEventId(eventId)
-                        com.aicompanion.plugin.PluginRegistry.executePlugin(name, args)
-                    } else {
-                        com.aicompanion.plugin.PluginRegistry.executePlugin(name, args)
+                    "neutral", "idle", emptyList(), emptyList(), "", tools,
+                    toolExecutor = { name, args ->
+                        if (name == "generate_image") {
+                            val eventId = java.util.UUID.randomUUID().toString()
+                            com.aicompanion.AppContainer.setAssociatedEventId(eventId)
+                            com.aicompanion.plugin.PluginRegistry.executePlugin(name, args)
+                        } else {
+                            com.aicompanion.plugin.PluginRegistry.executePlugin(name, args)
+                        }
                     }
-                }
+                )
             } else {
                 client.sendSimplePrompt(systemPrompt, "继续推演")
             }
@@ -430,16 +442,17 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
                 com.aicompanion.AppContainer.setImagePluginWorldId(currentWorldId)
                 client.sendChatWithToolLoop(
                     "virtual_world", "继续推演", "旁白", systemPrompt,
-                    "neutral", "idle", emptyList(), emptyList(), "", tools
-                ) { name, args ->
-                    if (name == "generate_image") {
-                        val eventId = java.util.UUID.randomUUID().toString()
-                        com.aicompanion.AppContainer.setAssociatedEventId(eventId)
-                        com.aicompanion.plugin.PluginRegistry.executePlugin(name, args)
-                    } else {
-                        com.aicompanion.plugin.PluginRegistry.executePlugin(name, args)
+                    "neutral", "idle", emptyList(), emptyList(), "", tools,
+                    toolExecutor = { name, args ->
+                        if (name == "generate_image") {
+                            val eventId = java.util.UUID.randomUUID().toString()
+                            com.aicompanion.AppContainer.setAssociatedEventId(eventId)
+                            com.aicompanion.plugin.PluginRegistry.executePlugin(name, args)
+                        } else {
+                            com.aicompanion.plugin.PluginRegistry.executePlugin(name, args)
+                        }
                     }
-                }
+                )
             } else {
                 client.sendSimplePrompt(systemPrompt, "继续推演")
             }
@@ -491,33 +504,40 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
 
             try {
                 val prompt = content.take(200)
-                val requestBody = JSONObject().apply {
-                    put("model", imageModel)
-                    put("prompt", prompt)
-                    put("n", 1)
-                    put("size", "512x512")
+                val settingsManager = com.aicompanion.settings.SettingsManager(context)
+                val presetFormatType = com.aicompanion.settings.ServicePresets.findImageGenPreset(
+                    settingsManager.imageGenProvider
+                ).formatType
+                AppLogger.i(TAG, "图片生成开始: model=$imageModel, formatType=$presetFormatType, prompt=${content.take(50)}")
+                val formatType = if (settingsManager.imageGenProvider == "custom") {
+                    when {
+                        imageApiUrl.contains("dashscope", ignoreCase = true) || imageApiUrl.contains("aliyuncs", ignoreCase = true) -> ProviderAdapter.FORMAT_ALIYUN_ASYNC
+                        imageApiUrl.contains("siliconflow", ignoreCase = true) -> ProviderAdapter.FORMAT_SILICONFLOW
+                        else -> "openai"
+                    }
+                } else {
+                    presetFormatType
+                }
+                val requestBody = ProviderAdapter.buildImageRequest(formatType, imageModel, prompt, 1, "1024x1024")
+                val headers = ProviderAdapter.buildImageHeaders(formatType, imageApiKey, imageApiSecretKey)
+                val requestBuilder = okhttp3.Request.Builder()
+                    .url(imageApiUrl)
+                    .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+                headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
+                val request = requestBuilder.build()
+
+                val response = imageGenClient.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    AppLogger.e(TAG, "图片生成请求失败: HTTP ${response.code}, 常见原因: 1)API Key无效 2)余额不足 3)URL错误 4)模型名错误 5)尺寸不支持")
+                    return@withContext null
                 }
 
-                val request = okhttp3.Request.Builder()
-                    .url(imageApiUrl)
-                    .addHeader("Authorization", "Bearer $imageApiKey")
-                    .addHeader("Content-Type", "application/json")
-                    .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
-                    .build()
-
-                val response = okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                    .build().newCall(request).execute()
-
-                if (!response.isSuccessful) return@withContext null
-
                 val body = response.body?.string() ?: return@withContext null
-                val json = JSONObject(body)
-                val imageUrl = json.optJSONArray("data")?.optJSONObject(0)?.optString("url", "") ?: ""
+                val imageUrl = ProviderAdapter.parseImageResponse(formatType, body, imageApiUrl, imageApiKey, imageApiSecretKey)
 
-                if (imageUrl.isNotBlank()) {
-                    val localPath = downloadImage(imageUrl, eventId)
+                if (imageUrl != null) {
+                    val localPath = downloadImage(imageUrl, eventId, imageApiKey)
                     if (localPath != null) {
                         val events = getStoryEvents().toMutableList()
                         val idx = events.indexOfFirst { it.id == eventId }
@@ -537,14 +557,21 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
             }
         }
 
-    private fun downloadImage(url: String, eventId: String): String? {
+    private fun downloadImage(url: String, eventId: String, apiKey: String = ""): String? {
         return try {
             val dir = File(context.filesDir, "virtual_world/images")
             dir.mkdirs()
             val file = File(dir, "img_${eventId}.jpg")
-            val request = okhttp3.Request.Builder().url(url).build()
+            val requestBuilder = okhttp3.Request.Builder().url(url)
+            if (apiKey.isNotBlank() && !url.contains("dashscope", ignoreCase = true) && !url.contains("aliyuncs", ignoreCase = true)) {
+                requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+            }
+            val request = requestBuilder.build()
             downloadClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
+                if (!response.isSuccessful) {
+                    AppLogger.e(TAG, "图片下载失败, 常见原因: 1)图片URL已过期 2)需要鉴权 3)网络问题")
+                    return null
+                }
                 val body = response.body ?: return null
                 body.byteStream().use { input ->
                     FileOutputStream(file).use { output -> input.copyTo(output) }
