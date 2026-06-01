@@ -14,12 +14,34 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
     }
 
     private val chunker = TextChunker()
-    private val embedder = TfidfEmbedder()
+    private var embedder: RagEmbedder = TfidfEmbedder()
     private val store = VectorStore(context, "persona_$personaId")
     private val rwLock = ReentrantReadWriteLock()
 
     @Volatile private var personaHash: String = ""
     @Volatile private var isIndexed = false
+
+    private fun resolveEmbedder(): RagEmbedder {
+        if (RagConfig.useCloudEmbedding
+            && RagConfig.cloudEmbeddingUrl.isNotBlank()
+            && RagConfig.cloudEmbeddingApiKey.isNotBlank()
+        ) {
+            val current = embedder
+            if (current is CloudEmbedder) return current
+            val cloud = CloudEmbedder(
+                RagConfig.cloudEmbeddingUrl,
+                RagConfig.cloudEmbeddingApiKey,
+                RagConfig.cloudEmbeddingModel
+            )
+            embedder = cloud
+            return cloud
+        }
+        val current = embedder
+        if (current is TfidfEmbedder) return current
+        val tfidf = TfidfEmbedder()
+        embedder = tfidf
+        return tfidf
+    }
 
     fun currentHash(): String = personaHash
 
@@ -42,7 +64,10 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
                     if (storedHash == newHash) {
                         personaHash = newHash
                         isIndexed = true
-                        embedder.buildVocabulary(store.getAllTexts())
+                        val emb = resolveEmbedder()
+                        if (emb is TfidfEmbedder) {
+                            emb.buildVocabulary(store.getAllTexts())
+                        }
                         return@withContext true
                     }
                 }
@@ -50,9 +75,12 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
                 val chunks = chunker.chunkPersona(personaFields)
                 if (chunks.isEmpty()) return@withContext false
 
+                val emb = resolveEmbedder()
                 val chunkTexts = chunks.map { it.text }
-                embedder.buildVocabulary(chunkTexts)
-                val vectors = embedder.embed(chunkTexts)
+                if (emb is TfidfEmbedder) {
+                    emb.buildVocabulary(chunkTexts)
+                }
+                val vectors = emb.embed(chunkTexts)
                 store.addAll(chunks, vectors)
                 store.save()
 
@@ -78,7 +106,7 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
         try {
             rwLock.readLock().lock()
             try {
-                val queryVec = embedder.embedSingle(query)
+                val queryVec = resolveEmbedder().embedSingle(query)
                 val results = store.search(queryVec, topK, RagConfig.minSimilarity)
                 results.map { (entry, _) -> entry.text }
             } finally {
@@ -95,7 +123,10 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
         return try {
             rwLock.readLock().lock()
             try {
-                val queryVec = embedder.embedSingleSync(query)
+                val emb = resolveEmbedder()
+                val queryVec = if (emb is TfidfEmbedder) emb.embedSingleSync(query) else {
+                    kotlinx.coroutines.runBlocking { emb.embedSingle(query) }
+                }
                 store.search(queryVec, topK, RagConfig.minSimilarity).map { (entry, _) -> entry.text }
             } finally {
                 rwLock.readLock().unlock()

@@ -158,6 +158,12 @@ class SettingsActivity : AppCompatActivity() {
     private var btnAiFrame: com.google.android.material.button.MaterialButton? = null
     private var btnUserFrame: com.google.android.material.button.MaterialButton? = null
     private var btnClearChatHistory: com.google.android.material.button.MaterialButton? = null
+    private var switchPersonaRagEnabled: Switch? = null
+    private var switchUseCloudEmbedding: Switch? = null
+    private var etCloudEmbeddingUrl: android.widget.EditText? = null
+    private var etCloudEmbeddingApiKey: android.widget.EditText? = null
+    private var etCloudEmbeddingModel: android.widget.EditText? = null
+    private var layoutCloudEmbeddingFields: View? = null
     private var btnVirtualWorld: com.google.android.material.button.MaterialButton? = null
     private var etImageApiUrl: com.google.android.material.textfield.TextInputEditText? = null
     private var etImageApiKey: com.google.android.material.textfield.TextInputEditText? = null
@@ -305,6 +311,17 @@ class SettingsActivity : AppCompatActivity() {
                 val searchEngine = view.findViewById<TextView>(R.id.et_search_engine_id)
                 if (searchEngine?.hasFocus() != true) searchEngine?.text = sm.searchEngineId
             }
+            SettingsAdapter.TYPE_MEMORY -> {
+                val ragConfig = com.aicompanion.rag.RagConfig
+                view.findViewById<Switch>(R.id.switch_persona_rag_enabled)?.isChecked = ragConfig.personaRagEnabled
+                view.findViewById<Switch>(R.id.switch_use_cloud_embedding)?.isChecked = ragConfig.useCloudEmbedding
+                val embUrl = view.findViewById<android.widget.EditText>(R.id.et_cloud_embedding_url)
+                if (embUrl?.hasFocus() != true) embUrl?.setText(ragConfig.cloudEmbeddingUrl)
+                val embKey = view.findViewById<android.widget.EditText>(R.id.et_cloud_embedding_api_key)
+                if (embKey?.hasFocus() != true) embKey?.setText(ragConfig.cloudEmbeddingApiKey)
+                val embModel = view.findViewById<android.widget.EditText>(R.id.et_cloud_embedding_model)
+                if (embModel?.hasFocus() != true) embModel?.setText(ragConfig.cloudEmbeddingModel)
+            }
         }
     }
 
@@ -427,6 +444,12 @@ class SettingsActivity : AppCompatActivity() {
             SettingsAdapter.TYPE_MEMORY -> {
                 btnPersonaEditor = view.findViewById(R.id.btn_persona_editor)
                 btnClearChatHistory = view.findViewById(R.id.btn_clear_chat_history)
+                switchPersonaRagEnabled = view.findViewById(R.id.switch_persona_rag_enabled)
+                switchUseCloudEmbedding = view.findViewById(R.id.switch_use_cloud_embedding)
+                etCloudEmbeddingUrl = view.findViewById(R.id.et_cloud_embedding_url)
+                etCloudEmbeddingApiKey = view.findViewById(R.id.et_cloud_embedding_api_key)
+                etCloudEmbeddingModel = view.findViewById(R.id.et_cloud_embedding_model)
+                layoutCloudEmbeddingFields = view.findViewById(R.id.layout_cloud_embedding_fields)
             }
             SettingsAdapter.TYPE_STYLE -> {
                 radioNagFrequency = view.findViewById(R.id.radio_nag_frequency)
@@ -525,7 +548,13 @@ class SettingsActivity : AppCompatActivity() {
                 switchSafetyMode?.isChecked = com.aicompanion.safety.ContentSafetyFilter.isEnabled(this)
             }
             SettingsAdapter.TYPE_MEMORY -> {
-                // No settings to load for memory buttons
+                val ragConfig = com.aicompanion.rag.RagConfig
+                switchPersonaRagEnabled?.isChecked = ragConfig.personaRagEnabled
+                switchUseCloudEmbedding?.isChecked = ragConfig.useCloudEmbedding
+                etCloudEmbeddingUrl?.setText(ragConfig.cloudEmbeddingUrl)
+                etCloudEmbeddingApiKey?.setText(ragConfig.cloudEmbeddingApiKey)
+                etCloudEmbeddingModel?.setText(ragConfig.cloudEmbeddingModel)
+                updateCloudEmbeddingVisibility()
             }
             SettingsAdapter.TYPE_STYLE -> {
                 radioNagFrequency?.check(
@@ -742,15 +771,37 @@ class SettingsActivity : AppCompatActivity() {
             }
             SettingsAdapter.TYPE_MEMORY -> {
                 btnPersonaEditor?.setOnClickListener {
-                    try {
-                        val intent = Intent(this, PersonaEditorActivity::class.java)
-                        val personaId = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                    val pm = com.aicompanion.persona.PersonaManager(this@SettingsActivity)
+                    pm.load()
+                    val personas = pm.getAllPersonas()
+                    if (personas.size <= 1) {
+                        try {
+                            val intent = Intent(this@SettingsActivity, PersonaEditorActivity::class.java)
+                            intent.putExtra("persona_id", personas.firstOrNull()?.id ?: "default")
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(this@SettingsActivity, "无法打开角色设定: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        val names = personas.map { it.name.ifEmpty { it.id } }.toTypedArray()
+                        val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
                             .getString("active_persona_id", "default") ?: "default"
-                        intent.putExtra("persona_id", personaId)
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        Toast.makeText(this, "无法打开角色设定: ${e.message}", Toast.LENGTH_SHORT).show()
+                        val currentIdx = personas.indexOfFirst { it.id == activeId }.coerceAtLeast(0)
+                        android.app.AlertDialog.Builder(this@SettingsActivity)
+                            .setTitle("选择要编辑的角色")
+                            .setSingleChoiceItems(names, currentIdx) { dialog, which ->
+                                val selected = personas[which]
+                                try {
+                                    val intent = Intent(this@SettingsActivity, PersonaEditorActivity::class.java)
+                                    intent.putExtra("persona_id", selected.id)
+                                    startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(this@SettingsActivity, "无法打开角色设定: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                                dialog.dismiss()
+                            }
+                            .setNegativeButton("取消", null)
+                            .show()
                     }
                 }
                 btnClearChatHistory?.setOnClickListener {
@@ -765,6 +816,33 @@ class SettingsActivity : AppCompatActivity() {
                         }
                         .setNegativeButton("取消", null)
                         .show()
+                }
+                switchPersonaRagEnabled?.setOnCheckedChangeListener { _, isChecked ->
+                    com.aicompanion.rag.RagConfig.personaRagEnabled = isChecked
+                    com.aicompanion.AppContainer.saveRagConfig()
+                }
+                switchUseCloudEmbedding?.setOnCheckedChangeListener { _, isChecked ->
+                    com.aicompanion.rag.RagConfig.useCloudEmbedding = isChecked
+                    com.aicompanion.AppContainer.saveRagConfig()
+                    updateCloudEmbeddingVisibility()
+                }
+                etCloudEmbeddingUrl?.setOnFocusChangeListener { _, hasFocus ->
+                    if (!hasFocus) {
+                        com.aicompanion.rag.RagConfig.cloudEmbeddingUrl = etCloudEmbeddingUrl?.text?.toString()?.trim() ?: ""
+                        com.aicompanion.AppContainer.saveRagConfig()
+                    }
+                }
+                etCloudEmbeddingApiKey?.setOnFocusChangeListener { _, hasFocus ->
+                    if (!hasFocus) {
+                        com.aicompanion.rag.RagConfig.cloudEmbeddingApiKey = etCloudEmbeddingApiKey?.text?.toString()?.trim() ?: ""
+                        com.aicompanion.AppContainer.saveRagConfig()
+                    }
+                }
+                etCloudEmbeddingModel?.setOnFocusChangeListener { _, hasFocus ->
+                    if (!hasFocus) {
+                        com.aicompanion.rag.RagConfig.cloudEmbeddingModel = etCloudEmbeddingModel?.text?.toString()?.trim() ?: "text-embedding-3-small"
+                        com.aicompanion.AppContainer.saveRagConfig()
+                    }
                 }
             }
         }
@@ -1944,6 +2022,13 @@ class SettingsActivity : AppCompatActivity() {
 
         com.aicompanion.util.AppLogger.enabled = sm.appLoggingEnabled
         com.aicompanion.util.AppLogger.debugVerbose = sm.appDebugVerbose
+
+        com.aicompanion.rag.RagConfig.personaRagEnabled = findSettingsView<Switch>(R.id.switch_persona_rag_enabled)?.isChecked ?: com.aicompanion.rag.RagConfig.personaRagEnabled
+        com.aicompanion.rag.RagConfig.useCloudEmbedding = findSettingsView<Switch>(R.id.switch_use_cloud_embedding)?.isChecked ?: com.aicompanion.rag.RagConfig.useCloudEmbedding
+        com.aicompanion.rag.RagConfig.cloudEmbeddingUrl = findSettingsView<android.widget.EditText>(R.id.et_cloud_embedding_url)?.text?.toString()?.trim() ?: com.aicompanion.rag.RagConfig.cloudEmbeddingUrl
+        com.aicompanion.rag.RagConfig.cloudEmbeddingApiKey = findSettingsView<android.widget.EditText>(R.id.et_cloud_embedding_api_key)?.text?.toString()?.trim() ?: com.aicompanion.rag.RagConfig.cloudEmbeddingApiKey
+        com.aicompanion.rag.RagConfig.cloudEmbeddingModel = findSettingsView<android.widget.EditText>(R.id.et_cloud_embedding_model)?.text?.toString()?.trim() ?: com.aicompanion.rag.RagConfig.cloudEmbeddingModel
+        com.aicompanion.AppContainer.saveRagConfig()
     }
 
     private fun setupTtsProviderSpinner() {
@@ -2132,6 +2217,10 @@ class SettingsActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "加载二维码失败: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun updateCloudEmbeddingVisibility() {
+        layoutCloudEmbeddingFields?.visibility = View.VISIBLE
     }
 
     private fun safeParseColor(colorStr: String?, default: Int): Int {

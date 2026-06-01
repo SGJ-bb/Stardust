@@ -2729,7 +2729,8 @@ class MainActivity : AppCompatActivity() {
                 val response = withContext(Dispatchers.IO) {
                     if (sm.chatApiUrl.isNotBlank()) {
                         val memCtx = contextManager?.memoryPool?.getPoolBlock()
-                        val persona = getPersonaInfo()
+                        val recentText = chatHistory.takeLast(3).map { it.second }.joinToString(" ")
+                        val persona = getPersonaInfo(recentText)
                         client.generateNagContent(persona.first, persona.second, memoryContext = memCtx, chatHistory = chatHistory)
                     } else null
                 }

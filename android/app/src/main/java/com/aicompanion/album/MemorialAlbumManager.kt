@@ -44,6 +44,7 @@ object MemorialAlbumManager {
     private const val KEY_CHAR_REF_IMAGE = "character_ref_image"
     private const val KEY_CHAR_REF_PROMPT = "character_ref_prompt"
     private const val KEY_CURRENT_TEMPLATE = "current_template_index"
+    private const val ENTRIES_FILE = "album_entries.json"
 
     val layoutTemplates = listOf(
         LayoutTemplate("经典方阵", "▦", 2, "1:1", 512, 512),
@@ -114,8 +115,18 @@ object MemorialAlbumManager {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
+    private fun getEntriesFile(context: Context): File {
+        return File(context.filesDir, ENTRIES_FILE)
+    }
+
     fun getEntries(context: Context): List<AlbumEntry> {
-        val json = getPrefs(context).getString(KEY_ENTRIES, "[]") ?: "[]"
+        migrateFromPrefsIfNeeded(context)
+        val file = getEntriesFile(context)
+        val json = if (file.exists()) {
+            try { file.readText(Charsets.UTF_8) } catch (e: Exception) {
+                AppLogger.e(TAG, "getEntries read: ${e.message}"); "[]"
+            }
+        } else "[]"
         return try {
             val arr = JSONArray(json)
             (0 until arr.length()).map { i ->
@@ -136,6 +147,22 @@ object MemorialAlbumManager {
         }
     }
 
+    private fun migrateFromPrefsIfNeeded(context: Context) {
+        val file = getEntriesFile(context)
+        if (file.exists()) return
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val oldJson = prefs.getString(KEY_ENTRIES, null) ?: return
+        if (oldJson != "[]") {
+            try {
+                file.writeText(oldJson, Charsets.UTF_8)
+                prefs.edit().remove(KEY_ENTRIES).apply()
+                AppLogger.i(TAG, "Migrated album entries from SharedPreferences to file")
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Migration failed: ${e.message}")
+            }
+        }
+    }
+
     private fun saveEntries(context: Context, entries: List<AlbumEntry>) {
         val arr = JSONArray()
         entries.forEach { e ->
@@ -149,7 +176,17 @@ object MemorialAlbumManager {
                 put("aspectRatio", e.aspectRatio)
             })
         }
-        getPrefs(context).edit().putString(KEY_ENTRIES, arr.toString()).apply()
+        try {
+            val file = getEntriesFile(context)
+            val bak = File(file.parent, "$ENTRIES_FILE.bak")
+            if (file.exists()) {
+                if (bak.exists()) bak.delete()
+                file.renameTo(bak)
+            }
+            file.writeText(arr.toString(), Charsets.UTF_8)
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "saveEntries: ${e.message}")
+        }
     }
 
     fun addEntry(context: Context, entry: AlbumEntry) {

@@ -143,6 +143,16 @@ class ProfileActivity : AppCompatActivity() {
             com.aicompanion.anim.AnimeUtils.pulse(it)
             pickAvatar(REQUEST_USER_AVATAR)
         }
+
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_edit_persona)?.setOnClickListener {
+            try {
+                val intent = Intent(this, PersonaEditorActivity::class.java)
+                intent.putExtra("persona_id", personaId)
+                startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(this, "无法打开人格设定: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun loadData() {

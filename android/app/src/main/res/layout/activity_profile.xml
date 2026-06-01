@@ -647,6 +647,22 @@
 
         <View
             android:layout_width="match_parent"
+            android:layout_height="16dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_edit_persona"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="编辑人格设定"
+            android:textSize="14sp"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#667eea"
+            app:cornerRadius="12dp"
+            android:layout_marginBottom="8dp" />
+
+        <View
+            android:layout_width="match_parent"
             android:layout_height="32dp" />
     </LinearLayout>
 </ScrollView>

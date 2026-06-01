@@ -8,4 +8,6 @@ object RagConfig {
     var chunkOverlapChars: Int = 60
     var minSimilarity: Float = 0.12f
     var cloudEmbeddingModel: String = "text-embedding-3-small"
+    var cloudEmbeddingUrl: String = ""
+    var cloudEmbeddingApiKey: String = ""
 }

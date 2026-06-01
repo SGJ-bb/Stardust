@@ -110,7 +110,31 @@ object AppContainer {
         this.appContext = appContext
         settingsManager = SettingsManager(appContext)
         com.aicompanion.network.ProviderAdapter.init(appContext)
+        loadRagConfig(appContext)
         registerBuiltinPlugins(appContext)
+    }
+
+    private fun loadRagConfig(context: Context) {
+        val prefs = context.getSharedPreferences("rag_config", android.content.Context.MODE_PRIVATE)
+        com.aicompanion.rag.RagConfig.personaRagEnabled = prefs.getBoolean("persona_rag_enabled", true)
+        com.aicompanion.rag.RagConfig.useCloudEmbedding = prefs.getBoolean("use_cloud_embedding", false)
+        com.aicompanion.rag.RagConfig.cloudEmbeddingUrl = prefs.getString("cloud_embedding_url", "") ?: ""
+        com.aicompanion.rag.RagConfig.cloudEmbeddingApiKey = prefs.getString("cloud_embedding_api_key", "") ?: ""
+        com.aicompanion.rag.RagConfig.cloudEmbeddingModel = prefs.getString("cloud_embedding_model", "text-embedding-3-small") ?: "text-embedding-3-small"
+        com.aicompanion.rag.RagConfig.minSimilarity = prefs.getFloat("min_similarity", 0.12f)
+    }
+
+    fun saveRagConfig() {
+        val ctx = appContext ?: return
+        val prefs = ctx.getSharedPreferences("rag_config", android.content.Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putBoolean("persona_rag_enabled", com.aicompanion.rag.RagConfig.personaRagEnabled)
+            putBoolean("use_cloud_embedding", com.aicompanion.rag.RagConfig.useCloudEmbedding)
+            putString("cloud_embedding_url", com.aicompanion.rag.RagConfig.cloudEmbeddingUrl)
+            putString("cloud_embedding_api_key", com.aicompanion.rag.RagConfig.cloudEmbeddingApiKey)
+            putString("cloud_embedding_model", com.aicompanion.rag.RagConfig.cloudEmbeddingModel)
+            putFloat("min_similarity", com.aicompanion.rag.RagConfig.minSimilarity)
+        }.apply()
     }
 
     fun rebuildApiClient() {
