@@ -524,6 +524,7 @@ class ApiClient(
                     val code = response.code
                     val msg = when {
                         code == 401 -> "API密钥无效，请检查"
+                        code == 402 -> "余额不足，请前往API厂商充值"
                         code == 403 -> "无权限访问，请检查API密钥权限"
                         code == 404 -> "接口地址不存在，请确认API地址是否正确"
                         code == 429 -> "请求过于频繁或已超出配额"

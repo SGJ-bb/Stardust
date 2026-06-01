@@ -280,23 +280,42 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var memorySearchCache: com.aicompanion.rag.EmbeddingSearchCache? = null
+
     suspend fun searchMemory(query: String, topK: Int): String = withContext(Dispatchers.IO) {
         val sb = StringBuilder()
 
         val poolEntries = contextManager?.memoryPool?.getAll() ?: emptyList()
         if (poolEntries.isNotEmpty()) {
-            val poolTexts = poolEntries.map { it.content }
-            val embedder = com.aicompanion.rag.TfidfEmbedder()
-            embedder.buildVocabulary(poolTexts)
-            val queryVec = embedder.embedSingleSync(query)
-            val vecs = embedder.embedSync(poolTexts)
-            val scored = vecs.mapIndexed { i, v -> i to com.aicompanion.rag.VectorMath.cosineSimilarity(queryVec, v) }
-                .sortedByDescending { it.second }
-                .filter { it.second > 0.1f }
-            if (scored.isNotEmpty()) {
-                sb.appendLine("[短期记忆池]")
-                scored.take(topK).forEach { (i, _) ->
-                    sb.appendLine("- ${poolEntries[i].content}")
+            try {
+                val cache = memorySearchCache ?: com.aicompanion.rag.EmbeddingSearchCache(
+                    getApplication<Application>(), "memory_pool"
+                ).also { memorySearchCache = it }
+
+                val entries = poolEntries.mapIndexed { i, e -> i.toString() to e.content }
+                cache.buildIndex(entries)
+
+                val results = cache.search(query, topK, 0.1f)
+                if (results.isNotEmpty()) {
+                    sb.appendLine("[短期记忆池]")
+                    results.forEach { r ->
+                        sb.appendLine("- ${r.text}")
+                    }
+                }
+            } catch (e: Exception) {
+                val poolTexts = poolEntries.map { it.content }
+                val embedder = com.aicompanion.rag.TfidfEmbedder()
+                embedder.buildVocabulary(poolTexts)
+                val queryVec = embedder.embedSingleSync(query)
+                val vecs = embedder.embedSync(poolTexts)
+                val scored = vecs.mapIndexed { i, v -> i to com.aicompanion.rag.VectorMath.cosineSimilarity(queryVec, v) }
+                    .sortedByDescending { it.second }
+                    .filter { it.second > 0.1f }
+                if (scored.isNotEmpty()) {
+                    sb.appendLine("[短期记忆池]")
+                    scored.take(topK).forEach { (i, _) ->
+                        sb.appendLine("- ${poolEntries[i].content}")
+                    }
                 }
             }
         }

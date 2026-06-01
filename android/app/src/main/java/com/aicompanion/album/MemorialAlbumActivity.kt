@@ -352,13 +352,14 @@ class MemorialAlbumActivity : AppCompatActivity() {
 
                 val imageFrame = FrameLayout(this).apply {
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, imageHeight)
+                    setBackgroundColor(cardColor)
                 }
 
                 val imageFile = File(entry.imagePath)
                 if (imageFile.exists()) {
                     val imageView = ImageView(this).apply {
                         layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        scaleType = ImageView.ScaleType.FIT_CENTER
                     }
                     val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     android.graphics.BitmapFactory.decodeFile(imageFile.absolutePath, opts)

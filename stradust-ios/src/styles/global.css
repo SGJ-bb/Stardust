@@ -1,0 +1,428 @@
+/* ============================================================
+   星尘 iOS - 设计系统 v2
+   基于 Impeccable 设计原则 + Anime.js 动效
+   ============================================================ */
+
+/* ── 排版系统 (Typography) ── */
+:root {
+  --font-sans: "SF Pro Display", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+  --font-rounded: "SF Pro Rounded", -apple-system, "PingFang SC", sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+
+  /* 模块化字号比例 (1.25 Major Third) */
+  --text-xs: 0.64rem;    /* 10.24px */
+  --text-sm: 0.8rem;     /* 12.8px */
+  --text-base: 1rem;     /* 16px */
+  --text-md: 1.125rem;   /* 18px */
+  --text-lg: 1.25rem;    /* 20px */
+  --text-xl: 1.563rem;   /* 25px */
+  --text-2xl: 1.953rem;  /* 31.25px */
+  --text-3xl: 2.441rem;  /* 39px */
+
+  /* 字重 */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* 行高 */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+
+  /* 字间距 */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+}
+
+/* ── 色彩系统 (Color) ── Impeccable: 带色调中性色，禁止纯灰 */
+:root {
+  /* 主背景 - 深紫调 */
+  --bg-primary: #0c0b14;
+  --bg-secondary: #14121f;
+  --bg-tertiary: #1c1929;
+  --bg-card: #1e1a2e;
+  --bg-card-hover: #252038;
+  --bg-input: #221e33;
+  --bg-overlay: rgba(8, 7, 14, 0.75);
+
+  /* 文本 - 紫调中性色 */
+  --text-primary: #f0ecf8;
+  --text-secondary: #a8a0c0;
+  --text-muted: #6e6888;
+  --text-inverse: #0c0b14;
+
+  /* 强调色 - 精心挑选的色板 */
+  --accent-primary: #8b6cff;
+  --accent-secondary: #5ea2ff;
+  --accent-pink: #ff6eb4;
+  --accent-orange: #ff9a5c;
+  --accent-green: #5cffb4;
+  --accent-yellow: #ffd55c;
+  --accent-red: #ff5c7c;
+
+  /* 渐变 */
+  --gradient-primary: linear-gradient(135deg, #8b6cff 0%, #5ea2ff 100%);
+  --gradient-warm: linear-gradient(135deg, #ff6eb4 0%, #ff9a5c 100%);
+  --gradient-cool: linear-gradient(135deg, #5ea2ff 0%, #5cffb4 100%);
+  --gradient-dark: linear-gradient(180deg, #14121f 0%, #0c0b14 100%);
+
+  /* 边框 - 紫调 */
+  --border-color: #2a2540;
+  --border-subtle: #1f1b30;
+  --border-active: #8b6cff;
+
+  /* 阴影 */
+  --shadow-sm: 0 2px 8px rgba(139, 108, 255, 0.06);
+  --shadow-md: 0 4px 16px rgba(139, 108, 255, 0.1);
+  --shadow-lg: 0 8px 32px rgba(139, 108, 255, 0.14);
+  --shadow-glow: 0 0 24px rgba(139, 108, 255, 0.2);
+
+  /* 聊天气泡 */
+  --chat-bubble-pet: linear-gradient(145deg, #221e38, #1a1630);
+  --chat-bubble-user: linear-gradient(145deg, #1a2848, #162040);
+}
+
+/* ── 空间系统 (Spatial) ── 4px 基准网格 */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+}
+
+/* ── 动效系统 (Motion) ── Impeccable: 禁止 bounce/elastic */
+:root {
+  /* 缓动曲线 */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* 时长 */
+  --duration-instant: 100ms;
+  --duration-fast: 200ms;
+  --duration-normal: 350ms;
+  --duration-slow: 500ms;
+  --duration-slower: 700ms;
+
+  /* 交错延迟 */
+  --stagger-fast: 30ms;
+  --stagger-normal: 60ms;
+  --stagger-slow: 100ms;
+}
+
+/* ── 安全区域 ── */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* ── 基础重置 ── */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── 滚动条 ── */
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: var(--radius-full);
+}
+
+/* ── 关键帧动画 ── Impeccable: 禁止 bounce, 使用 out-expo */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+  30% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(139, 108, 255, 0.15); }
+  50% { box-shadow: 0 0 20px rgba(139, 108, 255, 0.3); }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0); opacity: 0.6; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+/* ── 动画工具类 ── */
+.animate-fade-in { animation: fadeIn var(--duration-normal) var(--ease-out-expo) both; }
+.animate-fade-in-up { animation: fadeInUp var(--duration-normal) var(--ease-out-expo) both; }
+.animate-fade-in-down { animation: fadeInDown var(--duration-normal) var(--ease-out-expo) both; }
+.animate-fade-in-scale { animation: fadeInScale var(--duration-normal) var(--ease-out-expo) both; }
+.animate-slide-up { animation: slideUp var(--duration-slow) var(--ease-out-expo) both; }
+.animate-slide-in-right { animation: slideInRight var(--duration-slow) var(--ease-out-expo) both; }
+.animate-float { animation: float 3s var(--ease-in-out-quart) infinite; }
+.animate-glow { animation: glow 2s var(--ease-in-out-quart) infinite; }
+.animate-breathe { animation: breathe 3s var(--ease-in-out-quart) infinite; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(139, 108, 255, 0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* 交错动画 */
+.stagger-1 { animation-delay: calc(var(--stagger-fast) * 1); }
+.stagger-2 { animation-delay: calc(var(--stagger-fast) * 2); }
+.stagger-3 { animation-delay: calc(var(--stagger-fast) * 3); }
+.stagger-4 { animation-delay: calc(var(--stagger-fast) * 4); }
+.stagger-5 { animation-delay: calc(var(--stagger-fast) * 5); }
+.stagger-6 { animation-delay: calc(var(--stagger-fast) * 6); }
+.stagger-7 { animation-delay: calc(var(--stagger-fast) * 7); }
+.stagger-8 { animation-delay: calc(var(--stagger-fast) * 8); }
+
+/* ── 安全区域 ── */
+.safe-area {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+/* ── 输入框 ── Impeccable: 足够大的触摸目标 */
+input, textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-out-quart),
+              box-shadow var(--duration-fast) var(--ease-out-quart);
+  width: 100%;
+  min-height: 44px;
+}
+
+input:focus, textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(139, 108, 255, 0.15);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* ── 按钮 ── Impeccable: 最小44px触摸目标 */
+button {
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  font-family: var(--font-sans);
+  border-radius: var(--radius-md);
+  transition: all var(--duration-fast) var(--ease-out-quart);
+  min-height: 44px;
+  min-width: 44px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.btn-primary {
+  background: var(--gradient-primary);
+  color: white;
+  padding: var(--space-3) var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:active {
+  transform: scale(0.96);
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:active {
+  background: var(--bg-card-hover);
+  transform: scale(0.97);
+}
+
+/* ── 卡片 ── Impeccable: 禁止卡片嵌套卡片 */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  padding: var(--space-4);
+  transition: transform var(--duration-fast) var(--ease-out-quart),
+              box-shadow var(--duration-fast) var(--ease-out-quart);
+}
+
+.card:active {
+  transform: scale(0.98);
+}
+
+/* ── 标签 ── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+}
+
+.tag-purple {
+  background: rgba(139, 108, 255, 0.15);
+  color: var(--accent-primary);
+}
+
+.tag-blue {
+  background: rgba(94, 162, 255, 0.15);
+  color: var(--accent-secondary);
+}
+
+.tag-pink {
+  background: rgba(255, 110, 180, 0.15);
+  color: var(--accent-pink);
+}
+
+.tag-green {
+  background: rgba(92, 255, 180, 0.15);
+  color: var(--accent-green);
+}
+
+.tag-orange {
+  background: rgba(255, 154, 92, 0.15);
+  color: var(--accent-orange);
+}
+
+/* ── 页面转场 ── */
+.page-enter {
+  animation: slideInRight var(--duration-slow) var(--ease-out-expo) both;
+}
+
+.page-exit {
+  animation: slideOutRight var(--duration-normal) var(--ease-out-quart) both;
+}
+
+/* ── 减弱动画偏好 ── Impeccable: 必须尊重 prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── 选中文字颜色 ── */
+::selection {
+  background: rgba(139, 108, 255, 0.3);
+  color: var(--text-primary);
+}

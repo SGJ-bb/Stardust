@@ -99,9 +99,35 @@ class DiaryManager(private val context: Context, private val personaId: String =
         }
     }
 
+    private var diarySearchCache: com.aicompanion.rag.EmbeddingSearchCache? = null
+
     fun searchDiariesRag(query: String, topK: Int = 5): List<DiaryEntry> {
         val all = getAllDiaries()
         if (all.isEmpty() || query.isBlank()) return emptyList()
+
+        try {
+            val cache = diarySearchCache ?: com.aicompanion.rag.EmbeddingSearchCache(
+                context, "diary_$personaId"
+            ).also { diarySearchCache = it }
+
+            val entries = all.mapIndexed { i, d -> i.toString() to (d.title + " " + d.content) }
+
+            kotlinx.coroutines.runBlocking {
+                cache.buildIndex(entries)
+            }
+
+            val results = kotlinx.coroutines.runBlocking {
+                cache.search(query, topK, RagConfig.minSimilarity)
+            }
+
+            if (results.isNotEmpty()) {
+                return results.mapNotNull { r ->
+                    all.getOrNull(r.id.toIntOrNull() ?: -1)
+                }
+            }
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.e("DiaryManager", "searchDiariesRag cache failed: ${e.message}")
+        }
 
         val docs = all.map { it.title + " " + it.content }
         val embedder = com.aicompanion.rag.TfidfEmbedder()

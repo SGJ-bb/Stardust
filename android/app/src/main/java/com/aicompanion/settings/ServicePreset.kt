@@ -75,6 +75,7 @@ object ServicePresets {
     fun getImageRecogIndex(id: String): Int = imageRecogPresets.indexOfFirst { it.id == id }.coerceAtLeast(0)
 
     private val llmKnownDefaults = llmPresets.map { it.defaultModel }.filter { it.isNotEmpty() }.toSet()
+        .plus(setOf("deepseek-chat", "deepseek-reasoner", "gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"))
 
     fun getLlmKnownDefaults(): Set<String> = llmKnownDefaults
 
