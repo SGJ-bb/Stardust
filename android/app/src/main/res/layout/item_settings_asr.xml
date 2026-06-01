@@ -50,13 +50,38 @@
                     android:thumbTint="#c4b5fd" />
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="ASR 厂商"
+                    android:textSize="15sp"
+                    android:textColor="#d0d0e0" />
+
+                <Spinner
+                    android:id="@+id/spinner_asr_provider"
+                    android:layout_width="180dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_spinner"
+                    android:popupBackground="#1a1a3e"
+                    android:textColor="#d0d0e0" />
+            </LinearLayout>
+
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="ASR API 地址"
                 app:boxBackgroundColor="@android:color/transparent"
                 app:boxStrokeColor="#667eea"
-                app:hintTextColor="#667eea">
+                app:hintTextColor="#667eea"
+                android:layout_marginBottom="10dp">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_asr_api_url"
@@ -66,6 +91,62 @@
                     android:textColor="#d0d0e0"
                     android:textColorHint="#667788" />
             </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="ASR API Key"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxStrokeColor="#667eea"
+                app:hintTextColor="#667eea"
+                android:layout_marginBottom="10dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_asr_api_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:inputType="textPassword"
+                    android:textColorHint="#667788" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="ASR 模型 (Model)"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxStrokeColor="#667eea"
+                app:hintTextColor="#667eea">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_asr_model"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#d0d0e0"
+                    android:textColorHint="#667788" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_test_asr"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="8dp"
+                android:text="测试语音识别"
+                android:textColor="#667eea"
+                app:cornerRadius="10dp"
+                app:strokeColor="#667eea" />
+
+            <TextView
+                android:id="@+id/tv_asr_test_result"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="#4CAF50"
+                android:textSize="12sp"
+                android:visibility="gone" />
         </LinearLayout>
     </FrameLayout>
 

@@ -4,6 +4,7 @@ import android.content.Context
 import com.aicompanion.util.AppLogger
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 class VectorStore(private val context: Context, private val storeName: String = "default") {
 
@@ -12,10 +13,24 @@ class VectorStore(private val context: Context, private val storeName: String = 
         val text: String,
         val vector: FloatArray,
         val sourceField: String = ""
-    )
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is VectorEntry) return false
+            return id == other.id && text == other.text && vector.contentEquals(other.vector) && sourceField == other.sourceField
+        }
+
+        override fun hashCode(): Int {
+            var result = id
+            result = 31 * result + text.hashCode()
+            result = 31 * result + vector.contentHashCode()
+            result = 31 * result + sourceField.hashCode()
+            return result
+        }
+    }
 
     private val entries = mutableListOf<VectorEntry>()
-    private val prefs = context.getSharedPreferences("rag_vector_$storeName", Context.MODE_PRIVATE)
+    private val storeFile = File(context.filesDir, "rag_vectors/$storeName.json")
 
     fun add(id: Int, text: String, vector: FloatArray, sourceField: String = "") {
         entries.removeAll { it.id == id }
@@ -38,7 +53,7 @@ class VectorStore(private val context: Context, private val storeName: String = 
         if (queryVector.isEmpty() || entries.isEmpty()) return emptyList()
 
         val results = entries.map { entry ->
-            entry to cosineSimilarity(queryVector, entry.vector)
+            entry to VectorMath.cosineSimilarity(queryVector, entry.vector)
         }.filter { it.second >= minSimilarity }
             .sortedByDescending { it.second }
             .take(topK)
@@ -46,26 +61,13 @@ class VectorStore(private val context: Context, private val storeName: String = 
         return results
     }
 
-    fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
-        if (a.size != b.size || a.isEmpty()) return 0f
-        var dot = 0f
-        var normA = 0f
-        var normB = 0f
-        for (i in a.indices) {
-            dot += a[i] * b[i]
-            normA += a[i] * a[i]
-            normB += b[i] * b[i]
-        }
-        val denom = kotlin.math.sqrt(normA) * kotlin.math.sqrt(normB)
-        return if (denom > 0) dot / denom else 0f
-    }
-
     fun size(): Int = entries.size
 
     fun getAllTexts(): List<String> = entries.map { it.text }
 
-    fun save() {
-        try {
+    fun save(): Boolean {
+        return try {
+            storeFile.parentFile?.mkdirs()
             val arr = JSONArray()
             for (entry in entries) {
                 val obj = JSONObject()
@@ -77,13 +79,45 @@ class VectorStore(private val context: Context, private val storeName: String = 
                 obj.put("vector", vecArr)
                 arr.put(obj)
             }
-            prefs.edit().putString("entries", arr.toString()).apply()
-        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("VectorStore", "save: ${e.message}") }
+            storeFile.writeText(arr.toString())
+            true
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("VectorStore", "save: ${e.message}"); false }
     }
 
     fun load(): Boolean {
         try {
-            val json = prefs.getString("entries", null) ?: return false
+            if (!storeFile.exists()) {
+                val prefs = context.getSharedPreferences("rag_vector_$storeName", Context.MODE_PRIVATE)
+                val legacyJson = prefs.getString("entries", null)
+                if (legacyJson != null) {
+                    val arr = JSONArray(legacyJson)
+                    entries.clear()
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        val vecArr = obj.getJSONArray("vector")
+                        val vec = FloatArray(vecArr.length())
+                        for (j in 0 until vecArr.length()) vec[j] = vecArr.getDouble(j).toFloat()
+                        entries.add(VectorEntry(
+                            id = obj.getInt("id"),
+                            text = obj.getString("text"),
+                            vector = vec,
+                            sourceField = obj.optString("source", "")
+                        ))
+                    }
+                    if (save()) {
+                        prefs.edit().clear().apply()
+                    } else {
+                        storeFile.delete()
+                    }
+                    return entries.isNotEmpty()
+                }
+                return false
+            }
+            val json = storeFile.readText()
+            if (json.isBlank()) {
+                storeFile.delete()
+                return load()
+            }
             val arr = JSONArray(json)
             entries.clear()
             for (i in 0 until arr.length()) {
@@ -99,13 +133,14 @@ class VectorStore(private val context: Context, private val storeName: String = 
                 ))
             }
             return entries.isNotEmpty()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AppLogger.e("VectorStore", "load failed: ${e.message}")
             return false
         }
     }
 
     fun clear() {
         entries.clear()
-        prefs.edit().clear().apply()
+        try { storeFile.delete() } catch (_: Exception) {}
     }
 }

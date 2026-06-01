@@ -190,7 +190,7 @@ class MemoryPool(
             return@withContext false
         }
 
-        AppLogger.d(TAG, "consolidate: starting with ${entries.size} entries, ${detailEntries.size} details, $totalCharCount chars")
+        AppLogger.w(TAG, "consolidate: starting with ${entries.size} entries, ${detailEntries.size} details, $totalCharCount chars")
 
         val fullPool = buildString {
             appendLine(getPoolBlock())
@@ -226,7 +226,7 @@ class MemoryPool(
                     detailEntries.clear()
                     recalcCharCount()
                     saveToStorage()
-                    AppLogger.d(TAG, "consolidate: done, ${entries.size} entries, $totalCharCount chars")
+                    AppLogger.w(TAG, "consolidate: done, ${entries.size} entries, $totalCharCount chars")
                     turnsSinceLastConsolidate = 0
                     return@withContext true
                 }
@@ -339,7 +339,7 @@ class MemoryPool(
         if (turnsText.isBlank()) return@withContext emptyList()
 
         val poolBlock = if (entries.isEmpty()) "（空）" else getPoolBlock()
-        AppLogger.d(TAG, "evaluateTurn #$turnNumber: pool=${entries.size} entries")
+        //AppLogger.d(TAG, "evaluateTurn #$turnNumber: pool=${entries.size} entries")
 
         val nick = userNickname.ifBlank { "用户" }
         val systemPrompt = buildString {
@@ -383,9 +383,9 @@ class MemoryPool(
         try {
             val response = client.sendSimplePrompt(systemPrompt, userContent)
             if (response != null && response.text.isNotBlank()) {
-                AppLogger.d(TAG, "evaluateTurn #$turnNumber: API returned ${response.text.length} chars")
+                //AppLogger.d(TAG, "evaluateTurn #$turnNumber: API returned ${response.text.length} chars")
                 val result = parseEvaluationResult(response.text, turnNumber)
-                AppLogger.d(TAG, "evaluateTurn #$turnNumber result: ${result.size} new entries")
+                //AppLogger.d(TAG, "evaluateTurn #$turnNumber result: ${result.size} new entries")
                 result
             } else {
                 val reason = if (response == null) "response is null" else "response text is blank"

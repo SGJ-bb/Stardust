@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-class ModelManager(context: Context) {
+class ModelManager(private val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("model_manager", Context.MODE_PRIVATE)
     private val modelsDir = File(context.getExternalFilesDir(null), "live2d_models")
@@ -48,9 +48,11 @@ class ModelManager(context: Context) {
     fun setActiveModel(modelId: String): Boolean {
         val models = getAllModels().toMutableList()
         var success = false
+        var activeModelPath: String? = null
         models.replaceAll { model ->
             if (model.id == modelId) {
                 success = true
+                activeModelPath = model.modelPath
                 model.copy(isActive = true)
             } else {
                 model.copy(isActive = false)
@@ -58,6 +60,10 @@ class ModelManager(context: Context) {
         }
         if (success) {
             saveModels(models)
+            if (activeModelPath != null) {
+                val appPrefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                appPrefs.edit().putString("active_model_path", activeModelPath).apply()
+            }
         }
         return success
     }
@@ -181,34 +187,46 @@ class ModelManager(context: Context) {
 
     private fun loadModelFromFolder(folder: File): Live2DModel? {
         return try {
-            val modelJson = File(folder, "model.json")
-            val json = JSONObject(modelJson.readText())
+            val model3Json = folder.listFiles()?.firstOrNull {
+                it.isFile && it.name.endsWith(".model3.json")
+            }
+            val model2Json = folder.listFiles()?.firstOrNull {
+                it.isFile && it.name.endsWith(".model.json")
+            }
+            val modelJsonFile = model3Json ?: model2Json ?: return null
+            val json = JSONObject(modelJsonFile.readText())
+            val version = when {
+                model3Json != null -> "Cubism 4"
+                model2Json != null -> "Cubism 2"
+                else -> json.optString("Version", "1.0")
+            }
+            val fileRefs = json.optJSONObject("FileReferences") ?: json
             Live2DModel(
                 id = folder.name,
-                name = json.optString("name", folder.name),
-                description = json.optString("description", ""),
-                modelPath = folder.absolutePath,
-                texturePath = File(folder, json.optString("texture", "texture.png")).absolutePath,
-                physicsPath = File(folder, json.optString("physics", "physics.json")).absolutePath,
-                motionPath = File(folder, json.optString("motions", "motions/")).absolutePath,
-                version = json.optString("version", "1.0"),
-                sizeMB = folder.getFolderSizeMB()
+                name = json.optString("Name", folder.name).ifBlank { folder.name },
+                description = json.optString("Description", ""),
+                modelPath = modelJsonFile.absolutePath,
+                texturePath = "",
+                physicsPath = "",
+                motionPath = "",
+                version = version,
+                sizeMB = folder.getFolderSizeBytes() / (1024f * 1024f)
             )
         } catch (e: Exception) {
             null
         }
     }
 
-    private fun File.getFolderSizeMB(): Float {
+    private fun File.getFolderSizeBytes(): Long {
         var size = 0L
         try {
             listFiles()?.forEach { file ->
-                size += if (file.isDirectory) file.getFolderSizeMB().toLong() * 1024 * 1024 else file.length()
+                size += if (file.isDirectory) file.getFolderSizeBytes() else file.length()
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return size / (1024f * 1024f)
+        return size
     }
 
     private fun saveModels(models: List<Live2DModel>) {

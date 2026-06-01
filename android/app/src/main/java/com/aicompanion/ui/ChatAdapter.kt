@@ -24,14 +24,24 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
     RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     var aiAvatarOverride: String? = null
+    var personaName: String = "星尘"
 
     companion object {
         private const val VIEW_TYPE_USER = 1
         private const val VIEW_TYPE_PET = 2
         private const val VIEW_TYPE_TYPING = 3
 
-        private val avatarCache = LruCache<String, Bitmap>(12)
-        private val stickerCache = LruCache<String, Bitmap>(8)
+        private const val AVATAR_CACHE_KB = 8 * 1024
+        private const val STICKER_CACHE_KB = 16 * 1024
+
+        private val avatarCache = object : LruCache<String, Bitmap>(AVATAR_CACHE_KB) {
+            override fun sizeOf(key: String, value: Bitmap) = value.byteCount / 1024
+            override fun entryRemoved(evicted: Boolean, key: String, oldValue: Bitmap, newValue: Bitmap?) {}
+        }
+        private val stickerCache = object : LruCache<String, Bitmap>(STICKER_CACHE_KB) {
+            override fun sizeOf(key: String, value: Bitmap) = value.byteCount / 1024
+            override fun entryRemoved(evicted: Boolean, key: String, oldValue: Bitmap, newValue: Bitmap?) {}
+        }
 
         private val moodEmojis = mapOf(
             "开心" to "😊", "难过" to "😢", "生气" to "😤", "疲惫" to "😴",
@@ -39,31 +49,60 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         )
 
         private fun loadStickerBitmap(path: String): Bitmap? {
-            var bitmap = stickerCache.get(path)
-            if (bitmap != null) return bitmap
+            val bitmap = stickerCache.get(path)
+            if (bitmap != null && !bitmap.isRecycled) return bitmap
+            if (bitmap != null && bitmap.isRecycled) {
+                stickerCache.remove(path)
+            }
             return try {
-                val file = File(path)
-                if (file.exists()) {
-                    val options = BitmapFactory.Options().apply { inSampleSize = 2 }
-                    bitmap = BitmapFactory.decodeFile(path, options)
-                    if (bitmap != null) stickerCache.put(path, bitmap)
-                    bitmap
-                } else null
+                val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                BitmapFactory.decodeFile(path, options)?.also { stickerCache.put(path, it) }
             } catch (_: Exception) { null }
         }
 
         private fun loadAvatarBitmap(path: String): Bitmap? {
-            var bitmap = avatarCache.get(path)
-            if (bitmap != null) return bitmap
+            val bitmap = avatarCache.get(path)
+            if (bitmap != null && !bitmap.isRecycled) return bitmap
+            if (bitmap != null && bitmap.isRecycled) {
+                avatarCache.remove(path)
+            }
             return try {
-                val file = File(path)
-                if (file.exists()) {
-                    val options = BitmapFactory.Options().apply { inSampleSize = 2 }
-                    bitmap = BitmapFactory.decodeFile(path, options)
-                    if (bitmap != null) avatarCache.put(path, bitmap)
-                    bitmap
-                } else null
+                val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                BitmapFactory.decodeFile(path, options)?.also { avatarCache.put(path, it) }
             } catch (_: Exception) { null }
+        }
+
+        private val preloadExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+            Thread(r, "sticker-preload").apply { isDaemon = true }
+        }
+
+        fun preloadSticker(path: String) {
+            if (stickerCache.get(path) != null) return
+            preloadExecutor.execute {
+                try {
+                    val file = File(path)
+                    if (file.exists()) {
+                        val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                        BitmapFactory.decodeFile(path, options)?.let { stickerCache.put(path, it) }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        fun preloadAvatar(path: String) {
+            if (avatarCache.get(path) != null) return
+            preloadExecutor.execute {
+                try {
+                    val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                    BitmapFactory.decodeFile(path, options)?.let { avatarCache.put(path, it) }
+                } catch (_: Exception) {}
+            }
+        }
+
+        private val pathExistsCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+        fun stickerPathExists(path: String): Boolean {
+            return pathExistsCache.getOrPut(path) { File(path).exists() }
         }
     }
 
@@ -90,8 +129,12 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
     private var cachedAiImageBubbleDrawable: android.graphics.drawable.Drawable? = null
     private var cachedUserAvatarFrameBmp: Bitmap? = null
     private var cachedAiAvatarFrameBmp: Bitmap? = null
+    private var cachedUserTextColor: Int = Color.WHITE
+    private var cachedAiTextColor: Int = Color.parseColor("#E0E0E0")
 
     fun cacheSkinSettings(context: android.content.Context) {
+        cachedUserAvatarFrameBmp = null
+        cachedAiAvatarFrameBmp = null
         val skin = com.aicompanion.theme.BubbleSkinManager.getActiveSkin(context)
         val imageBubble = com.aicompanion.theme.BubbleSkinManager.getActiveImageBubble(context)
         val userFrame = com.aicompanion.theme.BubbleSkinManager.getActiveUserFrame(context)
@@ -137,6 +180,14 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         } else null
 
         cachedAiImageBubbleDrawable = cachedUserImageBubbleDrawable
+
+        cachedUserTextColor = skin.userTextColor
+        cachedAiTextColor = skin.aiTextColor
+
+        if (cachedUserImageBubbleDrawable != null) {
+            cachedUserTextColor = com.aicompanion.theme.BubbleSkin.calculateTextColor(skin.userBgColor)
+            cachedAiTextColor = com.aicompanion.theme.BubbleSkin.calculateTextColor(skin.aiBgColor)
+        }
 
         cachedUserAvatarFrameBmp = if (userImageFrame != null) {
             loadAvatarFrameBitmap(context, userImageFrame)
@@ -205,7 +256,7 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         val lastPetIndex = messages.indexOfLast { !it.isUser }
         if (lastPetIndex >= 0) {
             messages[lastPetIndex] = messages[lastPetIndex].copy(text = text, isPartial = isPartial)
-            notifyItemChanged(lastPetIndex)
+            notifyItemChanged(lastPetIndex, "text")
         }
     }
 
@@ -262,16 +313,30 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
     private fun applyBubbleBackground(bubble: View, isUser: Boolean) {
         val imgDrawable = if (isUser) cachedUserImageBubbleDrawable else cachedAiImageBubbleDrawable
         if (imgDrawable != null) {
-            bubble.background = imgDrawable.constantState?.newDrawable()?.mutate() ?: imgDrawable
+            val d = imgDrawable.constantState?.newDrawable()?.mutate() ?: imgDrawable
+            bubble.background = d
+            val pad = android.graphics.Rect()
+            if (d.getPadding(pad)) {
+                val extraH = (4 * density).toInt()
+                bubble.setPadding(pad.left, pad.top + extraH, pad.right, pad.bottom + extraH)
+            }
         } else if (isUser && userGradientColors.size >= 2) {
             bubble.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, userGradientColors.toIntArray()).apply {
                 cornerRadius = 18f * density
             }
+            bubble.setPadding(
+                (14 * density).toInt(), (10 * density).toInt(),
+                (14 * density).toInt(), (10 * density).toInt()
+            )
         } else {
             val bg = if (isUser) cachedUserBubbleBg else cachedAiBubbleBg
             if (bg != null) {
                 bubble.background = bg.constantState?.newDrawable()?.mutate() ?: bg
             }
+            bubble.setPadding(
+                (14 * density).toInt(), (10 * density).toInt(),
+                (14 * density).toInt(), (10 * density).toInt()
+            )
         }
     }
 
@@ -283,22 +348,29 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
             prefs.getString(if (isUser) "user_avatar" else "ai_avatar", "")
         }
         if (!path.isNullOrEmpty()) {
-            loadAvatarBitmap(path)?.let { ivAvatar.setImageBitmap(it) }
+            loadAvatarBitmap(path)?.let { bmp ->
+                if (!bmp.isRecycled) ivAvatar.setImageBitmap(bmp)
+            }
         }
 
         val frameBmp = if (isUser) cachedUserAvatarFrameBmp else cachedAiAvatarFrameBmp
-        if (frameBmp != null && frameLayout != null) {
-            val size = frameLayout.layoutParams.width
-            val overlaySize = (size * 1.25f).toInt()
-            val overlayIv = ImageView(ivAvatar.context).apply {
-                tag = "frame_overlay"
-                layoutParams = android.widget.FrameLayout.LayoutParams(overlaySize, overlaySize).apply {
-                    gravity = android.view.Gravity.CENTER
+        if (frameBmp != null && !frameBmp.isRecycled && frameLayout != null) {
+            val existingOverlay = frameLayout.findViewWithTag<ImageView>("frame_overlay")
+            if (existingOverlay != null) {
+                existingOverlay.setImageBitmap(frameBmp)
+            } else {
+                val size = frameLayout.layoutParams.width
+                val overlaySize = (size * 1.25f).toInt()
+                val overlayIv = ImageView(ivAvatar.context).apply {
+                    tag = "frame_overlay"
+                    layoutParams = android.widget.FrameLayout.LayoutParams(overlaySize, overlaySize).apply {
+                        gravity = android.view.Gravity.CENTER
+                    }
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    setImageBitmap(frameBmp)
                 }
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                setImageBitmap(frameBmp)
+                frameLayout.addView(overlayIv)
             }
-            frameLayout.addView(overlayIv)
             frameLayout.clipChildren = false
             frameLayout.clipToPadding = false
         } else {
@@ -307,6 +379,13 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
                 ivAvatar.background = frameBg.constantState?.newDrawable()?.mutate() ?: frameBg
             }
         }
+        ivAvatar.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
+                val size = Math.min(view.width, view.height)
+                outline.setOval(0, 0, size, size)
+            }
+        }
+        ivAvatar.clipToOutline = true
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
@@ -316,13 +395,44 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
         if (payloads.isEmpty()) {
             when (holder) {
-                is UserViewHolder -> holder.bind(messages[position], position)
-                is PetViewHolder -> holder.bind(messages[position], position)
+                is UserViewHolder -> {
+                    applyBubbleBackground(holder.bubble, true)
+                    holder.bind(messages[position], position)
+                }
+                is PetViewHolder -> {
+                    applyBubbleBackground(holder.bubble, false)
+                    holder.bind(messages[position], position)
+                }
                 is TypingViewHolder -> holder.bind(bubbleAIColor)
             }
         } else {
-            if (holder is PetViewHolder && payloads.contains("audio")) {
-                holder.updateVoiceButton(messages[position])
+            val msg = messages[position]
+            for (payload in payloads) {
+                when (payload) {
+                    "audio" -> {
+                        if (holder is PetViewHolder) holder.updateVoiceButton(msg)
+                    }
+                    "text" -> {
+                        when (holder) {
+                            is UserViewHolder -> {
+                                val tvMsg = holder.itemView.findViewById<TextView>(R.id.tv_message_text)
+                                val displayText = if (msg.isPartial) "${msg.text}…" else msg.text
+                                if (tvMsg?.text?.toString() != displayText) {
+                                    tvMsg?.text = displayText
+                                }
+                                holder.lastBoundText = displayText
+                            }
+                            is PetViewHolder -> {
+                                val tvMsg = holder.itemView.findViewById<TextView>(R.id.tv_message_text)
+                                val displayText = if (msg.isPartial) "${msg.text}…" else msg.text
+                                if (tvMsg?.text?.toString() != displayText) {
+                                    tvMsg?.text = displayText
+                                }
+                                holder.lastBoundText = displayText
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -491,8 +601,16 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         val ivAvatar: ImageView = view.findViewById(R.id.iv_user_avatar_chat)
         private val tvReaction: TextView = view.findViewById(R.id.tv_reaction_badge)
         val frameLayout = view.findViewById<android.widget.FrameLayout>(R.id.frame_user_avatar)
-        private var stickerIv: ImageView? = null
+        private val stickerIv: ImageView = view.findViewById(R.id.iv_sticker)
         private var currentPosition = -1
+        private var lastStickerVisible = false
+        private var lastMessageVisible = true
+        private var lastMoodVisible = false
+        private var lastReactionVisible = false
+        internal var lastBoundText: String? = null
+        private var lastBoundTime: String? = null
+        private var lastBoundMood: String? = null
+        private var lastBoundReaction: String? = null
 
         init {
             bubble.setOnLongClickListener {
@@ -506,47 +624,49 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         fun bind(message: ChatMessage, position: Int) {
             currentPosition = position
 
-            if (!message.stickerPath.isNullOrEmpty()) {
-                try {
-                    val file = File(message.stickerPath!!)
-                    if (file.exists()) {
-                        val bmp = loadStickerBitmap(message.stickerPath!!)
-                        tvMessage.visibility = View.GONE
-                        if (stickerIv == null) {
-                            stickerIv = ImageView(itemView.context).apply {
-                                val parent = tvMessage.parent as ViewGroup
-                                val index = parent.indexOfChild(tvMessage)
-                                val sizePx = (120 * density).toInt()
-                                parent.addView(this, index, LinearLayout.LayoutParams(sizePx, sizePx))
-                                scaleType = ImageView.ScaleType.CENTER_CROP
-                                setPadding(0, 4, 0, 4)
-                            }
-                        }
-                        stickerIv?.setImageBitmap(bmp)
-                        stickerIv?.visibility = View.VISIBLE
-                    }
-                } catch (e: Exception) { AppLogger.e("ChatAdapter", "UserViewHolder.bind: ${e.message}") }
+            val imagePath = message.generatedImagePath ?: message.stickerPath
+            if (!imagePath.isNullOrEmpty()) {
+                val bmp = loadStickerBitmap(imagePath)
+                if (bmp != null) {
+                    stickerIv.setImageBitmap(bmp)
+                    if (!lastStickerVisible) { stickerIv.visibility = View.VISIBLE; lastStickerVisible = true }
+                    if (lastMessageVisible) { tvMessage.visibility = View.GONE; lastMessageVisible = false }
+                } else {
+                    if (lastBoundText != message.text) { tvMessage.text = message.text; lastBoundText = message.text }
+                    if (!lastMessageVisible) { tvMessage.visibility = View.VISIBLE; lastMessageVisible = true }
+                    if (lastStickerVisible) { stickerIv.visibility = View.GONE; lastStickerVisible = false }
+                    preloadSticker(imagePath)
+                }
             } else {
-                tvMessage.text = message.text
-                tvMessage.visibility = View.VISIBLE
-                stickerIv?.visibility = View.GONE
+                if (lastBoundText != message.text) { tvMessage.text = message.text; lastBoundText = message.text }
+                tvMessage.setTextColor(cachedUserTextColor)
+                if (!lastMessageVisible) { tvMessage.visibility = View.VISIBLE; lastMessageVisible = true }
+                if (lastStickerVisible) { stickerIv.visibility = View.GONE; lastStickerVisible = false }
             }
 
-            tvTime.text = message.time
+            if (lastBoundTime != message.time) { tvTime.text = message.time; lastBoundTime = message.time }
 
             if (message.userMood.isNotEmpty()) {
-                val emoji = moodEmojis[message.userMood] ?: "💫"
-                tvMoodLabel.text = "$emoji ${message.userMood}"
-                tvMoodLabel.visibility = View.VISIBLE
+                if (lastBoundMood != message.userMood) {
+                    val emoji = moodEmojis[message.userMood] ?: "💫"
+                    tvMoodLabel.text = "$emoji ${message.userMood}"
+                    lastBoundMood = message.userMood
+                }
+                if (!lastMoodVisible) { tvMoodLabel.visibility = View.VISIBLE; lastMoodVisible = true }
             } else {
-                tvMoodLabel.visibility = View.GONE
+                if (lastMoodVisible) { tvMoodLabel.visibility = View.GONE; lastMoodVisible = false }
+                lastBoundMood = null
             }
 
             if (message.reactionEmoji.isNotEmpty()) {
-                tvReaction.text = message.reactionEmoji
-                tvReaction.visibility = View.VISIBLE
+                if (lastBoundReaction != message.reactionEmoji) {
+                    tvReaction.text = message.reactionEmoji
+                    lastBoundReaction = message.reactionEmoji
+                }
+                if (!lastReactionVisible) { tvReaction.visibility = View.VISIBLE; lastReactionVisible = true }
             } else {
-                tvReaction.visibility = View.GONE
+                if (lastReactionVisible) { tvReaction.visibility = View.GONE; lastReactionVisible = false }
+                lastBoundReaction = null
             }
         }
     }
@@ -562,43 +682,30 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         val ivAvatar: ImageView = view.findViewById(R.id.iv_ai_avatar_chat)
         private val tvReaction: TextView = view.findViewById(R.id.tv_reaction_badge)
         val aiFrameLayout = view.findViewById<android.widget.FrameLayout>(R.id.frame_ai_avatar)
-        private var stickerIv: ImageView? = null
-        private val voiceBtn: ImageView
+        private val stickerIv: ImageView = view.findViewById(R.id.iv_sticker)
+        private val voiceBtn: ImageView = view.findViewById(R.id.iv_voice_btn)
+        private var lastStickerVisible = false
+        private var lastMessageVisible = true
+        private var lastEmotionVisible = false
+        private var lastReactionVisible = false
+        private var lastVoiceVisible = false
+        internal var lastBoundText: String? = null
+        private var lastBoundTime: String? = null
+        private var lastBoundReaction: String? = null
 
         init {
+            voiceBtn.setColorFilter(0xFF81D4FA.toInt(), android.graphics.PorterDuff.Mode.SRC_IN)
+            val outValue = android.util.TypedValue()
+            itemView.context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outValue, true)
+            voiceBtn.setBackgroundResource(outValue.resourceId)
+            voiceBtn.isClickable = true
+            voiceBtn.isFocusable = true
+
             bubble.setOnLongClickListener {
                 if (currentPosition >= 0 && currentPosition < messages.size) {
                     showPopupMenu(bubble, currentPosition, messages[currentPosition])
                 }
                 true
-            }
-
-            voiceBtn = ImageView(itemView.context).apply {
-                val sizePx = (28 * density).toInt()
-                layoutParams = LinearLayout.LayoutParams(sizePx, sizePx).apply {
-                    setMargins((4 * density).toInt(), 0, 0, 0)
-                    gravity = Gravity.CENTER_VERTICAL
-                }
-                scaleType = ImageView.ScaleType.CENTER_INSIDE
-                setPadding((4 * density).toInt(), (4 * density).toInt(), (4 * density).toInt(), (4 * density).toInt())
-                setImageResource(R.drawable.ic_voice)
-                setColorFilter(0xFF81D4FA.toInt(), android.graphics.PorterDuff.Mode.SRC_IN)
-                val outValue = android.util.TypedValue()
-                itemView.context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outValue, true)
-                setBackgroundResource(outValue.resourceId)
-                isClickable = true
-                isFocusable = true
-                contentDescription = "播放语音"
-                visibility = View.GONE
-            }
-            try {
-                val parent = tvTime.parent as? ViewGroup
-                if (parent != null) {
-                    val timeIndex = parent.indexOfChild(tvTime)
-                    parent.addView(voiceBtn, timeIndex)
-                }
-            } catch (e: Exception) {
-                AppLogger.e("ChatAdapter", "PetViewHolder voiceBtn addView: ${e.message}")
             }
 
             btnLike.setOnClickListener {
@@ -614,54 +721,53 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         fun bind(message: ChatMessage, position: Int) {
             currentPosition = position
 
-            if (!message.stickerPath.isNullOrEmpty()) {
-                try {
-                    val file = File(message.stickerPath!!)
-                    if (file.exists()) {
-                        val bmp = loadStickerBitmap(message.stickerPath!!)
-                        tvMessage.visibility = View.GONE
-                        if (stickerIv == null) {
-                            stickerIv = ImageView(itemView.context).apply {
-                                val parent = tvMessage.parent as ViewGroup
-                                val index = parent.indexOfChild(tvMessage)
-                                val sizePx = (120 * density).toInt()
-                                parent.addView(this, index, LinearLayout.LayoutParams(sizePx, sizePx))
-                                scaleType = ImageView.ScaleType.CENTER_CROP
-                                setPadding(0, 4, 0, 4)
-                            }
-                        }
-                        stickerIv?.setImageBitmap(bmp)
-                        stickerIv?.visibility = View.VISIBLE
-                    }
-                } catch (e: Exception) { AppLogger.e("ChatAdapter", "PetViewHolder.bind: ${e.message}") }
+            val imagePath = message.generatedImagePath ?: message.stickerPath
+            if (!imagePath.isNullOrEmpty()) {
+                val bmp = loadStickerBitmap(imagePath)
+                if (bmp != null) {
+                    stickerIv.setImageBitmap(bmp)
+                    if (!lastStickerVisible) { stickerIv.visibility = View.VISIBLE; lastStickerVisible = true }
+                    if (lastMessageVisible) { tvMessage.visibility = View.GONE; lastMessageVisible = false }
+                } else {
+                    val displayText = if (message.isPartial) "${message.text}…" else message.text
+                    if (lastBoundText != displayText) { tvMessage.text = displayText; lastBoundText = displayText }
+                    tvMessage.setTextColor(cachedAiTextColor)
+                    if (!lastMessageVisible) { tvMessage.visibility = View.VISIBLE; lastMessageVisible = true }
+                    if (lastStickerVisible) { stickerIv.visibility = View.GONE; lastStickerVisible = false }
+                    preloadSticker(imagePath)
+                }
             } else {
-                tvMessage.text = if (message.isPartial) "${message.text}…" else message.text
-                tvMessage.visibility = View.VISIBLE
-                stickerIv?.visibility = View.GONE
+                val displayText = if (message.isPartial) "${message.text}…" else message.text
+                if (lastBoundText != displayText) { tvMessage.text = displayText; lastBoundText = displayText }
+                tvMessage.setTextColor(cachedAiTextColor)
+                if (!lastMessageVisible) { tvMessage.visibility = View.VISIBLE; lastMessageVisible = true }
+                if (lastStickerVisible) { stickerIv.visibility = View.GONE; lastStickerVisible = false }
             }
 
-            tvTime.text = message.time
-            tvEmotion.visibility = View.GONE
+            if (lastBoundTime != message.time) { tvTime.text = message.time; lastBoundTime = message.time }
+            if (lastEmotionVisible) { tvEmotion.visibility = View.GONE; lastEmotionVisible = false }
 
             if (message.reactionEmoji.isNotEmpty()) {
-                tvReaction.text = message.reactionEmoji
-                tvReaction.visibility = View.VISIBLE
+                if (lastBoundReaction != message.reactionEmoji) {
+                    tvReaction.text = message.reactionEmoji
+                    lastBoundReaction = message.reactionEmoji
+                }
+                if (!lastReactionVisible) { tvReaction.visibility = View.VISIBLE; lastReactionVisible = true }
             } else {
-                tvReaction.visibility = View.GONE
+                if (lastReactionVisible) { tvReaction.visibility = View.GONE; lastReactionVisible = false }
+                lastBoundReaction = null
             }
 
             bindVoiceButton(message)
 
-            btnLike.alpha = 0f
-            btnDislike.alpha = 0f
+            btnLike.visibility = View.GONE
+            btnDislike.visibility = View.GONE
 
             if (!message.isUser && message.feedback > 0) {
-                btnLike.alpha = 1.0f
-                btnDislike.alpha = 0f
+                btnLike.visibility = View.VISIBLE
                 btnLike.setTextColor(0xFF4CAF50.toInt())
             } else if (!message.isUser && message.feedback < 0) {
-                btnDislike.alpha = 1.0f
-                btnLike.alpha = 0f
+                btnDislike.visibility = View.VISIBLE
                 btnDislike.setTextColor(0xFFE53935.toInt())
             }
         }
@@ -674,7 +780,7 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
             val hasAudio = !message.audioPath.isNullOrBlank() || !message.audioUrl.isNullOrBlank()
 
             if (hasAudio) {
-                voiceBtn.visibility = View.VISIBLE
+                if (!lastVoiceVisible) { voiceBtn.visibility = View.VISIBLE; lastVoiceVisible = true }
 
                 val isCurrentlyPlaying = ttsManager?.isPlaying == true &&
                     (ttsManager?.playingPath == message.audioPath || ttsManager?.playingPath == message.audioUrl)
@@ -690,7 +796,7 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
                     onPlayVoice?.invoke(message)
                 }
             } else {
-                voiceBtn.visibility = View.GONE
+                if (lastVoiceVisible) { voiceBtn.visibility = View.GONE; lastVoiceVisible = false }
             }
         }
 
@@ -701,19 +807,25 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         }
     }
 
-    class TypingViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+    inner class TypingViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val bubble: View = view.findViewById(R.id.bubble_typing)
         private val dot1: View = view.findViewById(R.id.dot_1)
         private val dot2: View = view.findViewById(R.id.dot_2)
         private val dot3: View = view.findViewById(R.id.dot_3)
+        private var cachedColor: Int = 0
+        private val tvTypingLabel: TextView = view.findViewById(R.id.tv_typing_label)
 
         fun bind(color: Int) {
-            if (bubble.background is GradientDrawable) {
-                (bubble.background as GradientDrawable).setColor(color)
-            } else {
-                bubble.background = GradientDrawable().apply {
-                    setColor(color)
-                    cornerRadius = 18f * android.content.res.Resources.getSystem().displayMetrics.density
+            tvTypingLabel.text = "${personaName}正在输入..."
+            if (cachedColor != color) {
+                cachedColor = color
+                if (bubble.background is GradientDrawable) {
+                    (bubble.background as GradientDrawable).setColor(color)
+                } else {
+                    bubble.background = GradientDrawable().apply {
+                        setColor(color)
+                        cornerRadius = 18f * android.content.res.Resources.getSystem().displayMetrics.density
+                    }
                 }
             }
             startDotAnimation()

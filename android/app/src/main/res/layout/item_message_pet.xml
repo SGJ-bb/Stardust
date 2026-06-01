@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="4dp"
-    android:gravity="start">
+    android:padding="4dp">
 
     <FrameLayout
         android:id="@+id/frame_ai_avatar"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_marginEnd="6dp"
-        android:layout_gravity="bottom"
         android:clipChildren="false"
-        android:clipToPadding="false">
+        android:clipToPadding="false"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
         <ImageView
             android:id="@+id/iv_ai_avatar_chat"
@@ -24,94 +23,118 @@
             android:src="@drawable/ic_avatar_default_ai" />
     </FrameLayout>
 
-    <LinearLayout
-        android:layout_width="0dp"
+    <FrameLayout
+        android:id="@+id/bubble_pet"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
-
-        <FrameLayout
-            android:id="@+id/bubble_pet"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_message_pet"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:paddingTop="10dp"
-            android:paddingBottom="10dp">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tv_message_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="#e8e8e8"
-                    android:textSize="14sp"
-                    android:lineSpacingExtra="2dp"
-                    android:maxWidth="260dp" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/tv_reaction_badge"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:layout_gravity="bottom|end"
-                android:layout_marginEnd="-4dp"
-                android:layout_marginBottom="-10dp"
-                android:gravity="center"
-                android:textSize="12sp"
-                android:background="@drawable/bg_reaction_badge"
-                android:visibility="gone" />
-        </FrameLayout>
+        android:layout_marginStart="6dp"
+        android:background="@drawable/bg_message_pet"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        app:layout_constrainedWidth="true"
+        app:layout_constraintHorizontal_bias="0"
+        app:layout_constraintTop_toTopOf="@id/frame_ai_avatar"
+        app:layout_constraintStart_toEndOf="@id/frame_ai_avatar"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="2dp"
-            android:layout_marginStart="4dp"
-            android:gravity="center_vertical">
+            android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/tv_message_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="10sp"
-                android:textColor="#999" />
-
-            <TextView
-                android:id="@+id/tv_emotion_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="10sp"
-                android:textColor="#667eea"
-                android:layout_marginStart="8dp"
+            <ImageView
+                android:id="@+id/iv_sticker"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:scaleType="centerCrop"
+                android:padding="0dp"
+                android:contentDescription="贴纸图片"
                 android:visibility="gone" />
 
             <TextView
-                android:id="@+id/btn_feedback_like"
-                android:layout_width="24dp"
-                android:layout_height="18dp"
-                android:text="👍"
-                android:textSize="11sp"
-                android:gravity="center"
-                android:layout_marginStart="8dp"
-                android:alpha="0.0" />
-
-            <TextView
-                android:id="@+id/btn_feedback_dislike"
-                android:layout_width="24dp"
-                android:layout_height="18dp"
-                android:text="👎"
-                android:textSize="11sp"
-                android:gravity="center"
-                android:layout_marginStart="2dp"
-                android:alpha="0.0" />
+                android:id="@+id/tv_message_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/color_text_light_gray"
+                android:textSize="14sp"
+                android:lineSpacingExtra="2dp"
+                android:maxWidth="260dp" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_reaction_badge"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="-4dp"
+            android:layout_marginBottom="-10dp"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:background="@drawable/bg_reaction_badge"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/layout_bottom_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="2dp"
+        android:layout_marginStart="4dp"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toBottomOf="@id/bubble_pet"
+        app:layout_constraintStart_toStartOf="@id/bubble_pet">
+
+        <TextView
+            android:id="@+id/tv_message_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="10sp"
+            android:textColor="@color/color_text_disabled" />
+
+        <ImageView
+            android:id="@+id/iv_voice_btn"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:scaleType="centerInside"
+            android:padding="4dp"
+            android:src="@drawable/ic_voice"
+            android:layout_marginStart="4dp"
+            android:visibility="gone"
+            android:contentDescription="播放语音" />
+
+        <TextView
+            android:id="@+id/tv_emotion_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="10sp"
+            android:textColor="@color/color_emotion_label"
+            android:layout_marginStart="8dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/btn_feedback_like"
+            android:layout_width="24dp"
+            android:layout_height="18dp"
+            android:text="👍"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:layout_marginStart="8dp"
+            android:contentDescription="喜欢"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/btn_feedback_dislike"
+            android:layout_width="24dp"
+            android:layout_height="18dp"
+            android:text="👎"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:layout_marginStart="2dp"
+            android:contentDescription="不喜欢"
+            android:visibility="gone" />
     </LinearLayout>
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

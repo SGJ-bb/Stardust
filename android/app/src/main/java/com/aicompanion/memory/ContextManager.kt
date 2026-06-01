@@ -85,7 +85,7 @@ class ContextManager(private val context: Context, private val personaId: String
 
     suspend fun evaluateAndUpdateMemory(client: ApiClient) {
         if (!shouldEvaluate()) {
-            AppLogger.d(TAG, "evaluateAndUpdateMemory: skipped ($turnsSinceLastEval/$contextTurns turns)")
+            //AppLogger.d(TAG, "evaluateAndUpdateMemory: skipped ($turnsSinceLastEval/$contextTurns turns)")
             return
         }
 
@@ -103,7 +103,7 @@ class ContextManager(private val context: Context, private val personaId: String
             "$userNickname: ${turn.userMsg}\nAI: ${turn.aiMsg}"
         }
 
-        AppLogger.d(TAG, "evaluateAndUpdateMemory: evaluating ${turnsToEval.size} turns (total=$totalTurns, failCount=$evalFailCount)")
+        AppLogger.w(TAG, "evaluateAndUpdateMemory: evaluating ${turnsToEval.size} turns (total=$totalTurns, failCount=$evalFailCount)")
 
         try {
             val result = memoryPool.evaluateTurn(
@@ -145,7 +145,7 @@ class ContextManager(private val context: Context, private val personaId: String
             }
 
             if (memoryPool.needsConsolidate()) {
-                AppLogger.d(TAG, "evaluateAndUpdateMemory: consolidating after eval")
+                //AppLogger.d(TAG, "evaluateAndUpdateMemory: consolidating after eval")
                 memoryPool.consolidate(client)
             }
 
@@ -154,7 +154,7 @@ class ContextManager(private val context: Context, private val personaId: String
             evalFailCount = 0
             saveState()
             cachedContextBlock = null
-            AppLogger.d(TAG, "evaluateAndUpdateMemory: success, ${result.size} entries extracted")
+            AppLogger.w(TAG, "evaluateAndUpdateMemory: success, ${result.size} entries extracted")
         } catch (e: Exception) {
             evalFailCount++
             AppLogger.e(TAG, "evaluateAndUpdateMemory: exception (failCount=$evalFailCount) - ${e.message}")
@@ -182,7 +182,7 @@ class ContextManager(private val context: Context, private val personaId: String
 
     fun getContextBlock(): String {
         cachedContextBlock?.let { return it }
-        val result = globalMemoryPool.getGlobalBlock()
+        val result = getFullContextBlock()
         cachedContextBlock = result
         return result
     }

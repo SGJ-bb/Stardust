@@ -95,7 +95,11 @@ class ScreenCaptureManager(private val context: Context) {
     private fun startForegroundService() {
         try {
             val serviceIntent = Intent(context, ScreenCaptureService::class.java)
-            context.startService(serviceIntent)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
             AppLogger.d(TAG, "ScreenCaptureService start requested")
         } catch (e: Exception) {
             AppLogger.e(TAG, "Failed to start ScreenCaptureService: ${e.message}")
@@ -185,7 +189,9 @@ class ScreenCaptureManager(private val context: Context) {
         buffer.rewind()
         bitmap.copyPixelsFromBuffer(buffer)
         if (rowPadding == 0) return bitmap
-        return Bitmap.createBitmap(bitmap, 0, 0, width, height)
+        val cropped = Bitmap.createBitmap(bitmap, 0, 0, width, height)
+        bitmap.recycle()
+        return cropped
     }
 
     fun captureScreen(): Bitmap? {

@@ -20,6 +20,7 @@ class GlobalMemoryPool(
     }
 
     private val entries = mutableListOf<MemoryEntry>()
+    private val lock = Any()
     private var totalCharCount = 0
     private var writeCount = 0
     private val prefs = context.getSharedPreferences("${PREFS_KEY}_$personaId", Context.MODE_PRIVATE)
@@ -28,14 +29,13 @@ class GlobalMemoryPool(
         loadFromStorage()
     }
 
-    val size: Int get() = entries.size
+    val size: Int get() = synchronized(lock) { entries.size }
 
-    fun addFromScene(scene: String, newEntries: List<MemoryEntry>) {
+    fun addFromScene(scene: String, newEntries: List<MemoryEntry>) = synchronized(lock) {
         for (entry in newEntries) {
             if (!entry.isGlobal) continue
             val existingIdx = entries.indexOfFirst {
-                it.content.contains(entry.content.take(20), ignoreCase = true) ||
-                entry.content.contains(it.content.take(20), ignoreCase = true)
+                it.content == entry.content
             }
             if (existingIdx >= 0) {
                 entries[existingIdx] = entry.copy(isGlobal = true)
@@ -49,7 +49,7 @@ class GlobalMemoryPool(
         saveToStorage()
     }
 
-    fun getGlobalBlock(): String {
+    fun getGlobalBlock(): String = synchronized(lock) {
         if (entries.isEmpty()) return ""
         val sb = StringBuilder()
         sb.appendLine("[跨场景共享记忆]")
@@ -64,12 +64,16 @@ class GlobalMemoryPool(
         return sb.toString().trimEnd()
     }
 
-    fun needsConsolidate(): Boolean = writeCount >= CONSOLIDATE_INTERVAL
+    fun needsConsolidate(): Boolean = synchronized(lock) { writeCount >= CONSOLIDATE_INTERVAL }
 
     suspend fun consolidate(client: ApiClient): Boolean = withContext(Dispatchers.IO) {
-        if (entries.isEmpty()) {
-            writeCount = 0
-            return@withContext false
+        val entriesCopy: List<MemoryEntry>
+        synchronized(lock) {
+            if (entries.isEmpty()) {
+                writeCount = 0
+                return@withContext false
+            }
+            entriesCopy = entries.toList()
         }
 
         val fullPool = getGlobalBlock()
@@ -91,11 +95,13 @@ class GlobalMemoryPool(
             if (response != null && response.text.isNotBlank()) {
                 val newEntries = parseConsolidatedResult(response.text)
                 if (newEntries.isNotEmpty()) {
-                    entries.clear()
-                    entries.addAll(newEntries.map { it.copy(isGlobal = true) })
-                    recalcCharCount()
+                    synchronized(lock) {
+                        entries.clear()
+                        entries.addAll(newEntries.map { it.copy(isGlobal = true) })
+                        recalcCharCount()
+                        writeCount = 0
+                    }
                     saveToStorage()
-                    writeCount = 0
                     return@withContext true
                 }
             }
@@ -132,8 +138,8 @@ class GlobalMemoryPool(
 
     private fun trimToLimit() {
         while ((totalCharCount > MAX_CHARS || entries.size > MAX_ENTRIES) && entries.size > 1) {
-            entries.removeAt(0)
-            recalcCharCount()
+            val removed = entries.removeAt(0)
+            totalCharCount -= removed.content.length
         }
     }
 

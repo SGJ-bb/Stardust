@@ -288,10 +288,15 @@ class MomentsActivity : AppCompatActivity() {
     }
 
     private fun triggerAiReplyToUserMoment(moment: Moment) {
-        val apiClient = AppContainer.apiClient ?: return
+        val apiClient = AppContainer.apiClient
+        if (apiClient == null) {
+            com.aicompanion.util.AppLogger.e("MomentsActivity", "triggerAiReplyToUserMoment: apiClient为null")
+            return
+        }
         val persona = getPersonaInfo()
         val activeId = getSharedPreferences("app_prefs", MODE_PRIVATE)
             .getString("active_persona_id", "default") ?: "default"
+        com.aicompanion.util.AppLogger.w("MomentsActivity", "triggerAiReplyToUserMoment: persona=${persona.first}, activeId=$activeId, content=${moment.content.take(30)}")
         lifecycleScope.launch {
             val reply = momentsManager.generateAiCommentOnUserMoment(
                 apiClient,
@@ -300,6 +305,7 @@ class MomentsActivity : AppCompatActivity() {
                 moment.content,
                 activeId
             )
+            com.aicompanion.util.AppLogger.w("MomentsActivity", "triggerAiReplyToUserMoment: reply=${reply?.take(50) ?: "null"}")
             if (reply != null) {
                 momentsManager.addComment(moment.id, Comment(
                     id = java.util.UUID.randomUUID().toString(),

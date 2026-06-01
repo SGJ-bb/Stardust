@@ -20,7 +20,7 @@ class BootReceiver : BroadcastReceiver() {
             taskManager.rescheduleOnBoot()
 
             val settingsManager = SettingsManager(context)
-            if (settingsManager.autoStart) {
+            if (settingsManager.autoStart && settingsManager.backgroundRunning) {
                 try {
                     val serviceIntent = Intent(context, BackgroundService::class.java)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

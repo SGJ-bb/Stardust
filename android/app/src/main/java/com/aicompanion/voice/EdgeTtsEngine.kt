@@ -32,7 +32,17 @@ object EdgeTtsEngine {
     private const val WIN_EPOCH = 11644473600.0
     private const val S_TO_NS = 1e9
 
+    @Volatile
     private var clockSkewSeconds = 0.0
+    private val clockSkewLock = Any()
+
+    private val sharedClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
 
     val VOICES = listOf(
         Voice("zh-CN-XiaoxiaoNeural", "晓晓", "女", "zh-CN"),
@@ -67,7 +77,8 @@ object EdgeTtsEngine {
     }
 
     private fun generateSecMsGec(): String {
-        var ticks = System.currentTimeMillis() / 1000.0 + clockSkewSeconds
+        var ticks = System.currentTimeMillis() / 1000.0
+        synchronized(clockSkewLock) { ticks += clockSkewSeconds }
         ticks += WIN_EPOCH
         ticks -= ticks % 300
         ticks *= S_TO_NS / 100
@@ -89,8 +100,10 @@ object EdgeTtsEngine {
             val sdf = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
             val serverTimestamp = sdf.parse(serverDate)?.time?.div(1000.0) ?: return
             val clientTimestamp = System.currentTimeMillis() / 1000.0
-            clockSkewSeconds += serverTimestamp - clientTimestamp
-            AppLogger.i(TAG, "Clock skew adjusted: ${clockSkewSeconds}s")
+            synchronized(clockSkewLock) {
+                clockSkewSeconds += serverTimestamp - clientTimestamp
+            }
+            //AppLogger.i(TAG, "Clock skew adjusted: ${clockSkewSeconds}s")
         } catch (e: Exception) {
             AppLogger.w(TAG, "Failed to adjust clock skew: ${e.message}")
         }
@@ -102,11 +115,7 @@ object EdgeTtsEngine {
         outputDir: File,
         rate: Float = 1.0f,
         pitch: Float = 1.0f,
-        client: OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(10, TimeUnit.SECONDS)
-            .build()
+        client: OkHttpClient = sharedClient
     ): TtsResult = withContext(Dispatchers.IO) {
         if (text.isBlank()) return@withContext TtsResult(null, null, false, "文本为空")
 

@@ -12,7 +12,7 @@ import org.json.JSONObject
 
 class MemoryManager(private val context: Context, private val personaId: String = "default") {
 
-    private val apiClient = ApiClient("")
+    private val apiClient = ApiClient(com.aicompanion.settings.SettingsManager(context).chatApiUrl)
     private val localPrefs: SharedPreferences = context.getSharedPreferences("local_memory_$personaId", Context.MODE_PRIVATE)
     private var localMemories: MutableList<MemoryFact> = mutableListOf()
 
@@ -101,14 +101,15 @@ class MemoryManager(private val context: Context, private val personaId: String 
     suspend fun loadMemories(userId: String, limit: Int = 20): List<MemoryFact> {
         return try {
             val cloud = apiClient.getMemories(userId, limit)
-            localMemories = (cloud + localMemories)
-                .distinctBy { it.id }
+            val localOnly = localMemories.filter { local -> cloud.none { it.id == local.id } }
+            localMemories = (cloud + localOnly)
                 .sortedByDescending { it.timestamp }
                 .take(100)
                 .toMutableList()
             saveLocalCache()
             cloud
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AppLogger.e("MemoryManager", "loadMemories failed: ${e.message}")
             localMemories.take(limit)
         }
     }

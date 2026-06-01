@@ -39,6 +39,7 @@ class Live2DWebView @JvmOverloads constructor(
     private var onModelLoaded: ((Boolean) -> Unit)? = null
     var isDestroyed = false
         private set
+    @Volatile
     private var modelBasePath: String = ""
     private var onModelInfo: ((Float, Float, Float) -> Unit)? = null
     var touchHandler: ((MotionEvent) -> Boolean)? = null
@@ -80,7 +81,8 @@ class Live2DWebView @JvmOverloads constructor(
             egl.eglDestroyContext(display, context)
             egl.eglTerminate(display)
             addLog("GPU maxTextureSize detected: ${maxTex[0]}")
-            maxTex[0].coerceIn(2048, 8192)
+            val raw = maxTex[0].coerceIn(2048, 8192)
+            if (isPowerOfTwo(raw)) raw else Integer.highestOneBit(raw)
         } catch (e: Exception) {
             addLog("GPU detection failed: ${e.message}, using 4096")
             4096
@@ -123,7 +125,7 @@ class Live2DWebView @JvmOverloads constructor(
                     try {
                         val canonical = file.canonicalPath
                         if (canonical.startsWith(modelDir.canonicalPath)) {
-                            val mime = serverMime(uri)
+                            val mime = serverMime(decodedUri)
                             val fis = file.inputStream()
                             return newFixedLengthResponse(Response.Status.OK, mime, fis, file.length()).apply {
                                 addHeader("Access-Control-Allow-Origin", "*")
@@ -811,7 +813,10 @@ class Live2DWebView @JvmOverloads constructor(
                             if (texFile.exists()) {
                                 validTextures.put(texPath)
                             } else {
-                                val found = findFileByName(texFile.name, modelDir)
+                                var found = findFileByName(texFile.name, modelDir)
+                                if (found == null && modelDir.parentFile != null) {
+                                    found = findFileByName(texFile.name, modelDir.parentFile)
+                                }
                                 if (found != null) {
                                     val newPath = found.relativeTo(modelDir).path.replace("\\", "/")
                                     validTextures.put(newPath)
@@ -1122,60 +1127,67 @@ class Live2DWebView @JvmOverloads constructor(
 
     fun loadLive2DModelFromAssets(modelJsonPath: String) {
         if (isDestroyed) return
-        try {
-            copyModelFromAssets(modelJsonPath)
-            val modelDir = modelJsonPath.substringBeforeLast("/")
-            val localDirName = modelDir.replace("vtuber/", "")
-            val localDir = File(modelCacheDir, localDirName)
+        coroutineScope.launch {
+            try {
+                var htmlFilePath = ""
+                withContext(Dispatchers.IO) {
+                    copyModelFromAssets(modelJsonPath)
+                    val modelDir = modelJsonPath.substringBeforeLast("/")
+                    val localDirName = modelDir.replace("vtuber/", "")
+                    val localDir = File(modelCacheDir, localDirName)
 
-            checkAndCompressTextures(localDir)
+                    checkAndCompressTextures(localDir)
 
-            val cachedModelJson = findModelJsonRecursive(localDir)
-            if (cachedModelJson == null) {
-                addLog("ERROR: model JSON not found in cache after asset copy")
+                    val cachedModelJson = findModelJsonRecursive(localDir)
+                    if (cachedModelJson == null) {
+                        addLog("ERROR: model JSON not found in cache after asset copy")
+                        withContext(Dispatchers.Main) { onModelLoaded?.invoke(false) }
+                        return@withContext
+                    }
+
+                    val modelDirFile = cachedModelJson.parentFile ?: localDir
+                    modelBasePath = modelDirFile.absolutePath
+                    textureCache.clear()
+
+                    validateAndFixModel(cachedModelJson, modelDirFile)
+
+                    val modelJsonFile = modelJsonPath.substringAfterLast("/")
+                    val html = buildLive2DHtml(modelJsonFile)
+                    val htmlFile = File(modelDirFile, "view.html")
+                    htmlFile.writeText(html, Charsets.UTF_8)
+                    htmlFilePath = htmlFile.absolutePath
+                }
+
+                ensureServerRunning()
+                if (serverPort > 0) {
+                    addLog("Loading from assets via HTTP: http://127.0.0.1:$serverPort/view.html")
+                    post {
+                        if (!isDestroyed) {
+                            loadUrl("about:blank")
+                            postDelayed({
+                                if (!isDestroyed) {
+                                    loadUrl("http://127.0.0.1:$serverPort/view.html")
+                                }
+                            }, 100)
+                        }
+                    }
+                } else {
+                    val htmlFile = File(htmlFilePath)
+                    post {
+                        if (!isDestroyed) {
+                            loadUrl("about:blank")
+                            postDelayed({
+                                if (!isDestroyed) {
+                                    loadUrl("file://" + htmlFile.absolutePath)
+                                }
+                            }, 100)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                addLog("Exception: ${e.message}")
                 onModelLoaded?.invoke(false)
-                return
             }
-
-            val modelDirFile = cachedModelJson.parentFile ?: localDir
-            modelBasePath = modelDirFile.absolutePath
-            textureCache.clear()
-
-            validateAndFixModel(cachedModelJson, modelDirFile)
-
-            val modelJsonFile = modelJsonPath.substringAfterLast("/")
-            val html = buildLive2DHtml(modelJsonFile)
-            val htmlFile = File(modelDirFile, "view.html")
-            htmlFile.writeText(html, Charsets.UTF_8)
-
-            ensureServerRunning()
-            if (serverPort > 0) {
-                addLog("Loading from assets via HTTP: http://127.0.0.1:$serverPort/view.html")
-                post {
-                    if (!isDestroyed) {
-                        loadUrl("about:blank")
-                        postDelayed({
-                            if (!isDestroyed) {
-                                loadUrl("http://127.0.0.1:$serverPort/view.html")
-                            }
-                        }, 100)
-                    }
-                }
-            } else {
-                post {
-                    if (!isDestroyed) {
-                        loadUrl("about:blank")
-                        postDelayed({
-                            if (!isDestroyed) {
-                                loadUrl("file://" + htmlFile.absolutePath)
-                            }
-                        }, 100)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            addLog("Exception: ${e.message}")
-            onModelLoaded?.invoke(false)
         }
     }
 
@@ -1237,25 +1249,27 @@ class Live2DWebView @JvmOverloads constructor(
                     val w = options.outWidth
                     val h = options.outHeight
 
-                    var targetW = minOf(w, maxTextureSize)
-                    var targetH = minOf(h, maxTextureSize)
+                    var targetW = w
+                    var targetH = h
                     if (w > maxTextureSize || h > maxTextureSize) {
                         val scale = minOf(maxTextureSize.toFloat() / w, maxTextureSize.toFloat() / h)
                         targetW = (w * scale).toInt()
                         targetH = (h * scale).toInt()
                     }
 
-                    val maxPixels = 2048 * 2048
+                    val maxPixels = maxTextureSize * maxTextureSize
                     if (targetW * targetH > maxPixels) {
                         val extraScale = Math.sqrt((targetW * targetH).toDouble() / maxPixels)
                         targetW = (targetW / extraScale).toInt().coerceAtLeast(256)
                         targetH = (targetH / extraScale).toInt().coerceAtLeast(256)
                         addLog("Capped to ${targetW}x${targetH} to avoid OOM")
                     }
+                    addLog("Target: ${w}x${h} -> ${targetW}x${targetH}")
 
                     val inSampleSize = calculateInSampleSize(options, targetW, targetH)
                     val decodeOpts = BitmapFactory.Options().apply {
                         inPreferredConfig = Bitmap.Config.ARGB_8888
+                        inPremultiplied = false
                         this.inSampleSize = inSampleSize
                     }
 
@@ -1392,6 +1406,19 @@ class Live2DWebView @JvmOverloads constructor(
         return inSampleSize
     }
 
+    private fun isPowerOfTwo(n: Int): Boolean = n > 0 && (n and (n - 1)) == 0
+
+    private fun nextPOT(n: Int): Int {
+        if (n <= 1) return 1
+        var v = n - 1
+        v = v or (v shr 1)
+        v = v or (v shr 2)
+        v = v or (v shr 4)
+        v = v or (v shr 8)
+        v = v or (v shr 16)
+        return v + 1
+    }
+
     private fun copyModelFromAssets(modelJsonPath: String) {
         try {
             val assetManager = context.assets
@@ -1450,18 +1477,42 @@ class Live2DWebView @JvmOverloads constructor(
         }
     }
 
+    fun tapModelRegion(x: Float, y: Float, modelHeight: Float) {
+        if (isDestroyed) return
+        val normalizedY = y / modelHeight.coerceAtLeast(1f)
+        val region = when {
+            normalizedY < 0.25f -> "head"
+            normalizedY < 0.5f -> "face"
+            else -> "body"
+        }
+        val js = when (region) {
+            "head" -> "if(window.triggerLive2DAction)window.triggerLive2DAction('tap_head')"
+            "face" -> "if(window.triggerLive2DAction)window.triggerLive2DAction('tap_face')"
+            else -> "if(window.triggerLive2DAction)window.triggerLive2DAction('tap_body')"
+        }
+        post {
+            try {
+                evaluateJavascript(js, null)
+            } catch (e: Exception) { AppLogger.e("Live2D", "tapModelRegion: ${e.message}") }
+        }
+    }
+
     fun setEmotion(emotion: Emotion) {
         if (isDestroyed) return
-        try {
-            evaluateJavascript("window.setLive2DEmotion && window.setLive2DEmotion('${emotion.name.lowercase()}')", null)
-        } catch (e: Exception) { AppLogger.e("Live2D", "setEmotion: ${e.message}") }
+        post {
+            try {
+                evaluateJavascript("window.setLive2DEmotion && window.setLive2DEmotion('${emotion.name.lowercase()}')", null)
+            } catch (e: Exception) { AppLogger.e("Live2D", "setEmotion: ${e.message}") }
+        }
     }
 
     fun setAction(action: Action) {
         if (isDestroyed) return
-        try {
-            evaluateJavascript("window.triggerLive2DAction && window.triggerLive2DAction('${action.name.lowercase()}')", null)
-        } catch (e: Exception) { AppLogger.e("Live2D", "setAction: ${e.message}") }
+        post {
+            try {
+                evaluateJavascript("window.triggerLive2DAction && window.triggerLive2DAction('${action.name.lowercase()}')", null)
+            } catch (e: Exception) { AppLogger.e("Live2D", "setAction: ${e.message}") }
+        }
     }
 
     fun setAdjustMode(enabled: Boolean) {
@@ -1588,11 +1639,40 @@ class Live2DWebView @JvmOverloads constructor(
 
                         app = new PIXI.Application({
                             view: canvas, width: w, height: h, backgroundAlpha: 0,
-                            antialias: true, autoStart: true,
-                            resolution: window.devicePixelRatio || 1
+                            antialias: false, autoStart: true,
+                            resolution: Math.min(window.devicePixelRatio || 1, 2)
                         });
+                        if(app.ticker) app.ticker.targetFPS = 24;
+
+                        try {
+                            var _gl = app.renderer.gl;
+                            if (_gl) {
+                                var _origTexParameteri = _gl.texParameteri.bind(_gl);
+                                _gl.texParameteri = function(target, pname, param) {
+                                    if (target === _gl.TEXTURE_2D) {
+                                        if (pname === _gl.TEXTURE_MIN_FILTER) {
+                                            if (param === _gl.LINEAR_MIPMAP_LINEAR || param === _gl.LINEAR_MIPMAP_NEAREST ||
+                                                param === _gl.NEAREST_MIPMAP_LINEAR || param === _gl.NEAREST_MIPMAP_NEAREST) {
+                                                return _origTexParameteri(target, pname, _gl.LINEAR);
+                                            }
+                                        }
+                                        if ((pname === _gl.TEXTURE_WRAP_S || pname === _gl.TEXTURE_WRAP_T) &&
+                                            (param === _gl.REPEAT || param === _gl.MIRRORED_REPEAT)) {
+                                            return _origTexParameteri(target, pname, _gl.CLAMP_TO_EDGE);
+                                        }
+                                    }
+                                    return _origTexParameteri(target, pname, param);
+                                };
+                                var _origGenerateMipmap = _gl.generateMipmap.bind(_gl);
+                                _gl.generateMipmap = function(target) {
+                                    return;
+                                };
+                                step('GL texture patch applied');
+                            }
+                        } catch(e) { step('GL patch failed: ' + e.message); }
+
                         step('OK');
-                        var modelPath = '$modelFileName';
+                        var modelPath = '${modelFileName.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")}';
                         step('Model: ' + modelPath);
                         step('Loading...');
                         PIXI.live2d.Live2DModel.from(modelPath, {
@@ -1602,6 +1682,36 @@ class Live2DWebView @JvmOverloads constructor(
                             model = m;
                             modelNaturalW = m.width; modelNaturalH = m.height;
                             step('Size: ' + m.width + 'x' + m.height);
+
+                            try {
+                                var internalModel = m.internalModel;
+                                if (internalModel) {
+                                    var textures = internalModel.textures;
+                                    if (textures) {
+                                        step('Texture count: ' + textures.length);
+                                        for (var ti = 0; ti < textures.length; ti++) {
+                                            var tex = textures[ti];
+                                            var texInfo = tex ? ('valid=' + tex.valid + ', w=' + tex.width + ', h=' + tex.height + ', baseTexture=' + (tex.baseTexture ? tex.baseTexture.hasLoaded : 'null')) : 'null';
+                                            step('Texture[' + ti + ']: ' + texInfo);
+                                        }
+                                    } else {
+                                        step('WARN: internalModel.textures is null');
+                                    }
+                                }
+                            } catch(texCheckErr) {
+                                step('Texture check error: ' + texCheckErr.message);
+                            }
+
+                            try {
+                                var gl = app.renderer.gl;
+                                if (gl) {
+                                    var errCode = gl.getError();
+                                    if (errCode !== gl.NO_ERROR) {
+                                        step('WARN: GL error after model load: 0x' + errCode.toString(16));
+                                    }
+                                }
+                            } catch(glErr) { }
+
                             m.anchor.set(0.5, 0.5);
                             var sx = w / m.width, sy = h / m.height;
                             baseScale = Math.min(sx, sy) * 0.8;
@@ -1632,7 +1742,17 @@ class Live2DWebView @JvmOverloads constructor(
                                             var tReq = new XMLHttpRequest();
                                             tReq.open('GET', tex, false);
                                             tReq.send();
-                                            step('Texture[' + idx + '] ' + tex + ' status=' + tReq.status);
+                                            step('Texture[' + idx + '] ' + tex + ' status=' + tReq.status + ' size=' + tReq.responseText.length);
+                                            if (tReq.status === 200) {
+                                                try {
+                                                    var img = new Image();
+                                                    img.onload = function() { step('Texture[' + idx + '] decoded OK: ' + img.width + 'x' + img.height); };
+                                                    img.onerror = function() { step('Texture[' + idx + '] DECODE FAILED - image may be corrupted or wrong format'); };
+                                                    img.src = tex;
+                                                } catch(imgErr) { step('Texture[' + idx + '] img test error: ' + imgErr.message); }
+                                            } else {
+                                                step('Texture[' + idx + '] HTTP ' + tReq.status + ' - file not found on server');
+                                            }
                                         } catch(texEx) {
                                             step('Texture[' + idx + '] ' + tex + ' ERROR: ' + texEx.message);
                                         }
@@ -1690,19 +1810,52 @@ class Live2DWebView @JvmOverloads constructor(
                     }, 3000);
                 }
 
+                var EMOTION_MAP = {
+                    'happy': ['happy','smile','joy','laugh','glad','f01','f02','f03','smirk'],
+                    'angry': ['angry','mad','fury','rage','f04','f05'],
+                    'sad': ['sad','cry','tears','depressed','f06','f07'],
+                    'surprised': ['surprised','shock','amazed','f08','f09'],
+                    'tsundere': ['tsundere','shy','blush','embarrassed','f10'],
+                    'neutral': ['neutral','default','idle','normal','f00']
+                };
+                var ACTION_MAP = {
+                    'tail_flick': ['tail','flick','sway','idle','tapbody','tap'],
+                    'ear_twitch': ['ear','twitch','blink','idle','tapbody','tap'],
+                    'blush': ['blush','shy','flick','idle','tapbody','tap'],
+                    'stretch': ['stretch','body','idle','tapbody','tap'],
+                    'yawn': ['yawn','body','idle','tapbody','tap'],
+                    'idle': ['idle','stand','breath'],
+                    'tap': ['tap','tapbody','click'],
+                    'tap_head': ['taphead','head','pat','tap'],
+                    'tap_face': ['tapface','face','touch','tap'],
+                    'tap_body': ['tapbody','body','poke','tap']
+                };
+
                 window.setLive2DEmotion = function(emotion) {
                     if (!model) return;
                     try {
                         var expressions = model.internalModel.settings.expressions || [];
-                        if (expressions.length > 0) {
-                            var best = null;
+                        if (expressions.length === 0) return;
+                        var emotionLower = (emotion || '').toLowerCase();
+                        var candidates = EMOTION_MAP[emotionLower] || [emotionLower];
+                        var best = null;
+                        for (var c = 0; c < candidates.length && !best; c++) {
                             for (var i = 0; i < expressions.length; i++) {
                                 var nm = (expressions[i].name || '').toLowerCase();
-                                if (nm === emotion || nm.indexOf(emotion) !== -1 || emotion.indexOf(nm) !== -1) {
-                                    best = expressions[i].name; break;
+                                if (nm === candidates[c]) { best = expressions[i].name; break; }
+                            }
+                        }
+                        if (!best) {
+                            for (var c = 0; c < candidates.length && !best; c++) {
+                                for (var i = 0; i < expressions.length; i++) {
+                                    var nm = (expressions[i].name || '').toLowerCase();
+                                    if (nm.indexOf(candidates[c]) !== -1) { best = expressions[i].name; break; }
                                 }
                             }
-                            if (best) { model.expression(best); return; }
+                        }
+                        if (best) {
+                            model.expression(best);
+                            try { Live2DBridge.onEmotionChanged(best); } catch(e) {}
                         }
                     } catch(e) {}
                 };
@@ -1712,9 +1865,31 @@ class Live2DWebView @JvmOverloads constructor(
                     try {
                         var motions = model.internalModel.settings.motions || {};
                         var keys = Object.keys(motions);
-                        if (motions['TapBody'] && motions['TapBody'].length > 0) model.motion('TapBody');
-                        else if (motions['Tap'] && motions['Tap'].length > 0) model.motion('Tap');
-                        else if (keys.length > 0) model.motion(keys[0]);
+                        if (keys.length === 0) return;
+                        var actionLower = (action || '').toLowerCase();
+                        var candidates = ACTION_MAP[actionLower] || [actionLower];
+                        var bestGroup = null;
+                        for (var c = 0; c < candidates.length && !bestGroup; c++) {
+                            for (var k = 0; k < keys.length; k++) {
+                                var kn = keys[k].toLowerCase();
+                                if (kn === candidates[c]) { bestGroup = keys[k]; break; }
+                            }
+                        }
+                        if (!bestGroup) {
+                            for (var c = 0; c < candidates.length && !bestGroup; c++) {
+                                for (var k = 0; k < keys.length; k++) {
+                                    var kn = keys[k].toLowerCase();
+                                    if (kn.indexOf(candidates[c]) !== -1) { bestGroup = keys[k]; break; }
+                                }
+                            }
+                        }
+                        if (!bestGroup) return;
+                        var motionList = motions[bestGroup];
+                        if (motionList && motionList.length > 0) {
+                            var idx = Math.floor(Math.random() * motionList.length);
+                            model.motion(bestGroup, idx);
+                            try { Live2DBridge.onActionTriggered(bestGroup); } catch(e) {}
+                        }
                     } catch(e) {}
                 };
 
@@ -1769,18 +1944,22 @@ class Live2DWebView @JvmOverloads constructor(
 
         addLog("Default model not found at: $defaultPath")
         addLog("Searching for models in: ${context.filesDir.path}")
-        try {
-            val filesDir = context.filesDir
-            val foundModels = filesDir.walkTopDown().filter { it.name.endsWith(".model3.json") || it.name.endsWith(".model.json") }.toList()
-            if (foundModels.isNotEmpty()) {
-                val firstModel = foundModels.first()
-                addLog("  Found ${foundModels.size} model(s), loading first: ${firstModel.absolutePath}")
-                loadLive2DModelFromPath(firstModel.absolutePath)
-            } else {
-                addLog("  No models found")
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val filesDir = context.filesDir
+                val foundModels = filesDir.walkTopDown().filter { it.name.endsWith(".model3.json") || it.name.endsWith(".model.json") }.toList()
+                if (foundModels.isNotEmpty()) {
+                    val firstModel = foundModels.first()
+                    withContext(Dispatchers.Main) {
+                        addLog("  Found ${foundModels.size} model(s), loading first: ${firstModel.absolutePath}")
+                        loadLive2DModelFromPath(firstModel.absolutePath)
+                    }
+                } else {
+                    withContext(Dispatchers.Main) { addLog("  No models found") }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { addLog("  Search error: ${e.message}") }
             }
-        } catch (e: Exception) {
-            addLog("  Search error: ${e.message}")
         }
     }
 
@@ -1791,6 +1970,28 @@ class Live2DWebView @JvmOverloads constructor(
         } else {
             addLog("Default model not found")
         }
+    }
+
+    fun pauseRendering() {
+        try {
+            post {
+                if (!isDestroyed) {
+                    evaluateJavascript("if(typeof app!=='undefined'&&app.ticker){app.ticker.stop();}", null)
+                    onPause()
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun resumeRendering() {
+        try {
+            post {
+                if (!isDestroyed) {
+                    onResume()
+                    evaluateJavascript("if(typeof app!=='undefined'&&app.ticker){app.ticker.start();}", null)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     override fun destroy() {

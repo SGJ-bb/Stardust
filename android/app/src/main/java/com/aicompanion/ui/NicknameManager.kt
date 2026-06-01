@@ -10,8 +10,8 @@ data class NicknameEntry(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-class NicknameManager(context: Context) {
-    private val prefs = context.getSharedPreferences("nickname_data", Context.MODE_PRIVATE)
+class NicknameManager(context: Context, private val personaId: String = "default") {
+    private val prefs = context.getSharedPreferences("nickname_data_$personaId", Context.MODE_PRIVATE)
 
     fun getManualNickname(): String = prefs.getString("manual_nickname", "") ?: ""
 

@@ -17,6 +17,7 @@ data class ProviderProfile(
     val defaultMaxTokens: Int = 500,
     val supportsFreqPenalty: Boolean = true,
     val supportsPresPenalty: Boolean = true,
+    val supportsVision: Boolean = false,
     val paramHints: Map<String, String> = emptyMap()
 ) {
     companion object {
@@ -24,9 +25,10 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "custom",
                 displayName = "自定义",
-                apiUrl = "",
-                defaultModel = "",
+                apiUrl = ServicePresets.getLlmUrl("custom"),
+                defaultModel = ServicePresets.getLlmDefaultModel("custom"),
                 maxTokensLimit = 131072,
+                supportsVision = true,
                 paramHints = mapOf(
                     "freq_penalty" to "部分API不支持此参数",
                     "pres_penalty" to "部分API不支持此参数"
@@ -35,8 +37,8 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "openai",
                 displayName = "OpenAI",
-                apiUrl = "https://api.openai.com/v1/chat/completions",
-                defaultModel = "gpt-4o-mini",
+                apiUrl = ServicePresets.getLlmUrl("openai"),
+                defaultModel = ServicePresets.getLlmDefaultModel("openai"),
                 tempRange = 0f..2f,
                 topPRange = 0f..1f,
                 freqPenaltyRange = (-2f)..2f,
@@ -46,13 +48,14 @@ data class ProviderProfile(
                 defaultTopP = 0.9f,
                 defaultFreqPenalty = 0f,
                 defaultPresPenalty = 0f,
-                defaultMaxTokens = 1024
+                defaultMaxTokens = 1024,
+                supportsVision = true
             ),
             ProviderProfile(
                 id = "deepseek",
                 displayName = "DeepSeek",
-                apiUrl = "https://api.deepseek.com/v1/chat/completions",
-                defaultModel = "deepseek-v4-flash",
+                apiUrl = ServicePresets.getLlmUrl("deepseek"),
+                defaultModel = ServicePresets.getLlmDefaultModel("deepseek"),
                 tempRange = 0f..2f,
                 topPRange = 0f..1f,
                 freqPenaltyRange = 0f..2f,
@@ -63,6 +66,7 @@ data class ProviderProfile(
                 defaultFreqPenalty = 0f,
                 defaultPresPenalty = 0f,
                 defaultMaxTokens = 4096,
+                supportsVision = true,
                 paramHints = mapOf(
                     "freq_penalty" to "DeepSeek: 仅支持0~2(无负数)",
                     "pres_penalty" to "DeepSeek: 仅支持0~2(无负数)",
@@ -72,8 +76,8 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "aliyun",
                 displayName = "阿里云百炼",
-                apiUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-                defaultModel = "qwen-plus",
+                apiUrl = ServicePresets.getLlmUrl("aliyun"),
+                defaultModel = ServicePresets.getLlmDefaultModel("aliyun"),
                 tempRange = 0f..2f,
                 topPRange = 0f..1f,
                 freqPenaltyRange = null,
@@ -84,6 +88,7 @@ data class ProviderProfile(
                 defaultMaxTokens = 2048,
                 supportsFreqPenalty = false,
                 supportsPresPenalty = false,
+                supportsVision = true,
                 paramHints = mapOf(
                     "freq_penalty" to "阿里云百炼不支持此参数",
                     "pres_penalty" to "阿里云百炼不支持此参数"
@@ -92,8 +97,8 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "qwen",
                 displayName = "通义千问",
-                apiUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-                defaultModel = "qwen-max",
+                apiUrl = ServicePresets.getLlmUrl("qwen"),
+                defaultModel = ServicePresets.getLlmDefaultModel("qwen"),
                 tempRange = 0f..2f,
                 topPRange = 0f..1f,
                 freqPenaltyRange = null,
@@ -104,6 +109,7 @@ data class ProviderProfile(
                 defaultMaxTokens = 2048,
                 supportsFreqPenalty = false,
                 supportsPresPenalty = false,
+                supportsVision = true,
                 paramHints = mapOf(
                     "freq_penalty" to "通义千问不支持此参数",
                     "pres_penalty" to "通义千问不支持此参数"
@@ -112,8 +118,8 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "zhipu",
                 displayName = "智谱AI",
-                apiUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-                defaultModel = "glm-4-flash",
+                apiUrl = ServicePresets.getLlmUrl("zhipu"),
+                defaultModel = ServicePresets.getLlmDefaultModel("zhipu"),
                 tempRange = 0f..1f,
                 topPRange = 0f..1f,
                 freqPenaltyRange = null,
@@ -124,6 +130,7 @@ data class ProviderProfile(
                 defaultMaxTokens = 2048,
                 supportsFreqPenalty = false,
                 supportsPresPenalty = false,
+                supportsVision = true,
                 paramHints = mapOf(
                     "temperature" to "智谱AI: 温度范围0~1",
                     "freq_penalty" to "智谱AI不支持此参数",
@@ -133,8 +140,8 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "minimax",
                 displayName = "MiniMax",
-                apiUrl = "https://api.minimax.chat/v1/text/chatcompletion_v2",
-                defaultModel = "MiniMax-Text-01",
+                apiUrl = ServicePresets.getLlmUrl("minimax"),
+                defaultModel = ServicePresets.getLlmDefaultModel("minimax"),
                 tempRange = 0f..1f,
                 topPRange = 0f..1f,
                 freqPenaltyRange = null,
@@ -145,6 +152,7 @@ data class ProviderProfile(
                 defaultMaxTokens = 2048,
                 supportsFreqPenalty = false,
                 supportsPresPenalty = false,
+                supportsVision = true,
                 paramHints = mapOf(
                     "temperature" to "MiniMax: 温度范围0~1",
                     "freq_penalty" to "MiniMax不支持此参数",
@@ -154,8 +162,8 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "moonshot",
                 displayName = "月之暗面",
-                apiUrl = "https://api.moonshot.cn/v1/chat/completions",
-                defaultModel = "moonshot-v1-8k",
+                apiUrl = ServicePresets.getLlmUrl("moonshot"),
+                defaultModel = ServicePresets.getLlmDefaultModel("moonshot"),
                 tempRange = 0f..1f,
                 topPRange = 0f..1f,
                 freqPenaltyRange = null,
@@ -166,6 +174,7 @@ data class ProviderProfile(
                 defaultMaxTokens = 2048,
                 supportsFreqPenalty = false,
                 supportsPresPenalty = false,
+                supportsVision = true,
                 paramHints = mapOf(
                     "temperature" to "月之暗面: 温度范围0~1",
                     "freq_penalty" to "月之暗面不支持此参数",
@@ -175,12 +184,13 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "n1n",
                 displayName = "n1n",
-                apiUrl = "https://api.n1n.ai/v1/chat/completions",
-                defaultModel = "gpt-4o-mini",
+                apiUrl = ServicePresets.getLlmUrl("n1n"),
+                defaultModel = ServicePresets.getLlmDefaultModel("n1n"),
                 maxTokensLimit = 32768,
                 defaultTemp = 1.0f,
                 defaultTopP = 0.9f,
                 defaultMaxTokens = 1024,
+                supportsVision = true,
                 paramHints = mapOf(
                     "max_tokens" to "具体限制取决于所选模型"
                 )
@@ -188,8 +198,8 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "siliconflow",
                 displayName = "硅基流动",
-                apiUrl = "https://api.siliconflow.cn/v1/chat/completions",
-                defaultModel = "Qwen/Qwen2.5-7B-Instruct",
+                apiUrl = ServicePresets.getLlmUrl("siliconflow"),
+                defaultModel = ServicePresets.getLlmDefaultModel("siliconflow"),
                 tempRange = 0f..2f,
                 topPRange = 0f..1f,
                 freqPenaltyRange = null,
@@ -200,6 +210,7 @@ data class ProviderProfile(
                 defaultMaxTokens = 2048,
                 supportsFreqPenalty = false,
                 supportsPresPenalty = false,
+                supportsVision = true,
                 paramHints = mapOf(
                     "freq_penalty" to "硅基流动部分模型不支持此参数",
                     "pres_penalty" to "硅基流动部分模型不支持此参数",
@@ -209,8 +220,8 @@ data class ProviderProfile(
             ProviderProfile(
                 id = "openrouter",
                 displayName = "OpenRouter",
-                apiUrl = "https://openrouter.ai/api/v1/chat/completions",
-                defaultModel = "google/gemini-2.0-flash-001",
+                apiUrl = ServicePresets.getLlmUrl("openrouter"),
+                defaultModel = ServicePresets.getLlmDefaultModel("openrouter"),
                 tempRange = 0f..2f,
                 topPRange = 0f..1f,
                 freqPenaltyRange = (-2f)..2f,
@@ -219,6 +230,7 @@ data class ProviderProfile(
                 defaultTemp = 1.0f,
                 defaultTopP = 0.9f,
                 defaultMaxTokens = 4096,
+                supportsVision = true,
                 paramHints = mapOf(
                     "max_tokens" to "具体限制取决于所选模型"
                 )
@@ -239,6 +251,10 @@ data class ProviderProfile(
 
         fun shouldSendPresPenalty(providerId: String): Boolean {
             return getProfile(providerId).supportsPresPenalty
+        }
+
+        fun supportsVision(providerId: String): Boolean {
+            return getProfile(providerId).supportsVision
         }
 
         fun getMaxTokensLimit(providerId: String): Int {

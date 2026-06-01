@@ -4,6 +4,7 @@ package com.aicompanion.interaction
 import com.aicompanion.models.Emotion
 import com.aicompanion.models.Action
 import com.aicompanion.settings.SettingsManager
+import kotlin.random.Random
 
 class ProactiveInteractionEngine(private val settingsManager: SettingsManager) {
 
@@ -63,7 +64,7 @@ class ProactiveInteractionEngine(private val settingsManager: SettingsManager) {
             "infrequent" -> infrequentPhrases
             else -> normalPhrases
         }
-        val idx = (System.currentTimeMillis() % phrases.size).toInt()
+        val idx = Random.nextInt(phrases.size)
         return phrases[idx]
     }
 

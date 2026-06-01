@@ -80,17 +80,27 @@ class PersonaStatsManager(private val context: Context, private val personaId: S
         set(v) = prefs.edit().putLong(KEY_TOTAL_WORDS_AI, v).apply()
 
     fun recordUserMessage(text: String) {
-        userMessages = userMessages + 1
-        totalMessages = totalMessages + 1
-        totalWordsUser = totalWordsUser + text.length
+        val newUM = userMessages + 1
+        val newTM = totalMessages + 1
+        val newWU = totalWordsUser + text.length
+        prefs.edit().apply {
+            putInt(KEY_USER_MESSAGES, newUM)
+            putInt(KEY_TOTAL_MESSAGES, newTM)
+            putLong(KEY_TOTAL_WORDS_USER, newWU)
+        }.apply()
         recordChatDay()
         recordHour()
     }
 
     fun recordAiMessage(text: String) {
-        aiMessages = aiMessages + 1
-        totalMessages = totalMessages + 1
-        totalWordsAi = totalWordsAi + text.length
+        val newAM = aiMessages + 1
+        val newTM = totalMessages + 1
+        val newWA = totalWordsAi + text.length
+        prefs.edit().apply {
+            putInt(KEY_AI_MESSAGES, newAM)
+            putInt(KEY_TOTAL_MESSAGES, newTM)
+            putLong(KEY_TOTAL_WORDS_AI, newWA)
+        }.apply()
         recordChatDay()
         recordHour()
     }

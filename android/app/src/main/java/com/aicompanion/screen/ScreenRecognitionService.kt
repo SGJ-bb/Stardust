@@ -4,35 +4,48 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.aicompanion.util.AppLogger
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 class ScreenRecognitionService : AccessibilityService() {
 
     companion object {
+        private const val TAG = "ScreenRecognitionService"
         private var currentInstance: ScreenRecognitionService? = null
-        private var lastScreenText: String = ""
-        private var lastClickableData: List<ClickableData> = emptyList()
-        private var lastRefreshTime = 0L
-        private const val REFRESH_THROTTLE_MS = 500L
+        private val _lastScreenText = AtomicReference("")
+        private val _lastClickableData = AtomicReference<List<ClickableData>>(emptyList())
+        @Volatile private var lastRefreshTime = 0L
+        private const val REFRESH_THROTTLE_MS = 2000L
+        private val bgExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "ScreenRefresh").also { it.isDaemon = true } }
+        private val refreshPending = AtomicBoolean(false)
 
         fun getInstance(): ScreenRecognitionService? = currentInstance
-        fun getLastScreenText(): String = lastScreenText
-        fun getClickableData(): List<ClickableData> = lastClickableData
+        fun getLastScreenText(): String = _lastScreenText.get()
+        fun getClickableData(): List<ClickableData> = _lastClickableData.get()
 
         fun performClick(text: String): Boolean {
             val service = currentInstance ?: return false
-            val data = lastClickableData.find {
+            val data = _lastClickableData.get().find {
                 it.text.contains(text, ignoreCase = true) ||
                         it.desc.contains(text, ignoreCase = true)
             } ?: return false
             val root = service.rootInActiveWindow ?: return false
             try {
-                return findNodeByBounds(root, data.bounds)?.let { node ->
+                val node = findNodeByBounds(root, data.bounds)
+                if (node != null && node !== root) {
                     val result = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                     node.recycle()
-                    result
-                } ?: false
+                    return result
+                } else if (node === root) {
+                    return root.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                }
+                return false
             } finally {
                 root.recycle()
             }
@@ -40,15 +53,20 @@ class ScreenRecognitionService : AccessibilityService() {
 
         fun performClickByIndex(index: Int): Boolean {
             val service = currentInstance ?: return false
-            if (index < 0 || index >= lastClickableData.size) return false
-            val data = lastClickableData[index]
+            val clickables = _lastClickableData.get()
+            if (index < 0 || index >= clickables.size) return false
+            val data = clickables[index]
             val root = service.rootInActiveWindow ?: return false
             try {
-                return findNodeByBounds(root, data.bounds)?.let { node ->
+                val node = findNodeByBounds(root, data.bounds)
+                if (node != null && node !== root) {
                     val result = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                     node.recycle()
-                    result
-                } ?: false
+                    return result
+                } else if (node === root) {
+                    return root.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                }
+                return false
             } finally {
                 root.recycle()
             }
@@ -73,15 +91,22 @@ class ScreenRecognitionService : AccessibilityService() {
             val root = service.rootInActiveWindow ?: return false
             try {
                 val scrollable = findScrollableNode(root)
-                if (scrollable != null) {
+                if (scrollable != null && scrollable !== root) {
                     val action = when (direction) {
                         "forward" -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD
                         "backward" -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD
                         else -> null
                     }
-                    if (action != null) {
-                        return scrollable.performAction(action.id)
+                    val result = if (action != null) scrollable.performAction(action.id) else false
+                    scrollable.recycle()
+                    return result
+                } else if (scrollable === root) {
+                    val action = when (direction) {
+                        "forward" -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD
+                        "backward" -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD
+                        else -> null
                     }
+                    return if (action != null) root.performAction(action.id) else false
                 }
                 return false
             } finally {
@@ -95,7 +120,7 @@ class ScreenRecognitionService : AccessibilityService() {
                 val child = node.getChild(i) ?: continue
                 val result = findScrollableNode(child)
                 if (result != null) {
-                    child.recycle()
+                    if (child !== result) child.recycle()
                     return result
                 }
                 child.recycle()
@@ -105,16 +130,26 @@ class ScreenRecognitionService : AccessibilityService() {
 
         fun refreshScreenData(): Boolean {
             val service = currentInstance ?: return false
-            val root = service.rootInActiveWindow ?: return false
-            try {
-                val text = extractText(root)
-                lastScreenText = text
-                lastClickableData = extractClickableData(root)
-                lastRefreshTime = System.currentTimeMillis()
-                return true
-            } finally {
-                root.recycle()
+            if (refreshPending.getAndSet(true)) return true
+            bgExecutor.execute {
+                try {
+                    val root = service.rootInActiveWindow ?: return@execute
+                    try {
+                        val text = extractText(root)
+                        val clickables = extractClickableData(root)
+                        _lastScreenText.set(text)
+                        _lastClickableData.set(clickables)
+                        lastRefreshTime = System.currentTimeMillis()
+                    } finally {
+                        root.recycle()
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e(TAG, "refreshScreenData error: ${e.message}")
+                } finally {
+                    refreshPending.set(false)
+                }
             }
+            return true
         }
 
         private fun findNodeByBounds(root: AccessibilityNodeInfo, targetBounds: Rect): AccessibilityNodeInfo? {
@@ -173,6 +208,10 @@ class ScreenRecognitionService : AccessibilityService() {
                 child.recycle()
             }
         }
+
+        fun shutdown() {
+            try { bgExecutor.shutdownNow() } catch (_: Exception) {}
+        }
     }
 
     data class ClickableData(
@@ -181,9 +220,13 @@ class ScreenRecognitionService : AccessibilityService() {
         val bounds: Rect
     )
 
+    private var cachedPrefs: android.content.SharedPreferences? = null
+    private var lastCategorySaveTime = 0L
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         currentInstance = this
+        cachedPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -191,22 +234,19 @@ class ScreenRecognitionService : AccessibilityService() {
         try {
             val packageName = event.packageName?.toString() ?: return
             val category = AppCategoryClassifier.classify(packageName)
-            val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-            prefs.edit().putString("current_app_category", category).apply()
+            val now = System.currentTimeMillis()
+            if (now - lastCategorySaveTime > 1000) {
+                cachedPrefs?.edit()?.putString("current_app_category", category)?.apply()
+                lastCategorySaveTime = now
+            }
 
             when (event.eventType) {
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                     refreshScreenData()
                 }
-                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
-                    val now = System.currentTimeMillis()
-                    if (now - lastRefreshTime >= REFRESH_THROTTLE_MS) {
-                        refreshScreenData()
-                    }
-                }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.e(TAG, "onAccessibilityEvent error: ${e.message}")
         }
     }
 

@@ -94,7 +94,7 @@ class AffectionManager(private val context: Context, private val personaId: Stri
         val current = affectionLevel
         if (current >= lastEvolution + 5) {
             personaPrefs.edit().putInt("last_evolution_affection", current).apply()
-            AppLogger.i("Affection", "personalityEvolution triggered: affection=$current")
+            //AppLogger.i("Affection", "personalityEvolution triggered: affection=$current")
             return true
         }
         return false
@@ -109,7 +109,7 @@ class AffectionManager(private val context: Context, private val personaId: Stri
         val current = affectionLevel
         if (current >= lastSummary + 10) {
             globalPrefs.edit().putInt("last_personality_summary_affection", current).apply()
-            AppLogger.i("Affection", "personalitySummary triggered: affection=$current")
+            //AppLogger.i("Affection", "personalitySummary triggered: affection=$current")
             return true
         }
         return false

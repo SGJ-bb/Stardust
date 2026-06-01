@@ -213,7 +213,6 @@ class ChatBubblePopup(private val context: Context) {
         val dx = (bitmap.width - size) / 2f
         val dy = (bitmap.height - size) / 2f
         canvas.drawBitmap(bitmap, -dx, -dy, paint)
-        bitmap.recycle()
         return output
     }
 

@@ -120,7 +120,10 @@ class WakeUpTaskManager(private val context: Context) {
         return updated
     }
 
+    private var previousTaskIds: Set<String> = emptySet()
+
     fun deleteTask(id: String) {
+        previousTaskIds = tasks.map { it.id }.toSet()
         tasks.removeAll { it.id == id }
         save()
         scheduleAll()
@@ -129,6 +132,7 @@ class WakeUpTaskManager(private val context: Context) {
     fun toggleTask(id: String, enabled: Boolean) {
         val idx = tasks.indexOfFirst { it.id == id }
         if (idx >= 0) {
+            previousTaskIds = tasks.map { it.id }.toSet()
             tasks[idx] = tasks[idx].copy(enabled = enabled)
             save()
             scheduleAll()
@@ -185,7 +189,39 @@ class WakeUpTaskManager(private val context: Context) {
     }
 
     private fun cancelOrphanedAlarms(alarmManager: AlarmManager) {
-        val validIds = tasks.map { it.id }.toSet()
+        val validIds = tasks.filter { it.enabled }.map { it.id }.toSet()
+        val oldIds = if (previousTaskIds.isNotEmpty()) previousTaskIds else loadTaskIdsFromPrefs()
+        for (taskId in oldIds) {
+            if (taskId !in validIds) {
+                val requestCode = taskId.hashCode() and 0x7FFFFFFF
+                val intent = Intent(context, WakeUpReceiver::class.java).apply {
+                    action = WakeUpReceiver.ACTION_WAKE_UP
+                    putExtra("task_id", taskId)
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context, requestCode, intent,
+                    PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+                )
+                if (pendingIntent != null) {
+                    alarmManager.cancel(pendingIntent)
+                    pendingIntent.cancel()
+                }
+            }
+        }
+        previousTaskIds = emptySet()
+    }
+
+    private fun loadTaskIdsFromPrefs(): Set<String> {
+        return try {
+            if (!file.exists()) return emptySet()
+            val json = JSONObject(file.readText())
+            val arr = json.optJSONArray("tasks") ?: return emptySet()
+            val ids = mutableSetOf<String>()
+            for (i in 0 until arr.length()) {
+                ids.add(arr.getJSONObject(i).optString("id", ""))
+            }
+            ids.filter { it.isNotBlank() }.toSet()
+        } catch (_: Exception) { emptySet() }
     }
 
     fun rescheduleOnBoot() {

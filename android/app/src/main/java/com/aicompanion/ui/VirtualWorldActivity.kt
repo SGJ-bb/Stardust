@@ -180,8 +180,8 @@ class VirtualWorldActivity : AppCompatActivity() {
 
         val ratioOptions = arrayOf("1x (同步现实)", "5x (1天=5天)", "10x (1天=10天)", "24x (1天=24天)")
         val ratioValues = intArrayOf(1, 5, 10, 24)
-        val ratioAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, ratioOptions)
-        ratioAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val ratioAdapter = ArrayAdapter(this, R.layout.spinner_item_dark, ratioOptions)
+        ratioAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_dark)
         spinnerTimeRatio.adapter = ratioAdapter
         val currentRatioIdx = ratioValues.indexOf(config.timeRatio).coerceAtLeast(0)
         spinnerTimeRatio.setSelection(currentRatioIdx)
@@ -767,12 +767,33 @@ class VirtualWorldActivity : AppCompatActivity() {
 
             holder.itemView.alpha = 0f
             holder.itemView.translationY = 20f
+            holder.itemView.scaleX = 0.8f
+            holder.itemView.scaleY = 0.8f
             holder.itemView.animate()
                 .alpha(1f)
                 .translationY(0f)
-                .setDuration(300)
-                .setStartDelay((position * 40L).coerceAtMost(400))
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(400)
+                .setStartDelay((position * 50L).coerceAtMost(500))
                 .setInterpolator(android.view.animation.DecelerateInterpolator(1.2f))
+                .start()
+
+            val dot = holder.timelineDot
+            dot.scaleX = 1f
+            dot.scaleY = 1f
+            dot.animate()
+                .scaleX(1.8f)
+                .scaleY(1.8f)
+                .setDuration(300)
+                .setStartDelay((position * 50L).coerceAtMost(500) + 200)
+                .withEndAction {
+                    dot.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(200)
+                        .start()
+                }
                 .start()
         }
 
@@ -781,6 +802,7 @@ class VirtualWorldActivity : AppCompatActivity() {
             val tvSpeaker: TextView = view.findViewById(R.id.tv_event_speaker)
             val tvContent: TextView = view.findViewById(R.id.tv_event_content)
             val ivImage: ImageView = view.findViewById(R.id.iv_event_image)
+            val timelineDot: View = view.findViewById(R.id.timeline_dot)
         }
     }
 }

@@ -3,6 +3,7 @@ package com.aicompanion.voice
 import android.content.Context
 import android.media.MediaPlayer
 import com.aicompanion.models.Emotion
+import com.aicompanion.network.ProviderAdapter
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.util.AppLogger
 import kotlinx.coroutines.Dispatchers
@@ -44,13 +45,17 @@ class TtsManager(private val context: Context) {
         get() = sm.ttsApiUrl.isNotBlank() && sm.ttsApiKey.isNotBlank()
 
     suspend fun synthesize(text: String, emotion: Emotion = Emotion.NEUTRAL): TtsResult {
+        return synthesizeWithVoice(text, null, emotion)
+    }
+
+    suspend fun synthesizeWithVoice(text: String, overrideVoice: String? = null, emotion: Emotion = Emotion.NEUTRAL): TtsResult {
         if (text.isBlank()) return TtsResult(null, null, false, "文本为空")
 
         val mode = engineMode
         if (mode == ENGINE_EDGE) {
             return try {
                 val audioDir = File(context.filesDir, "tts_audio")
-                val voiceId = sm.ttsVoice.ifBlank { "zh-CN-XiaoxiaoNeural" }
+                val voiceId = overrideVoice ?: sm.ttsVoice.ifBlank { "zh-CN-XiaoxiaoNeural" }
                 EdgeTtsEngine.synthesize(text, voiceId, audioDir, sm.ttsRate, sm.ttsPitch)
             } catch (e: Exception) {
                 AppLogger.e(TAG, "Edge TTS失败: ${e.message}")
@@ -63,7 +68,7 @@ class TtsManager(private val context: Context) {
         }
 
         return try {
-            cloudSynthesize(text)
+            cloudSynthesize(text, overrideVoice)
         } catch (e: Exception) {
             AppLogger.e(TAG, "云端TTS失败，回退本地: ${e.message}")
             if (mode == ENGINE_AUTO) {
@@ -74,11 +79,13 @@ class TtsManager(private val context: Context) {
         }
     }
 
-    private suspend fun cloudSynthesize(text: String): TtsResult = withContext(Dispatchers.IO) {
+    private suspend fun cloudSynthesize(text: String, overrideVoice: String? = null): TtsResult = withContext(Dispatchers.IO) {
         val ttsUrl = sm.ttsApiUrl
         val ttsKey = sm.ttsApiKey
         val ttsModel = sm.ttsModel
-        var ttsVoice = sm.ttsVoice
+        var ttsVoice = overrideVoice ?: sm.ttsVoiceName.ifBlank { sm.ttsVoice }
+        val formatType = com.aicompanion.settings.ServicePresets.findTtsPreset(sm.ttsProvider).formatType
+        AppLogger.i(TAG, "TTS云端合成开始: text=${text.take(30)}, model=$ttsModel, voice=$ttsVoice, formatType=$formatType")
 
         val isSiliconFlow = ttsUrl.contains("siliconflow", ignoreCase = true)
         val isCosyVoice = ttsModel.contains("CosyVoice", ignoreCase = true)
@@ -88,52 +95,54 @@ class TtsManager(private val context: Context) {
             ttsVoice = if (voiceName in cosyVoiceNames) "$ttsModel:$voiceName" else "$ttsModel:alex"
         }
 
-        val jsonBody = JSONObject().apply {
-            put("model", ttsModel)
-            put("input", text)
-            put("voice", ttsVoice)
-        }
-
-        val jsonRequest = Request.Builder()
+        val jsonBody = ProviderAdapter.buildTtsRequest(formatType, ttsModel, text, ttsVoice)
+        val headers = ProviderAdapter.buildTtsHeaders(formatType, ttsKey, ttsModel)
+        val requestBuilder = Request.Builder()
             .url(ttsUrl)
-            .addHeader("Authorization", "Bearer $ttsKey")
-            .addHeader("Content-Type", "application/json")
             .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-            .build()
+        headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
+        val jsonRequest = requestBuilder.build()
 
         val client = com.aicompanion.network.ApiClient.sharedClient
-        val jsonResp = client.newCall(jsonRequest).execute()
+        client.newCall(jsonRequest).execute().use { jsonResp ->
 
         if (jsonResp.code == 422) {
             jsonResp.body?.close()
-            AppLogger.d(TAG, "TTS JSON格式422，尝试multipart/form-data")
+            AppLogger.w(TAG, "TTS请求422错误，可能是参数格式不匹配。常见原因: 1)voice名称不正确 2)模型不支持该voice 3)API格式不compatible")
+            AppLogger.w(TAG, "TTS JSON格式422，尝试替换voice字段名")
 
-            val textBytes = text.toByteArray(Charsets.UTF_8)
-            val textFileBody = textBytes.toRequestBody("text/plain".toMediaType(), 0, textBytes.size)
-
-            val formBody = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("file", "input.txt", textFileBody)
-                .addFormDataPart("model", ttsModel)
-                .addFormDataPart("voice", ttsVoice)
-                .build()
-
-            val formRequest = Request.Builder()
+            val fallbackBody = org.json.JSONObject(jsonBody.toString()).apply {
+                if (has("voice")) {
+                    val voiceVal = optString("voice", "")
+                    put("voice_name", voiceVal)
+                    remove("voice")
+                }
+            }
+            val fallbackRequest = Request.Builder()
                 .url(ttsUrl)
                 .addHeader("Authorization", "Bearer $ttsKey")
-                .post(formBody)
+                .addHeader("Content-Type", "application/json")
+                .post(fallbackBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val formResp = client.newCall(formRequest).execute()
-            return@withContext parseResponse(formResp)
+            client.newCall(fallbackRequest).execute().use { fallbackResp ->
+                if (fallbackResp.isSuccessful) {
+                    return@withContext parseResponse(fallbackResp)
+                }
+                fallbackResp.body?.close()
+                val errBody = fallbackResp.body?.string()?.take(300) ?: "无响应体"
+                return@withContext TtsResult(null, null, false, "HTTP ${fallbackResp.code}: $errBody")
+            }
         }
 
         if (!jsonResp.isSuccessful) {
+            AppLogger.e(TAG, "TTS请求失败: HTTP ${jsonResp.code}, 常见原因: 1)API Key无效 2)余额不足 3)URL错误 4)模型名错误")
             val errBody = jsonResp.body?.string()?.take(300) ?: "无响应体"
             return@withContext TtsResult(null, null, false, "HTTP ${jsonResp.code}: $errBody")
         }
 
-        parseResponse(jsonResp)
+        return@withContext parseResponse(jsonResp)
+        }
     }
 
     private fun parseResponse(response: okhttp3.Response): TtsResult {
@@ -237,6 +246,8 @@ class TtsManager(private val context: Context) {
     }
 
     fun stopPlayback() {
+        val listener = onPlaybackCompleteListener
+        onPlaybackCompleteListener = null
         try {
             mediaPlayer?.let {
                 if (it.isPlaying) it.stop()
@@ -246,6 +257,7 @@ class TtsManager(private val context: Context) {
         } catch (_: Exception) {}
         mediaPlayer = null
         currentlyPlayingPath = null
+        listener?.invoke()
     }
 
     val isPlaying: Boolean

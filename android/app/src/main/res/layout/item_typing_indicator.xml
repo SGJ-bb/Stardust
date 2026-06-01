@@ -53,6 +53,7 @@
         android:textColor="#667788"
         android:layout_marginTop="2dp"
         android:layout_marginStart="4dp"
+        android:id="@+id/tv_typing_label"
         android:text="正在输入..." />
 
 </LinearLayout>

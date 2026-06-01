@@ -20,7 +20,15 @@ class VoiceManager(private val context: Context) {
     private var textToSpeech: TextToSpeech? = null
     private var mediaPlayer: MediaPlayer? = null
     private var isListening = false
-    private var isTTSReady = false
+    @Volatile private var isTTSReady = false
+    private data class PendingSpeechData(
+        val text: String,
+        val emotion: Emotion,
+        val pitchOffset: Float,
+        val rateOffset: Float
+    )
+
+    private val pendingSpeechQueue = java.util.concurrent.ConcurrentLinkedDeque<PendingSpeechData>()
 
     companion object {
         private const val TAG = "VoiceManager"
@@ -30,8 +38,6 @@ class VoiceManager(private val context: Context) {
         try {
             if (SpeechRecognizer.isRecognitionAvailable(context)) {
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
-            } else {
-                AppLogger.w(TAG, "Speech recognition not available on this device")
             }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Failed to create speech recognizer: ${e.message}", e)
@@ -48,13 +54,19 @@ class VoiceManager(private val context: Context) {
                             textToSpeech?.language = cn
                         } else {
                             textToSpeech?.language = Locale.getDefault()
-                            AppLogger.w(TAG, "Chinese TTS not available, using default locale")
                         }
                     } catch (e: Exception) {
                         AppLogger.w(TAG, "TTS language setting failed: ${e.message}")
                     }
+                    AppLogger.w(TAG, "TTS初始化成功")
+                    var isFirst = true
+                    while (pendingSpeechQueue.isNotEmpty()) {
+                        val data = pendingSpeechQueue.removeFirst()
+                        speakInternal(data.text, data.emotion, data.pitchOffset, data.rateOffset, if (isFirst) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD)
+                        isFirst = false
+                    }
                 } else {
-                    AppLogger.w(TAG, "TTS initialization failed with status: $status (device may lack TTS engine)")
+                    AppLogger.w(TAG, "TTS初始化失败 status=$status")
                     isTTSReady = false
                 }
             }
@@ -68,7 +80,7 @@ class VoiceManager(private val context: Context) {
         if (isListening) return
         val recognizer = speechRecognizer
         if (recognizer == null) {
-            AppLogger.w(TAG, "SpeechRecognizer not initialized, cannot start listening")
+            // AppLogger.w(TAG, "SpeechRecognizer not initialized, cannot start listening")
             return
         }
 
@@ -131,12 +143,44 @@ class VoiceManager(private val context: Context) {
         }
     }
 
+    private var utteranceCompleteListener: (() -> Unit)? = null
+
+    fun setOnUtteranceCompleteListener(listener: (() -> Unit)?) {
+        utteranceCompleteListener = listener
+    }
+
     fun speak(text: String, emotion: Emotion = Emotion.NEUTRAL, emotionPitchOffset: Float = 0f, emotionRateOffset: Float = 0f) {
+        if (text.isBlank()) return
         if (!isTTSReady) {
-            AppLogger.w(TAG, "TTS not ready, cannot speak")
+            if (pendingSpeechQueue.size < 3) {
+                AppLogger.w(TAG, "TTS未就绪，缓存语音等待初始化完成: ${text.take(30)}...")
+                pendingSpeechQueue.addLast(PendingSpeechData(text, emotion, emotionPitchOffset, emotionRateOffset))
+            } else {
+                AppLogger.w(TAG, "TTS未就绪且缓存已满，丢弃: ${text.take(30)}...")
+            }
             return
         }
-        if (text.isBlank()) return
+        speakInternal(text, emotion, emotionPitchOffset, emotionRateOffset, TextToSpeech.QUEUE_FLUSH)
+    }
+
+    fun stopSpeaking() {
+        try {
+            pendingSpeechQueue.clear()
+            textToSpeech?.stop()
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "stopSpeaking failed: ${e.message}", e)
+        }
+    }
+
+    fun isSpeaking(): Boolean {
+        return try {
+            textToSpeech?.isSpeaking == true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun speakInternal(text: String, emotion: Emotion, emotionPitchOffset: Float, emotionRateOffset: Float, queueMode: Int) {
         try {
             val sm = SettingsManager(context)
             val basePitch = sm.ttsPitch
@@ -157,7 +201,18 @@ class VoiceManager(private val context: Context) {
             textToSpeech?.setPitch(pitch)
             textToSpeech?.setSpeechRate(rate)
             val utteranceId = UUID.randomUUID().toString()
-            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            try {
+                textToSpeech?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onError(utteranceId: String?) {
+                        utteranceCompleteListener?.invoke()
+                    }
+                    override fun onDone(utteranceId: String?) {
+                        utteranceCompleteListener?.invoke()
+                    }
+                })
+            } catch (_: Exception) {}
+            textToSpeech?.speak(text, queueMode, null, utteranceId)
         } catch (e: Exception) {
             AppLogger.e(TAG, "TTS speak failed: ${e.message}", e)
         }
@@ -204,6 +259,7 @@ class VoiceManager(private val context: Context) {
 
     fun cleanup() {
         isListening = false
+        isTTSReady = false
         try {
             speechRecognizer?.destroy()
         } catch (e: Exception) {

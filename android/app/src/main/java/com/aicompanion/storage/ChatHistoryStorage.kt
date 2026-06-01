@@ -21,10 +21,12 @@ data class StoredMessage(
     val isFavorited: Boolean = false,
     val reactionEmoji: String = "",
     val stickerPath: String? = null,
+    val generatedImagePath: String? = null,
     val senderPersonaId: String = "",
     val senderName: String = "",
     val audioPath: String? = null,
-    val audioUrl: String? = null
+    val audioUrl: String? = null,
+    val imageUrls: List<String> = emptyList()
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -38,10 +40,12 @@ data class StoredMessage(
         put("isFavorited", isFavorited)
         put("reactionEmoji", reactionEmoji)
         if (stickerPath != null) put("stickerPath", stickerPath)
+        if (generatedImagePath != null) put("generatedImagePath", generatedImagePath)
         if (senderPersonaId.isNotBlank()) put("senderPersonaId", senderPersonaId)
         if (senderName.isNotBlank()) put("senderName", senderName)
         if (audioPath != null) put("audioPath", audioPath)
         if (audioUrl != null) put("audioUrl", audioUrl)
+        if (imageUrls.isNotEmpty()) put("imageUrls", JSONArray(imageUrls))
     }
 
     companion object {
@@ -56,11 +60,16 @@ data class StoredMessage(
             timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
             isFavorited = obj.optBoolean("isFavorited", false),
             reactionEmoji = obj.optString("reactionEmoji", ""),
-            stickerPath = obj.optString("stickerPath", ""),
+            stickerPath = obj.optString("stickerPath", "").ifBlank { null },
+            generatedImagePath = obj.optString("generatedImagePath", "").ifBlank { null },
             senderPersonaId = obj.optString("senderPersonaId", ""),
             senderName = obj.optString("senderName", ""),
-            audioPath = obj.optString("audioPath", ""),
-            audioUrl = obj.optString("audioUrl", "")
+            audioPath = obj.optString("audioPath", "").ifBlank { null },
+            audioUrl = obj.optString("audioUrl", "").ifBlank { null },
+            imageUrls = try {
+                val arr = obj.optJSONArray("imageUrls")
+                if (arr != null) (0 until arr.length()).map { arr.getString(it) } else emptyList()
+            } catch (_: Exception) { emptyList() }
         )
     }
 }
@@ -277,7 +286,7 @@ class ChatHistoryStorage(private val context: Context) {
             }
             if (msgs.isNotEmpty()) {
                 addMessages(scope, scopeId, msgs)
-                AppLogger.i(TAG, "migrated ${msgs.size} msgs from $prefsName")
+                //AppLogger.i(TAG, "migrated ${msgs.size} msgs from $prefsName")
             }
             return msgs.size
         } catch (e: Exception) {

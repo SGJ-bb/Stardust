@@ -25,7 +25,8 @@
             android:layout_height="24dp"
             android:gravity="center"
             android:text="⭐"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:contentDescription="收藏图标" />
 
         <TextView
             android:id="@+id/tv_favorite_label"
@@ -58,7 +59,8 @@
             android:layout_height="24dp"
             android:gravity="center"
             android:text="🎨"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:contentDescription="点缀图标" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -90,7 +92,8 @@
             android:layout_height="24dp"
             android:gravity="center"
             android:text="🗑"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:contentDescription="删除图标" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -122,7 +125,8 @@
             android:layout_height="24dp"
             android:gravity="center"
             android:text="💬"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:contentDescription="引用图标" />
 
         <TextView
             android:layout_width="wrap_content"

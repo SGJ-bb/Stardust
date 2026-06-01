@@ -15,7 +15,7 @@ class ScreenCaptureService : Service() {
         private const val TAG = "ScreenCaptureService"
         private const val CHANNEL_ID = "screen_capture_channel"
         private const val NOTIFICATION_ID = 2001
-        var isRunning = false
+        @Volatile var isRunning = false
             private set
     }
 
@@ -32,6 +32,12 @@ class ScreenCaptureService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        AppLogger.d(TAG, "ScreenCaptureService onTaskRemoved")
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
 
     override fun onDestroy() {
         isRunning = false

@@ -9,14 +9,16 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import com.aicompanion.network.ProviderAdapter
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.util.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.InputStreamReader
@@ -50,11 +52,14 @@ class LocalAsrManager(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var speechRecognizer: SpeechRecognizer? = null
     private var listener: AsrListener? = null
+    @Volatile
     private var isListening = false
 
-    private var audioRecord: AudioRecord? = null
+    @Volatile
     private var isRecording = false
-    private var recordingBuffer = mutableListOf<Byte>()
+
+    private var audioRecord: AudioRecord? = null
+    private val recordingBuffer = java.io.ByteArrayOutputStream()
 
     val mode: String
         get() = sm.asrMode
@@ -101,6 +106,8 @@ class LocalAsrManager(private val context: Context) {
         if (!isListening) return
         if (isRecording) {
             isRecording = false
+            isListening = false
+            listener?.onFinalResult("")
             return
         }
         isListening = false
@@ -127,6 +134,7 @@ class LocalAsrManager(private val context: Context) {
     fun cleanup() {
         isListening = false
         isRecording = false
+        scope.cancel()
         try {
             audioRecord?.stop()
             audioRecord?.release()
@@ -141,7 +149,7 @@ class LocalAsrManager(private val context: Context) {
     private fun startCloudListening() {
         listener?.onReady()
         isRecording = true
-        recordingBuffer.clear()
+        recordingBuffer.reset()
 
         val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
         if (bufferSize == AudioRecord.ERROR_BAD_VALUE || bufferSize == AudioRecord.ERROR) {
@@ -181,7 +189,7 @@ class LocalAsrManager(private val context: Context) {
         scope.launch {
             try {
                 audioRecord?.startRecording()
-                AppLogger.d(TAG, "Cloud ASR: 开始录音")
+                //AppLogger.d(TAG, "Cloud ASR: 开始录音")
 
                 val data = ByteArray(bufferSize)
                 val startTime = System.currentTimeMillis()
@@ -189,12 +197,10 @@ class LocalAsrManager(private val context: Context) {
                 while (isRecording && isListening) {
                     val read = audioRecord?.read(data, 0, data.size) ?: 0
                     if (read > 0) {
-                        for (i in 0 until read) {
-                            recordingBuffer.add(data[i])
-                        }
+                        recordingBuffer.write(data, 0, read)
                     }
                     if (System.currentTimeMillis() - startTime > MAX_RECORDING_MS) {
-                        AppLogger.d(TAG, "Cloud ASR: 达到最大录音时长")
+                        //AppLogger.d(TAG, "Cloud ASR: 达到最大录音时长")
                         break
                     }
                 }
@@ -203,9 +209,9 @@ class LocalAsrManager(private val context: Context) {
                 audioRecord?.release()
                 audioRecord = null
                 isRecording = false
-                listener?.onEndOfSpeech()
+                withContext(Dispatchers.Main) { listener?.onEndOfSpeech() }
 
-                if (recordingBuffer.isEmpty()) {
+                if (recordingBuffer.size() == 0) {
                     withContext(Dispatchers.Main) {
                         listener?.onError("未录制到音频")
                         isListening = false
@@ -214,11 +220,19 @@ class LocalAsrManager(private val context: Context) {
                 }
 
                 val pcmBytes = recordingBuffer.toByteArray()
-                AppLogger.d(TAG, "Cloud ASR: 录音完成, ${pcmBytes.size} bytes")
+                AppLogger.w(TAG, "Cloud ASR: 录音完成, ${pcmBytes.size} bytes")
 
                 val wavBytes = pcmToWav(pcmBytes, SAMPLE_RATE)
 
-                val text = callCloudAsr(wavBytes)
+                var text = ""
+                for (attempt in 1..2) {
+                    text = callCloudAsr(wavBytes)
+                    if (text.isNotBlank()) break
+                    if (attempt == 1) {
+                        AppLogger.w(TAG, "Cloud ASR: 第${attempt}次识别无结果，重试中...")
+                        delay(500)
+                    }
+                }
 
                 withContext(Dispatchers.Main) {
                     isListening = false
@@ -229,11 +243,19 @@ class LocalAsrManager(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
-                AppLogger.e(TAG, "Cloud ASR error: ${e.message}")
+                if (e is kotlinx.coroutines.CancellationException) {
+                    AppLogger.w(TAG, "Cloud ASR: 协程被取消")
+                    withContext(Dispatchers.Main) {
+                        isListening = false
+                        isRecording = false
+                    }
+                    throw e
+                }
+                AppLogger.e(TAG, "Cloud ASR error: ${e.javaClass.simpleName}: ${e.message ?: "unknown"}")
                 withContext(Dispatchers.Main) {
                     isListening = false
                     isRecording = false
-                    listener?.onError("云端ASR失败: ${e.message}")
+                    listener?.onError("云端ASR失败: ${e.message ?: "未知错误"}")
                 }
             }
         }
@@ -269,13 +291,16 @@ class LocalAsrManager(private val context: Context) {
     }
 
     private suspend fun callCloudAsr(wavBytes: ByteArray): String = withContext(Dispatchers.IO) {
+        var conn: HttpURLConnection? = null
         try {
             val apiUrl = sm.asrApiUrl
             val apiKey = sm.asrApiKey
             val model = sm.asrModel.ifBlank { "whisper-1" }
+            val formatType = com.aicompanion.settings.ServicePresets.findAsrPreset(sm.asrProvider).formatType
+            AppLogger.i(TAG, "ASR云端识别开始: model=$model, formatType=$formatType, audioSize=${wavBytes.size}字节")
 
             val boundary = "----FormBoundary${System.currentTimeMillis()}"
-            val conn = URL(apiUrl).openConnection() as HttpURLConnection
+            conn = URL(apiUrl).openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.doOutput = true
             conn.connectTimeout = 30000
@@ -283,50 +308,52 @@ class LocalAsrManager(private val context: Context) {
             conn.setRequestProperty("Authorization", "Bearer $apiKey")
             conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
 
-            val output = DataOutputStream(conn.outputStream)
+            val fields = ProviderAdapter.buildAsrRequestFields(formatType, model)
 
-            output.writeBytes("--$boundary\r\n")
-            output.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n")
-            output.writeBytes("Content-Type: audio/wav\r\n\r\n")
-            output.write(wavBytes)
-            output.writeBytes("\r\n")
+            DataOutputStream(conn.outputStream).use { output ->
+                output.writeBytes("--$boundary\r\n")
+                output.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n")
+                output.writeBytes("Content-Type: audio/wav\r\n\r\n")
+                output.write(wavBytes)
+                output.writeBytes("\r\n")
 
-            output.writeBytes("--$boundary\r\n")
-            output.writeBytes("Content-Disposition: form-data; name=\"model\"\r\n\r\n")
-            output.writeBytes("$model\r\n")
+                fields.forEach { (key, value) ->
+                    output.writeBytes("--$boundary\r\n")
+                    output.writeBytes("Content-Disposition: form-data; name=\"$key\"\r\n\r\n")
+                    output.writeBytes("$value\r\n")
+                }
 
-            output.writeBytes("--$boundary\r\n")
-            output.writeBytes("Content-Disposition: form-data; name=\"language\"\r\n\r\n")
-            output.writeBytes("zh\r\n")
-
-            output.writeBytes("--$boundary--\r\n")
-            output.flush()
-            output.close()
+                output.writeBytes("--$boundary--\r\n")
+                output.flush()
+            }
 
             val code = conn.responseCode
+            if (code == 500 || code == 502 || code == 503) {
+                val errBody = try {
+                    conn.errorStream?.bufferedReader()?.use { it.readText()?.take(200) } ?: ""
+                } catch (_: Exception) { "" }
+                AppLogger.w(TAG, "Cloud ASR HTTP $code (服务器临时错误，将重试): $errBody")
+                return@withContext ""
+            }
             if (code != 200) {
                 val errBody = try {
-                    BufferedReader(InputStreamReader(conn.errorStream)).readText()
+                    conn.errorStream?.bufferedReader()?.use { it.readText()?.take(200) } ?: ""
                 } catch (_: Exception) { "" }
+                AppLogger.e(TAG, "ASR请求失败: HTTP $code, 常见原因: 1)API Key无效 2)音频格式不支持 3)URL错误 4)模型名错误")
                 AppLogger.e(TAG, "Cloud ASR HTTP $code: $errBody")
                 return@withContext ""
             }
 
-            val body = BufferedReader(InputStreamReader(conn.inputStream)).readText()
-            val json = JSONObject(body)
-
-            val text = json.optString("text", "")
-            if (text.isNotBlank()) return@withContext text
-
-            val choices = json.optJSONArray("choices")
-            if (choices != null && choices.length() > 0) {
-                return@withContext choices.getJSONObject(0).optJSONObject("message")?.optString("content", "") ?: ""
-            }
+            val body = conn.inputStream?.bufferedReader()?.use { it.readText() } ?: ""
+            val resultText = ProviderAdapter.parseAsrResponse(formatType, body)
+            if (resultText.isNotBlank()) return@withContext resultText
 
             ""
         } catch (e: Exception) {
             AppLogger.e(TAG, "callCloudAsr: ${e.message}")
             ""
+        } finally {
+            conn?.disconnect()
         }
     }
 

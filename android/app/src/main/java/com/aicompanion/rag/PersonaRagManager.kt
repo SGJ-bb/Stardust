@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 class PersonaRagManager(private val context: Context, private val personaId: String = "default") {
 
@@ -14,44 +16,56 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
     private val chunker = TextChunker()
     private val embedder = TfidfEmbedder()
     private val store = VectorStore(context, "persona_$personaId")
+    private val rwLock = ReentrantReadWriteLock()
 
-    private var personaHash: String = ""
-    private var isIndexed = false
+    @Volatile private var personaHash: String = ""
+    @Volatile private var isIndexed = false
 
     fun currentHash(): String = personaHash
 
+    private fun sha256(input: String): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(input.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
+    }
+
     suspend fun buildIndex(personaFields: Map<String, String>): Boolean = withContext(Dispatchers.IO) {
         try {
-            val newHash = personaFields.values.joinToString("|").hashCode().toString()
+            val newHash = sha256(personaFields.values.joinToString("|"))
             if (newHash == personaHash && isIndexed) return@withContext true
 
-            if (store.load() && store.size() > 0) {
-                val storedHash = context.getSharedPreferences("rag_vector_persona", Context.MODE_PRIVATE)
-                    .getString("persona_hash", "")
-                if (storedHash == newHash) {
-                    personaHash = newHash
-                    isIndexed = true
-                    embedder.buildVocabulary(store.getAllTexts())
-                    return@withContext true
+            rwLock.writeLock().lock()
+            try {
+                if (store.load() && store.size() > 0) {
+                    val storedHash = context.getSharedPreferences("rag_vector_persona", Context.MODE_PRIVATE)
+                        .getString("persona_hash", "")
+                    if (storedHash == newHash) {
+                        personaHash = newHash
+                        isIndexed = true
+                        embedder.buildVocabulary(store.getAllTexts())
+                        return@withContext true
+                    }
                 }
+
+                val chunks = chunker.chunkPersona(personaFields)
+                if (chunks.isEmpty()) return@withContext false
+
+                val chunkTexts = chunks.map { it.text }
+                embedder.buildVocabulary(chunkTexts)
+                val vectors = embedder.embed(chunkTexts)
+                store.addAll(chunks, vectors)
+                store.save()
+
+                context.getSharedPreferences("rag_vector_persona", Context.MODE_PRIVATE)
+                    .edit().putString("persona_hash", newHash).apply()
+
+                personaHash = newHash
+                isIndexed = true
+                Log.d(TAG, "Index built: ${chunks.size} chunks")
+                true
+            } finally {
+                rwLock.writeLock().unlock()
             }
-
-            val chunks = chunker.chunkPersona(personaFields)
-            if (chunks.isEmpty()) return@withContext false
-
-            val chunkTexts = chunks.map { it.text }
-            embedder.buildVocabulary(chunkTexts)
-            val vectors = embedder.embed(chunkTexts)
-            store.addAll(chunks, vectors)
-            store.save()
-
-            context.getSharedPreferences("rag_vector_persona", Context.MODE_PRIVATE)
-                .edit().putString("persona_hash", newHash).apply()
-
-            personaHash = newHash
-            isIndexed = true
-            Log.d(TAG, "Index built: ${chunks.size} chunks")
-            true
         } catch (e: Exception) {
             com.aicompanion.util.AppLogger.e(TAG, "buildIndex failed: ${e.message}", e)
             false
@@ -62,9 +76,14 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
         if (!isIndexed || query.isBlank()) return@withContext emptyList()
 
         try {
-            val queryVec = embedder.embedSingle(query)
-            val results = store.search(queryVec, topK, RagConfig.minSimilarity)
-            results.map { (entry, _) -> entry.text }
+            rwLock.readLock().lock()
+            try {
+                val queryVec = embedder.embedSingle(query)
+                val results = store.search(queryVec, topK, RagConfig.minSimilarity)
+                results.map { (entry, _) -> entry.text }
+            } finally {
+                rwLock.readLock().unlock()
+            }
         } catch (e: Exception) {
             com.aicompanion.util.AppLogger.e(TAG, "retrieve failed: ${e.message}", e)
             emptyList()
@@ -74,8 +93,13 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
     fun retrieveSync(query: String, topK: Int = RagConfig.personaTopK): List<String> {
         if (!isIndexed || query.isBlank()) return emptyList()
         return try {
-            val queryVec = embedder.embedSingleSync(query)
-            store.search(queryVec, topK, RagConfig.minSimilarity).map { (entry, _) -> entry.text }
+            rwLock.readLock().lock()
+            try {
+                val queryVec = embedder.embedSingleSync(query)
+                store.search(queryVec, topK, RagConfig.minSimilarity).map { (entry, _) -> entry.text }
+            } finally {
+                rwLock.readLock().unlock()
+            }
         } catch (e: Exception) {
             com.aicompanion.util.AppLogger.e(TAG, "RAG同步检索失败: ${e.message}", e); emptyList()
         }
@@ -86,8 +110,13 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
     fun getChunkCount(): Int = store.size()
 
     fun clear() {
-        store.clear()
-        personaHash = ""
-        isIndexed = false
+        rwLock.writeLock().lock()
+        try {
+            store.clear()
+            personaHash = ""
+            isIndexed = false
+        } finally {
+            rwLock.writeLock().unlock()
+        }
     }
 }

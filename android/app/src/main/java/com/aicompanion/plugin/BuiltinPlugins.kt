@@ -12,7 +12,8 @@ import com.aicompanion.settings.SettingsManager
 import com.aicompanion.util.AppLogger
 import com.aicompanion.sticker.StickerManager
 import com.aicompanion.virtualworld.VirtualWorldManager
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -33,10 +34,11 @@ class AlarmPlugin(private val context: Context) : ToolPlugin {
             "required" to listOf("minutes")
         )
     )
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val args = JSONObject(arguments)
         val minutes = args.optInt("minutes", 0)
         if (minutes <= 0) return "错误：请提供有效的分钟数"
+        if (minutes > 1440) return "错误：闹钟时间不能超过24小时（1440分钟）"
         val label = args.optString("label", "提醒")
         val actionMgr = AIActionManager(context)
         val cal = Calendar.getInstance().apply { add(Calendar.MINUTE, minutes) }
@@ -65,7 +67,7 @@ class AlarmAtTimePlugin(private val context: Context) : ToolPlugin {
             "required" to listOf("hour", "minute")
         )
     )
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val args = JSONObject(arguments)
         val hour = args.optInt("hour", -1)
         val minute = args.optInt("minute", 0)
@@ -91,7 +93,7 @@ class SchedulePlugin(private val context: Context) : ToolPlugin {
             "required" to listOf("description", "datetime")
         )
     )
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val args = JSONObject(arguments)
         val description = args.optString("description", "")
         val datetime = args.optString("datetime", "")
@@ -131,19 +133,21 @@ class WebSearchPlugin(private val context: Context) : ToolPlugin {
             "required" to listOf("query")
         )
     )
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val args = JSONObject(arguments)
         val query = args.optString("query", "")
         if (query.isBlank()) return "错误：请提供搜索关键词"
-        AppLogger.d("WebSearchPlugin", "search_web: query=$query")
-        return searchEngine.searchAndSummarize(query)
+        AppLogger.w("WebSearchPlugin", "search_web: query=$query")
+        return withContext(Dispatchers.IO) {
+            searchEngine.searchAndSummarize(query)
+        }
     }
 }
 
 class SearchMemoryPlugin : ToolPlugin {
     override val name = "search_memory"
     override val description = "搜索用户的短期记忆"
-    var onSearchMemory: ((String, Int) -> String)? = null
+    var onSearchMemory: (suspend (String, Int) -> String)? = null
     override fun getDefinition() = ToolDefinition(
         name = "search_memory",
         description = "搜索用户的短期记忆池。用于查找用户最近聊天中提到过的信息、偏好、约定等。注意：短期记忆只包含近期对话中提取的关键信息，如需查找更早的长期记忆请使用search_diary工具。",
@@ -155,7 +159,7 @@ class SearchMemoryPlugin : ToolPlugin {
             "required" to listOf("query")
         )
     )
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val args = JSONObject(arguments)
         val query = args.optString("query", "")
         if (query.isBlank()) return "错误：请提供搜索关键词"
@@ -166,7 +170,7 @@ class SearchMemoryPlugin : ToolPlugin {
 class SearchDiaryPlugin : ToolPlugin {
     override val name = "search_diary"
     override val description = "搜索用户的日记记录（长期记忆）"
-    var onSearchDiary: ((String, Int) -> String)? = null
+    var onSearchDiary: (suspend (String, Int) -> String)? = null
     override fun getDefinition() = ToolDefinition(
         name = "search_diary",
         description = "搜索用户的日记记录，这是用户的长期记忆。当你需要回忆用户过去几天的经历、心情变化、重要事件时调用此工具。日记包含每日总结、情绪记录和关键事件。可以多次调用不同query来获取更完整的信息。",
@@ -179,7 +183,7 @@ class SearchDiaryPlugin : ToolPlugin {
             "required" to listOf("query")
         )
     )
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val args = JSONObject(arguments)
         val query = args.optString("query", "")
         if (query.isBlank()) return "错误：请提供搜索关键词"
@@ -200,7 +204,7 @@ class CurrentTimePlugin : ToolPlugin {
             "required" to emptyList<String>()
         )
     )
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val now = Calendar.getInstance()
         val sdf = SimpleDateFormat("yyyy年M月d日 EEEE HH:mm", Locale.CHINESE)
         return "当前时间：${sdf.format(now.time)}"
@@ -226,7 +230,7 @@ class NicknamePlugin : ToolPlugin {
             "required" to listOf("nicknames")
         )
     )
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val args = JSONObject(arguments)
         val nicknamesArray = args.optJSONArray("nicknames")
         if (nicknamesArray == null || nicknamesArray.length() == 0) {
@@ -239,7 +243,6 @@ class NicknamePlugin : ToolPlugin {
         }
         onNicknamesGenerated?.invoke(nicknames)
         val summary = nicknames.joinToString("、")
-        AppLogger.d("NicknamePlugin", "summarize_nicknames: 生成了称呼列表 [$summary]")
         return "已收到你为主人建议的称呼：$summary。系统已保存这些称呼，你可以在后续的对话中自由选择使用其中一个来称呼主人。"
     }
 }
@@ -254,7 +257,7 @@ class SendStickerPlugin(private val context: Context) : ToolPlugin {
     }
     override fun getDefinition() = ToolDefinition(
         name = "send_sticker",
-        description = "发送一个表情包来表达你的情感。你有丰富的表情包可用（偷听、偷瞄、卖萌、吐槽、呆滞、哭泣、宕机、慌张、捂嘴笑、调侃、邪恶的笑、风趣调侃、骂人、鬼迷日眼的笑等）。当你有以下强烈情绪时请务必调用此工具而不是只用文字：开心/可爱/撒娇→卖萌揣手手；偷笑/窃喜→捂嘴笑；无语/嫌弃→吐槽；发呆/放空→呆滞；难过/委屈→哭泣；崩溃/卡住→宕机；慌张/紧张→慌张；好奇/八卦→偷听；害羞/腼腆→偷瞄；调侃/打趣→调侃；坏笑/腹黑→邪恶的笑；搞笑/幽默→风趣调侃；嫌弃/骂人→骂别人是猪；狡黠/贼笑→鬼迷日眼的笑。",
+        description = "发送一个表情包来表达你的情感。当用户让你发表情包、发图、发可爱图片时，必须调用此工具发送表情包，不要只用文字描述。你有丰富的表情包可用（偷听、偷瞄、卖萌、吐槽、呆滞、哭泣、宕机、慌张、捂嘴笑、调侃、邪恶的笑、风趣调侃、骂人、鬼迷日眼的笑等）。当你有以下强烈情绪时也请务必调用此工具而不是只用文字：开心/可爱/撒娇→卖萌揣手手；偷笑/窃喜→捂嘴笑；无语/嫌弃→吐槽；发呆/放空→呆滞；难过/委屈→哭泣；崩溃/卡住→宕机；慌张/紧张→慌张；好奇/八卦→偷听；害羞/腼腆→偷瞄；调侃/打趣→调侃；坏笑/腹黑→邪恶的笑；搞笑/幽默→风趣调侃；嫌弃/骂人→骂别人是猪；狡黠/贼笑→鬼迷日眼的笑。重要：用户说发表情包、发个表情、来个表情包等时，必须调用此工具！",
         parameters = mapOf(
             "type" to "object",
             "properties" to mapOf(
@@ -263,15 +266,20 @@ class SendStickerPlugin(private val context: Context) : ToolPlugin {
             "required" to listOf("emotion")
         )
     )
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val args = JSONObject(arguments)
         val emotion = args.optString("emotion", "")
+        AppLogger.w("SendStickerPlugin", "send_sticker: emotion=$emotion")
         if (emotion.isBlank()) return "请提供要表达的情感"
         val stickers = stickerManager.searchStickersByKeyword(emotion)
+        AppLogger.w("SendStickerPlugin", "send_sticker: 搜索到${stickers.size}个表情包")
         if (stickers.isEmpty()) return "没有找到匹配「$emotion」的表情包，用文字表达吧～"
-        val sticker = stickers.first()
+        val sticker = stickers.random()
+        AppLogger.w("SendStickerPlugin", "send_sticker: 选中 ${sticker.id}, path=${sticker.filePath}, onStickerSent=${onStickerSent != null}")
         if (sticker.filePath.isNotBlank()) {
             onStickerSent?.invoke(sticker.filePath)
+        } else {
+            AppLogger.w("SendStickerPlugin", "send_sticker: filePath为空，无法发送")
         }
         return "已发送表情包：${sticker.description.ifBlank { sticker.emotion }}（${sticker.id.removePrefix("builtin_")}）"
     }
@@ -283,6 +291,24 @@ class GenerateImagePlugin(private val context: Context) : ToolPlugin {
     var onImageGenerated: ((String) -> Unit)? = null
     var associatedEventId: String? = null
     var worldId: String = ""
+
+    companion object {
+        private val _generatedImagePaths = java.util.concurrent.ConcurrentLinkedQueue<String>()
+        val generatedImagePaths: List<String> get() = _generatedImagePaths.toList()
+
+        fun consumeGeneratedImagePaths(): List<String> {
+            val paths = _generatedImagePaths.toList()
+            _generatedImagePaths.clear()
+            return paths
+        }
+
+        @Deprecated("Use consumeGeneratedImagePaths() for multi-image support")
+        fun consumeGeneratedImagePath(): String? = _generatedImagePaths.poll()
+
+        internal fun addGeneratedImagePath(path: String) {
+            _generatedImagePaths.add(path)
+        }
+    }
 
     override fun isEnabled(): Boolean {
         val vwManager = VirtualWorldManager(context, worldId)
@@ -304,7 +330,7 @@ class GenerateImagePlugin(private val context: Context) : ToolPlugin {
         )
     )
 
-    override fun execute(arguments: String): String {
+    override suspend fun execute(arguments: String): String {
         val args = JSONObject(arguments)
         val prompt = args.optString("prompt", "")
         if (prompt.isBlank()) return "请提供图片描述"
@@ -320,13 +346,14 @@ class GenerateImagePlugin(private val context: Context) : ToolPlugin {
         }
 
         val eventId = associatedEventId ?: java.util.UUID.randomUUID().toString()
-        AppLogger.d("GenerateImagePlugin", "generate_image: prompt=$fullPrompt, eventId=$eventId")
+        AppLogger.w("GenerateImagePlugin", "generate_image: prompt=$fullPrompt, eventId=$eventId")
 
         return try {
-            val result = runBlocking {
+            val result = withContext(Dispatchers.IO) {
                 effectiveManager.generateImageForEvent(fullPrompt, eventId)
             }
             if (result != null) {
+                addGeneratedImagePath(result)
                 onImageGenerated?.invoke(result)
                 "图片已生成成功，路径：$result"
             } else {

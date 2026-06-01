@@ -50,6 +50,30 @@
                     android:thumbTint="#c4b5fd" />
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="图片识别厂商"
+                    android:textSize="15sp"
+                    android:textColor="#d0d0e0" />
+
+                <Spinner
+                    android:id="@+id/spinner_image_recog_provider"
+                    android:layout_width="180dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_spinner"
+                    android:popupBackground="#1a1a3e"
+                    android:textColor="#d0d0e0" />
+            </LinearLayout>
+
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -107,6 +131,63 @@
                     android:trackTint="#667eea"
                     android:thumbTint="#c4b5fd" />
             </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="使用聊天模型识别"
+                        android:textSize="15sp"
+                        android:textColor="#d0d0e0" />
+
+                    <Switch
+                        android:id="@+id/switch_chat_model_vision"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:trackTint="#667eea"
+                        android:thumbTint="#c4b5fd" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="当聊天模型支持视觉时，优先使用它识别屏幕内容"
+                    android:textSize="12sp"
+                    android:textColor="#667788"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_test_image_recog"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="8dp"
+                android:text="测试图片识别"
+                android:textColor="#667eea"
+                app:cornerRadius="10dp"
+                app:strokeColor="#667eea" />
+
+            <TextView
+                android:id="@+id/tv_image_recog_test_result"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="#4CAF50"
+                android:textSize="12sp"
+                android:visibility="gone" />
         </LinearLayout>
     </FrameLayout>
 

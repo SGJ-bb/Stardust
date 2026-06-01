@@ -1,5 +1,6 @@
-/** API预设配置: 预配置各厂商AI API地址/模型, 支持一键切换提供商 */
 package com.aicompanion.api
+
+import com.aicompanion.settings.ServicePresets
 
 object ApiProviderPreset {
 
@@ -27,8 +28,8 @@ object ApiProviderPreset {
         ApiProvider(
             name = "OpenAI (GPT)",
             icon = "\uD83D\uDFE2",
-            chatUrl = "https://api.openai.com/v1/chat/completions",
-            modelDefault = "gpt-4o-mini",
+            chatUrl = ServicePresets.getLlmUrl("openai"),
+            modelDefault = ServicePresets.getLlmDefaultModel("openai"),
             screenApiUrl = "https://api.openai.com/v1/chat/completions",
             screenModel = "gpt-4o",
             ttsUrl = "https://api.openai.com/v1/audio/speech",
@@ -47,14 +48,14 @@ object ApiProviderPreset {
         ApiProvider(
             name = "DeepSeek",
             icon = "\uD83D\uDD35",
-            chatUrl = "https://api.deepseek.com/v1/chat/completions",
-            modelDefault = "deepseek-chat",
+            chatUrl = ServicePresets.getLlmUrl("deepseek"),
+            modelDefault = ServicePresets.getLlmDefaultModel("deepseek"),
         ),
         ApiProvider(
             name = "\u7845\u57FA\u6D41\u52A8 (SiliconFlow)",
             icon = "\uD83D\uDFE3",
-            chatUrl = "https://api.siliconflow.cn/v1/chat/completions",
-            modelDefault = "THUDM/glm-4-9b-chat",
+            chatUrl = ServicePresets.getLlmUrl("siliconflow"),
+            modelDefault = ServicePresets.getLlmDefaultModel("siliconflow"),
             ttsUrl = "https://api.siliconflow.cn/v1/audio/speech",
             ttsModel = "FunAudioLLM/CosyVoice2-0.5B",
             ttsVoice = "FunAudioLLM/CosyVoice2-0.5B:alex",
@@ -72,8 +73,8 @@ object ApiProviderPreset {
         ApiProvider(
             name = "\u901A\u4E49\u5343\u95EE (Qwen)",
             icon = "\uD83D\uDFE0",
-            chatUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-            modelDefault = "qwen-turbo",
+            chatUrl = ServicePresets.getLlmUrl("aliyun"),
+            modelDefault = ServicePresets.getLlmDefaultModel("aliyun"),
             screenApiUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
             screenModel = "qwen-vl-plus",
             ttsUrl = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
@@ -90,24 +91,24 @@ object ApiProviderPreset {
         ApiProvider(
             name = "\u667A\u8C31AI (Zhipu)",
             icon = "\uD83D\uDD34",
-            chatUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-            modelDefault = "glm-4-flash",
+            chatUrl = ServicePresets.getLlmUrl("zhipu"),
+            modelDefault = ServicePresets.getLlmDefaultModel("zhipu"),
             screenApiUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions",
             screenModel = "glm-4v-plus",
         ),
         ApiProvider(
             name = "\u6708\u4E4B\u6697\u9762 (Moonshot)",
             icon = "\uD83C\uDF19",
-            chatUrl = "https://api.moonshot.cn/v1/chat/completions",
-            modelDefault = "moonshot-v1-8k",
+            chatUrl = ServicePresets.getLlmUrl("moonshot"),
+            modelDefault = ServicePresets.getLlmDefaultModel("moonshot"),
             screenApiUrl = "https://api.moonshot.cn/v1/chat/completions",
             screenModel = "moonshot-v1-8k",
         ),
         ApiProvider(
             name = "n1n",
             icon = "\uD83D\uDFE1",
-            chatUrl = "https://api.n1n.ai/v1/chat/completions",
-            modelDefault = "gpt-4o-mini",
+            chatUrl = ServicePresets.getLlmUrl("n1n"),
+            modelDefault = ServicePresets.getLlmDefaultModel("n1n"),
         ),
         ApiProvider(
             name = "\u81EA\u5B9A\u4E49",

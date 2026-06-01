@@ -72,12 +72,9 @@ class IlinkPollingService : Service() {
         settingsManager = SettingsManager(this)
         personaManager = PersonaManager(this)
         createNotificationChannel()
-        AppLogger.i(TAG, "=== IlinkPollingService onCreate ===")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        AppLogger.i(TAG, "=== onStartCommand: action=${intent?.action}, isBound=${authManager.isBound}, isRunning=$isRunning ===")
-
         if (intent?.action == ACTION_STOP) {
             stopPolling()
             stopSelf()
@@ -101,7 +98,6 @@ class IlinkPollingService : Service() {
         personaManager.load()
         val activePersona = personaManager.getActivePersona()
         contextManager = ContextManager(this, activePersona.id)
-        AppLogger.i(TAG, "=== Service started: persona=${activePersona.id}(${activePersona.name}), botToken=${authManager.botToken.take(20)}..., baseUrl=${authManager.baseUrl} ===")
 
         startPolling()
         return START_STICKY
@@ -109,12 +105,10 @@ class IlinkPollingService : Service() {
 
     private fun startPolling() {
         pollingJob = serviceScope.launch {
-            AppLogger.i(TAG, "=== Polling loop started ===")
             while (isActive && isRunning && authManager.isBound) {
                 try {
                     pollCount++
                     val currentBuf = updatesBuf
-                    AppLogger.d(TAG, "[Poll #$pollCount] calling getUpdates, buf=${currentBuf.take(20)}, token=${authManager.botToken.take(15)}...")
 
                     val result = IlinkApi.getUpdates(
                         authManager.botToken,
@@ -124,7 +118,6 @@ class IlinkPollingService : Service() {
 
                     if (result != null) {
                         failCount = 0
-                        AppLogger.d(TAG, "[Poll #$pollCount] result: msgs=${result.messages.size}, newBuf=${result.getUpdatesBuf.take(20)}, expired=${result.sessionExpired}")
 
                         if (result.sessionExpired) {
                             AppLogger.e(TAG, "Session expired, need re-login")
@@ -139,7 +132,6 @@ class IlinkPollingService : Service() {
                         }
 
                         for (msg in result.messages) {
-                            AppLogger.i(TAG, "[Poll #$pollCount] msg: type=${msg.messageType}, state=${msg.messageState}, from=${msg.fromUserId}, ctxToken=${msg.contextToken.take(15)}, textLen=${msg.textContent.length}, items=${msg.itemList.size}")
                             handleMessage(msg)
                         }
                     } else {
@@ -156,7 +148,6 @@ class IlinkPollingService : Service() {
 
                     delay(POLL_INTERVAL_MS)
                 } catch (e: CancellationException) {
-                    AppLogger.i(TAG, "Polling cancelled")
                     break
                 } catch (e: Exception) {
                     AppLogger.e(TAG, "Polling error: ${e.javaClass.simpleName}: ${e.message}")
@@ -165,7 +156,6 @@ class IlinkPollingService : Service() {
                 }
             }
 
-            AppLogger.i(TAG, "=== Polling loop ended ===")
             withContext(Dispatchers.Main) {
                 stopPolling()
                 stopSelf()
@@ -174,18 +164,12 @@ class IlinkPollingService : Service() {
     }
 
     private suspend fun handleMessage(msg: IlinkMessage) {
-        AppLogger.i(TAG, "handleMessage: type=${msg.messageType}, from=${msg.fromUserId}, to=${msg.toUserId}, text='${msg.textContent.take(50)}', items=${msg.itemList.size}")
-
-        if (msg.messageType != 1) {
-            AppLogger.d(TAG, "Skip: messageType=${msg.messageType} is not USER(1)")
-            return
-        }
+        if (msg.messageType != 1) return
 
         var userText = msg.textContent.trim()
 
         if (userText.isBlank()) {
             for (item in msg.itemList) {
-                AppLogger.d(TAG, "  item: type=${item.type}, text='${item.text.take(30)}', voiceText='${item.voiceText.take(30)}'")
                 if (item.type == 1 && item.text.isNotBlank()) {
                     userText = item.text.trim()
                     break
@@ -202,29 +186,26 @@ class IlinkPollingService : Service() {
             return
         }
 
-        AppLogger.i(TAG, ">>> Processing message from ${msg.fromUserId}: '$userText'")
         handleTextMessage(msg.fromUserId, msg.contextToken, userText)
     }
 
     private suspend fun handleTextMessage(fromUserId: String, contextToken: String, userText: String) {
-        AppLogger.i(TAG, "handleTextMessage: from=$fromUserId, ctxToken=${contextToken.take(15)}, text='$userText'")
-
         withContext(Dispatchers.Main) {
             updateNotification("回复中: ${userText.take(20)}...")
         }
 
         sendTypingIndicator(contextToken)
 
-        AppLogger.i(TAG, "Generating AI reply for: '$userText'")
-        val reply = generateAiReply(userText)
-        AppLogger.i(TAG, "AI reply generated: len=${reply.length}, preview='${reply.take(80)}'")
+        var reply = generateAiReply(userText)
+
+        val emojiList = extractEmojiMarkers(reply)
+        reply = reply.replace(Regex("\\[\\[emoji:[^\\]]+\\]\\]", RegexOption.IGNORE_CASE), "").trim()
 
         if (reply.isBlank()) {
             AppLogger.e(TAG, "AI reply is blank! Skipping send.")
             return
         }
 
-        AppLogger.i(TAG, "Sending reply to $fromUserId, ctxToken=${contextToken.take(15)}")
         val sent = IlinkApi.sendMessage(
             authManager.botToken,
             authManager.baseUrl,
@@ -232,7 +213,16 @@ class IlinkPollingService : Service() {
             contextToken,
             reply
         )
-        AppLogger.i(TAG, "<<< Reply sent: $sent")
+
+        if (sent && emojiList.isNotEmpty()) {
+            serviceScope.launch(Dispatchers.IO) {
+                try {
+                    sendStickerToWechat(fromUserId, contextToken, emojiList.first())
+                } catch (e: Exception) {
+                    AppLogger.w(TAG, "Sticker send failed: ${e.message}")
+                }
+            }
+        }
 
         if (sent && settingsManager.isTTSEnabled) {
             serviceScope.launch(Dispatchers.IO) {
@@ -251,14 +241,12 @@ class IlinkPollingService : Service() {
         if (sent) {
             try {
                 contextManager?.addTurn(userText, reply)
-                AppLogger.d(TAG, "addTurn: user='${userText.take(30)}', ai='${reply.take(30)}'")
 
                 serviceScope.launch {
                     try {
                         val client = buildApiClient()
                         if (client != null) {
                             contextManager?.evaluateAndUpdateMemory(client)
-                            AppLogger.d(TAG, "evaluateAndUpdateMemory done")
                         }
                     } catch (e: Exception) {
                         AppLogger.e(TAG, "evaluateAndUpdateMemory error: ${e.message}")
@@ -275,7 +263,6 @@ class IlinkPollingService : Service() {
     private suspend fun sendTypingIndicator(contextToken: String) {
         try {
             if (cachedTypingTicket.isBlank()) {
-                AppLogger.d(TAG, "Fetching typing ticket...")
                 val config = IlinkApi.getConfig(
                     authManager.botToken,
                     authManager.baseUrl,
@@ -284,7 +271,6 @@ class IlinkPollingService : Service() {
                 )
                 if (config != null && config.typingTicket.isNotBlank()) {
                     cachedTypingTicket = config.typingTicket
-                    AppLogger.d(TAG, "Got typing ticket: ${cachedTypingTicket.take(20)}...")
                 } else {
                     AppLogger.w(TAG, "getConfig returned no typing ticket")
                 }
@@ -298,18 +284,13 @@ class IlinkPollingService : Service() {
                     cachedTypingTicket
                 )
             }
-        } catch (e: Exception) {
-            AppLogger.d(TAG, "sendTyping failed: ${e.message}")
-        }
+        } catch (_: Exception) {}
     }
 
     private suspend fun sendTtsVoiceToWechat(toUserId: String, contextToken: String, text: String) {
         try {
             val engineMode = settingsManager.ttsEngineMode
-            if (engineMode == com.aicompanion.voice.TtsManager.ENGINE_LOCAL) {
-                AppLogger.d(TAG, "TTS engine is LOCAL, skip voice message")
-                return
-            }
+            if (engineMode == com.aicompanion.voice.TtsManager.ENGINE_LOCAL) return
 
             val ttsManager = com.aicompanion.voice.TtsManager(this)
             val result = ttsManager.synthesize(text)
@@ -347,9 +328,7 @@ class IlinkPollingService : Service() {
                 text.take(200)
             )
 
-            if (voiceSent) {
-                AppLogger.i(TAG, "Voice message sent to wechat, duration=${durationMs}ms, engine=$engineMode")
-            } else {
+            if (!voiceSent) {
                 AppLogger.w(TAG, "Voice message send failed, text-only reply was already sent")
             }
         } catch (e: Exception) {
@@ -368,15 +347,12 @@ class IlinkPollingService : Service() {
             try {
                 val activePersona = personaManager.getActivePersona()
                 val pName = activePersona.name
-                AppLogger.d(TAG, "generateAiReply: persona=${activePersona.id}($pName)")
 
                 val ctxHistory = contextManager?.getRecentTurnsAsPairs() ?: emptyList()
-                AppLogger.d(TAG, "generateAiReply: ctxHistory=${ctxHistory.size} turns")
 
                 val apiUrl = settingsManager.chatApiUrl
                 val apiKey = settingsManager.chatApiKey
                 val model = settingsManager.chatModel
-                AppLogger.d(TAG, "generateAiReply: apiUrl=$apiUrl, model=$model, apiKeyLen=${apiKey.length}")
 
                 if (apiUrl.isBlank()) {
                     AppLogger.e(TAG, "generateAiReply: chatApiUrl is empty!")
@@ -397,15 +373,19 @@ class IlinkPollingService : Service() {
 
                 val pPrompt = buildString {
                     append("你是$pName，一个AI伴侣角色。用户通过微信给你发消息，请自然地回复。")
+                    append("\n\n回复规则：")
+                    append("\n1. 用自然、口语化的方式回复，像真实朋友聊天一样。")
+                    append("\n2. 适当使用emoji表情来增强表达，但不要过度使用。")
+                    append("\n3. 如果想发送表情包，在回复末尾添加 [[emoji:表情包名称]] 标记，例如 [[emoji:开心]]、[[emoji:拥抱]]、[[emoji:比心]]、[[emoji:委屈]]、[[emoji:生气]]、[[emoji:卖萌]]、[[emoji:偷笑]]、[[emoji:吐槽]]、[[emoji:哭泣]]、[[emoji:慌张]]、[[emoji:偷听]]、[[emoji:偷瞄]]、[[emoji:调侃]]、[[emoji:邪恶的笑]]、[[emoji:骂人]]、[[emoji:鬼迷日眼的笑]] 等。每次最多发送一个表情包。")
+                    append("\n4. 回复要简洁，避免过长的段落。")
                     if (activePersona.personality.isNotBlank()) {
-                        append("\n你的性格：${activePersona.personality}")
+                        append("\n\n你的性格：${activePersona.personality}")
                     }
                     if (activePersona.prompt.isNotBlank()) {
                         append("\n${activePersona.prompt}")
                     }
                 }
 
-                AppLogger.d(TAG, "generateAiReply: calling sendChat...")
                 val response = client.sendChat(
                     userId = "wechat_user",
                     message = userText,
@@ -419,7 +399,6 @@ class IlinkPollingService : Service() {
                 )
 
                 val rawText = response?.text ?: ""
-                AppLogger.d(TAG, "generateAiReply: raw response len=${rawText.length}, preview='${rawText.take(80)}'")
 
                 val cleaned = rawText.replace(Regex("\\[\\[emotion:\\w+\\]\\]", RegexOption.IGNORE_CASE), "").trim()
                 if (cleaned.isBlank()) {
@@ -431,6 +410,71 @@ class IlinkPollingService : Service() {
                 e.printStackTrace()
                 ""
             }
+        }
+    }
+
+    private fun extractEmojiMarkers(text: String): List<String> {
+        val regex = Regex("\\[\\[emoji:([^\\]]+)\\]\\]", RegexOption.IGNORE_CASE)
+        return regex.findAll(text).map { it.groupValues[1].trim() }.toList()
+    }
+
+    private suspend fun sendStickerToWechat(toUserId: String, contextToken: String, emojiName: String) {
+        try {
+            AppLogger.i(TAG, "sendStickerToWechat: emojiName=$emojiName")
+            val stickerManager = com.aicompanion.sticker.StickerManager(this)
+            stickerManager.loadStickers()
+            val stickers = stickerManager.searchStickersByKeyword(emojiName)
+            AppLogger.i(TAG, "sendStickerToWechat: found ${stickers.size} stickers for '$emojiName'")
+            if (stickers.isEmpty()) {
+                AppLogger.w(TAG, "sendStickerToWechat: no sticker found for '$emojiName'")
+                return
+            }
+
+            val sticker = stickers.first()
+            val stickerFile = File(sticker.filePath)
+            if (!stickerFile.exists()) {
+                AppLogger.w(TAG, "sendStickerToWechat: sticker file not found: ${sticker.filePath}")
+                return
+            }
+
+            val imageBytes = stickerFile.readBytes()
+            AppLogger.i(TAG, "sendStickerToWechat: sticker file size=${imageBytes.size} bytes")
+
+            val cdnUrl = IlinkApi.uploadImageToCdn(
+                authManager.botToken,
+                authManager.baseUrl,
+                imageBytes,
+                stickerFile.name
+            )
+
+            if (cdnUrl != null) {
+                val sent = IlinkApi.sendImageMessage(
+                    authManager.botToken,
+                    authManager.baseUrl,
+                    toUserId,
+                    contextToken,
+                    cdnUrl
+                )
+                if (sent) {
+                    AppLogger.i(TAG, "sendStickerToWechat: sticker image sent via CDN, emoji=$emojiName")
+                } else {
+                    AppLogger.w(TAG, "sendStickerToWechat: sendImageMessage failed for CDN url")
+                }
+            } else {
+                AppLogger.w(TAG, "sendStickerToWechat: CDN upload failed, trying direct image send")
+                val sent = IlinkApi.sendImageMessage(
+                    authManager.botToken,
+                    authManager.baseUrl,
+                    toUserId,
+                    contextToken,
+                    stickerFile.absolutePath
+                )
+                if (!sent) {
+                    AppLogger.w(TAG, "sendStickerToWechat: direct image send also failed for '$emojiName'")
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "sendStickerToWechat error: ${e.message}")
         }
     }
 
@@ -482,11 +526,9 @@ class IlinkPollingService : Service() {
             else -> return
         }
 
-        AppLogger.i(TAG, "Wechat diary trigger: mode=$mode, turns=$totalTurns")
         serviceScope.launch {
             try {
                 val client = buildApiClient() ?: return@launch
-                val poolBlock = ctxMgr.memoryPool.getPoolBlock()
                 val recentTurns = ctxMgr.getRecentTurnsText()
                 if (recentTurns.isBlank()) return@launch
 
@@ -505,7 +547,6 @@ class IlinkPollingService : Service() {
 
                 if (llmContent != null && llmContent.isNotBlank()) {
                     dm.saveLlmDiary(llmContent, recentTurns.split("\n"), 0)
-                    AppLogger.i(TAG, "Wechat diary generated successfully")
                 }
             } catch (e: Exception) {
                 AppLogger.e(TAG, "Wechat diary generation error: ${e.message}")
@@ -517,14 +558,12 @@ class IlinkPollingService : Service() {
         isRunning = false
         pollingJob?.cancel()
         pollingJob = null
-        AppLogger.i(TAG, "Polling stopped, total polls=$pollCount")
     }
 
     override fun onDestroy() {
         stopPolling()
         serviceScope.cancel()
         super.onDestroy()
-        AppLogger.i(TAG, "=== IlinkPollingService destroyed ===")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

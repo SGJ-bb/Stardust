@@ -39,7 +39,15 @@ class FavoriteManager(context: Context, private val personaId: String = "default
                 feedback = obj.optInt("feedback", 0),
                 timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
                 isFavorited = true,
-                reactionEmoji = obj.optString("reactionEmoji", "")
+                reactionEmoji = obj.optString("reactionEmoji", ""),
+                stickerPath = obj.optString("stickerPath", "").ifBlank { null },
+                generatedImagePath = obj.optString("generatedImagePath", "").ifBlank { null },
+                imageUrls = try {
+                    val imgArr = obj.optJSONArray("imageUrls")
+                    if (imgArr != null) (0 until imgArr.length()).map { imgArr.getString(it) } else emptyList()
+                } catch (_: Exception) { emptyList() },
+                audioPath = obj.optString("audioPath", "").ifBlank { null },
+                audioUrl = obj.optString("audioUrl", "").ifBlank { null }
             ))
         }
         return result
@@ -67,6 +75,11 @@ class FavoriteManager(context: Context, private val personaId: String = "default
                 put("timestamp", msg.timestamp)
                 put("isFavorited", true)
                 put("reactionEmoji", msg.reactionEmoji)
+                if (msg.stickerPath != null) put("stickerPath", msg.stickerPath)
+                if (msg.generatedImagePath != null) put("generatedImagePath", msg.generatedImagePath)
+                if (msg.imageUrls.isNotEmpty()) put("imageUrls", JSONArray(msg.imageUrls))
+                if (msg.audioPath != null) put("audioPath", msg.audioPath)
+                if (msg.audioUrl != null) put("audioUrl", msg.audioUrl)
             })
         }
         prefs.edit().putString("messages", arr.toString()).apply()

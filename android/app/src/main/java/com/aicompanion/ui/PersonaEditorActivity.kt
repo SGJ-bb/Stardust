@@ -50,7 +50,7 @@ class PersonaEditorActivity : Activity() {
             ?: getSharedPreferences("app_prefs", MODE_PRIVATE).getString("active_persona_id", "default")
             ?: "default"
 
-        nicknameManager = NicknameManager(this)
+        nicknameManager = NicknameManager(this, personaId)
         initViews()
         loadPersona()
         loadDiscoveredNicknames()
@@ -216,11 +216,11 @@ class PersonaEditorActivity : Activity() {
 
         val appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         appPrefs.edit().apply {
-            putString("ai_name", name.ifBlank { "星尘" })
-            putString("user_call_name", nickname)
             putString("ai_prompt_$personaId", prompt)
             apply()
         }
+
+        com.aicompanion.prompt.PromptBuilder.invalidateCache()
     }
 
     private fun loadDiscoveredNicknames() {

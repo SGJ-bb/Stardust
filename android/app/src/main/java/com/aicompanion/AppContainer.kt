@@ -36,37 +36,81 @@ object AppContainer {
     private var _nicknamePlugin: NicknamePlugin? = null
     private var _generateImagePlugin: GenerateImagePlugin? = null
 
+    private var _cachedPersonaId: String? = null
+
     val apiClient: ApiClient? get() = _apiClient
     val affectionManager: AffectionManager
-        get() = _affectionManager ?: AffectionManager(appContext!!, readActivePersonaId()).also { _affectionManager = it }
+        get() = getOrCreatePersonaAware(::_affectionManager, { _affectionManager = it }) { ctx, pid ->
+            AffectionManager(ctx, pid)
+        }
     val achievementManager: AchievementManager
-        get() = _achievementManager ?: AchievementManager(appContext!!, readActivePersonaId()).also { _achievementManager = it }
+        get() = getOrCreatePersonaAware(::_achievementManager, { _achievementManager = it }) { ctx, pid ->
+            AchievementManager(ctx, pid)
+        }
     val stickerManager: StickerManager
-        get() = _stickerManager ?: StickerManager(appContext!!).also { _stickerManager = it }
+        get() = _stickerManager ?: StickerManager(requireContext()).also { _stickerManager = it }
     val contextManager: ContextManager
-        get() = _contextManager ?: ContextManager(appContext!!).also { _contextManager = it }
+        get() = _contextManager ?: ContextManager(requireContext()).also { _contextManager = it }
     val favoriteManager: FavoriteManager
-        get() = _favoriteManager ?: FavoriteManager(appContext!!, readActivePersonaId()).also { _favoriteManager = it }
+        get() = getOrCreatePersonaAware(::_favoriteManager, { _favoriteManager = it }) { ctx, pid ->
+            FavoriteManager(ctx, pid)
+        }
     val nicknameManager: NicknameManager
-        get() = _nicknameManager ?: NicknameManager(appContext!!).also { _nicknameManager = it }
+        get() = getOrCreatePersonaAware(::_nicknameManager, { _nicknameManager = it }) { ctx, pid ->
+            NicknameManager(ctx, pid)
+        }
     val voiceManager: VoiceManager
-        get() = _voiceManager ?: VoiceManager(appContext!!).also { _voiceManager = it }
+        get() = _voiceManager ?: VoiceManager(requireContext()).also { _voiceManager = it }
     val momentsManager: MemorableMomentsManager
-        get() = _momentsManager ?: MemorableMomentsManager(appContext!!, readActivePersonaId()).also { _momentsManager = it }
+        get() = getOrCreatePersonaAware(::_momentsManager, { _momentsManager = it }) { ctx, pid ->
+            MemorableMomentsManager(ctx, pid)
+        }
     val actionManager: AIActionManager
-        get() = _actionManager ?: AIActionManager(appContext!!).also { _actionManager = it }
+        get() = _actionManager ?: AIActionManager(requireContext()).also { _actionManager = it }
     val personaRagManager: PersonaRagManager
-        get() = _personaRagManager ?: PersonaRagManager(appContext!!, readActivePersonaId()).also { _personaRagManager = it }
+        get() = getOrCreatePersonaAware(::_personaRagManager, { _personaRagManager = it }) { ctx, pid ->
+            PersonaRagManager(ctx, pid)
+        }
 
-    fun initialize(appContext: Context) {
-        this.appContext = appContext
-        settingsManager = SettingsManager(appContext)
-        registerBuiltinPlugins(appContext)
+    private fun requireContext(): Context {
+        return appContext ?: throw IllegalStateException("AppContainer not initialized. Call initialize() first.")
     }
 
     private fun readActivePersonaId(): String {
         return appContext?.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
             ?.getString("active_persona_id", "default") ?: "default"
+    }
+
+    private inline fun <T : Any> getOrCreatePersonaAware(
+        currentGetter: () -> T?,
+        setter: (T) -> Unit,
+        factory: (Context, String) -> T
+    ): T {
+        val ctx = requireContext()
+        val currentPid = readActivePersonaId()
+        val current = currentGetter()
+        if (current != null && _cachedPersonaId == currentPid) return current
+        val newInstance = factory(ctx, currentPid)
+        setter(newInstance)
+        _cachedPersonaId = currentPid
+        return newInstance
+    }
+
+    fun onPersonaChanged() {
+        _affectionManager = null
+        _achievementManager = null
+        _favoriteManager = null
+        _nicknameManager = null
+        _momentsManager = null
+        _personaRagManager = null
+        _cachedPersonaId = null
+    }
+
+    fun initialize(appContext: Context) {
+        this.appContext = appContext
+        settingsManager = SettingsManager(appContext)
+        com.aicompanion.network.ProviderAdapter.init(appContext)
+        registerBuiltinPlugins(appContext)
     }
 
     fun rebuildApiClient() {
@@ -97,11 +141,11 @@ object AppContainer {
         PluginRegistry.register(_generateImagePlugin!!)
     }
 
-    fun setSearchMemoryCallback(callback: (String, Int) -> String) {
+    fun setSearchMemoryCallback(callback: suspend (String, Int) -> String) {
         _searchMemoryPlugin?.onSearchMemory = callback
     }
 
-    fun setSearchDiaryCallback(callback: (String, Int) -> String) {
+    fun setSearchDiaryCallback(callback: suspend (String, Int) -> String) {
         _searchDiaryPlugin?.onSearchDiary = callback
     }
 
