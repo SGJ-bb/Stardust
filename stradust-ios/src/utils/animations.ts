@@ -261,8 +261,8 @@ export function progressFill(
  */
 export function ripple(
   targets: string | Element | Element[],
-  originX: string = "50%",
-  originY: string = "50%"
+  _originX: string = "50%",
+  _originY: string = "50%"
 ) {
   return animate(targets, {
     scale: [0, 4],

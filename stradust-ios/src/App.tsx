@@ -15,7 +15,6 @@ import WakeUpPage from "./pages/WakeUpPage";
 import ChatHistoryPage from "./pages/ChatHistoryPage";
 import MemorialAlbumPage from "./pages/MemorialAlbumPage";
 import CalendarPage from "./pages/CalendarPage";
-import { buttonPress } from "./utils/animations";
 
 type Page = "chat" | "settings" | "profile" | "diary" | "achievement" | "memory" | "moments" | "more" | "capsule" | "groupchat" | "skinshop" | "sticker" | "wakeup" | "chathistory" | "memorial" | "calendar";
 

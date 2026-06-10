@@ -15,9 +15,6 @@ import {
   listStaggerIn,
   fadeInScale,
   glowPulse,
-  buttonPress,
-  staggerFadeIn,
-  fadeInUp,
 } from "../utils/animations";
 
 interface DiaryPageProps {
@@ -58,7 +55,7 @@ export default function DiaryPage({ onBack }: DiaryPageProps) {
     if (diaryListRef.current && diaries.length > 0) {
       const cards = diaryListRef.current.querySelectorAll("[data-diary-card]");
       if (cards.length > 0) {
-        listStaggerIn(cards);
+        listStaggerIn(Array.from(cards));
       }
     }
   }, [diaries]);

@@ -16,7 +16,6 @@ import {
   staggerFadeIn,
   progressFill,
   glowPulse,
-  fadeInUp,
   fadeInScale,
 } from "../utils/animations";
 
@@ -44,15 +43,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   hidden: "var(--accent-yellow)",
 };
 
-const CATEGORY_GRADIENTS: Record<string, string> = {
-  chat: "var(--gradient-cool)",
-  checkin: "var(--gradient-warm)",
-  affection: "linear-gradient(135deg, var(--accent-pink), var(--accent-primary))",
-  memory: "var(--gradient-primary)",
-  diary: "linear-gradient(135deg, var(--accent-green), var(--accent-secondary))",
-  hidden: "linear-gradient(135deg, var(--accent-yellow), var(--accent-orange))",
-};
-
 export default function AchievementPage({ onBack }: AchievementPageProps) {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,8 +52,6 @@ export default function AchievementPage({ onBack }: AchievementPageProps) {
   const unlockedCountRef = useRef<HTMLSpanElement>(null);
   const overallProgressRef = useRef<HTMLDivElement>(null);
   const listWrapRef = useRef<HTMLDivElement>(null);
-  const prevUnlockedCount = useRef(0);
-  const prevOverallProgress = useRef(0);
 
   useEffect(() => {
     async function init() {
@@ -176,7 +164,7 @@ export default function AchievementPage({ onBack }: AchievementPageProps) {
     if (loading || !listWrapRef.current) return;
     const cards = listWrapRef.current.querySelectorAll("[data-ach-card]");
     if (cards.length > 0) {
-      staggerFadeIn(cards);
+      staggerFadeIn(Array.from(cards));
     }
   }, [loading, achievements]);
 

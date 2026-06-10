@@ -9,9 +9,7 @@ import {
 import {
   listStaggerIn,
   bottomSheetIn,
-  breathe,
   glowPulse,
-  fadeInUp,
 } from "../utils/animations";
 
 interface TimeCapsulePageProps {
