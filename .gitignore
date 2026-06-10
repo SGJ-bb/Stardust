@@ -59,3 +59,23 @@ config/.env
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# iOS build
+stradust-ios/node_modules/
+stradust-ios/dist/
+stradust-ios/src-tauri/target/
+stradust-ios/src-tauri/gen/
+*.ipa
+
+# PC build
+stradust-pc/node_modules/
+stradust-pc/dist/
+stradust-pc/src-tauri/target/
+stradust-pc/src-tauri/gen/
+
+# Temp files
+*.png
+!stradust-ios/src-tauri/icons/*.png
+taste-skill-main/
+*.zip
+build_log.txt
