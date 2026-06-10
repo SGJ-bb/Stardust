@@ -27,7 +27,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22.16"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -51,22 +51,26 @@ jobs:
       - name: Initialize Tauri iOS
         working-directory: stradust-ios
         run: |
+          # 设置 Team ID（占位符或真实值）
+          TEAM_ID="${{ secrets.APPLE_DEVELOPMENT_TEAM }}"
+          if [ -z "$TEAM_ID" ]; then
+            TEAM_ID="0000000000"
+          fi
+
+          # 用 python3 更新 tauri.conf.json 中的 developmentTeam
+          cd src-tauri
+          python3 -c "
+          import json
+          with open('tauri.conf.json', 'r') as f:
+              cfg = json.load(f)
+          cfg['bundle']['iOS']['developmentTeam'] = '$TEAM_ID'
+          with open('tauri.conf.json', 'w') as f:
+              json.dump(cfg, f, indent=2, ensure_ascii=False)
+          "
+          cd ..
+
+          # 初始化 iOS 项目（如果尚未初始化）
           if [ ! -d "src-tauri/gen/apple" ]; then
-            # 使用占位 Team ID 初始化（debug 不需要真实签名）
-            TEAM_ID="${{ secrets.APPLE_DEVELOPMENT_TEAM }}"
-            if [ -z "$TEAM_ID" ]; then
-              TEAM_ID="0000000000"
-            fi
-            cd src-tauri
-            python3 -c "
-            import json
-            with open('tauri.conf.json', 'r') as f:
-                cfg = json.load(f)
-            cfg['bundle']['iOS']['developmentTeam'] = '$TEAM_ID'
-            with open('tauri.conf.json', 'w') as f:
-                json.dump(cfg, f, indent=2, ensure_ascii=False)
-            "
-            cd ..
             pnpm tauri ios init --ci
           fi
 

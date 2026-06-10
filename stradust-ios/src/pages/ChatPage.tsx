@@ -10,7 +10,6 @@ import {
   generateId,
   formatTime,
   getEmotionEmoji,
-  getEmotionColor,
   humanizeResponse,
   filterContent,
   getSafetyRefusal,
@@ -20,7 +19,6 @@ import {
   getCareMessage,
   type ApiConfig,
   type CharacterCard,
-  type HumanizedSegment,
 } from "../utils/api";
 import {
   messageBubbleIn,
@@ -158,7 +156,7 @@ export default function ChatPage({ onOpenSettings, onOpenProfile, onOpenChatHist
   useEffect(() => {
     let anim: ReturnType<typeof typingDots> | null = null;
     if (isTyping && typingDotsRef.current) {
-      anim = typingDots(typingDotsRef.current.children);
+      anim = typingDots(Array.from(typingDotsRef.current.children));
     }
     return () => { if (anim) anim.revert(); };
   }, [isTyping]);
@@ -296,7 +294,6 @@ export default function ChatPage({ onOpenSettings, onOpenProfile, onOpenChatHist
         await saveHistory(updated);
       } else {
         // 人性化处理
-        let displayText = response.text;
         try {
           const segments = await humanizeResponse(response.text);
           if (segments.length > 1) {

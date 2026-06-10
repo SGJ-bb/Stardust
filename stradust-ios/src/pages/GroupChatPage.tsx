@@ -20,8 +20,6 @@ import {
   listStaggerIn,
   messageBubbleIn,
   bottomSheetIn,
-  bottomSheetOut,
-  buttonPress,
 } from "../utils/animations";
 
 // 成员头像颜色映射

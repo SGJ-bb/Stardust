@@ -22,11 +22,8 @@ import {
 } from "../utils/api";
 import {
   progressFill,
-  listStaggerIn,
   staggerFadeIn,
   breathe,
-  glowPulse,
-  fadeInUp,
   fadeInScale,
   bottomSheetIn,
 } from "../utils/animations";
@@ -148,7 +145,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
     if (milestoneListRef.current && milestones.length > 0) {
       const items = milestoneListRef.current.querySelectorAll("[data-milestone]");
       if (items.length > 0) {
-        staggerFadeIn(items);
+        staggerFadeIn(Array.from(items));
       }
     }
   }, [milestones]);
@@ -416,7 +413,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
               {milestones.map((m) => (
                 <div key={m.id} data-milestone style={{
                   ...styles.milestoneItem,
-                  borderLeft: m.unlocked
+                  borderLeft: (m as any).unlocked
                     ? "3px solid var(--accent-green)"
                     : "3px solid var(--accent-primary)",
                 }}>
