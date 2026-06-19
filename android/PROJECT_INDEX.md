@@ -241,8 +241,10 @@ AI伴侣Android应用，支持多模态交互（文字/语音/图片），虚拟
 |------|------|--------|
 | `IlinkApi.kt` | 微信iLink API接口 | `IlinkApi` → `sendMessage()`, `generateQRCode()` |
 | `IlinkAuthManager.kt` | iLink认证管理 | `IlinkAuthManager` → `isBound`, `botToken`, `bindBot()`, `unbindBot()` |
-| `IlinkPollingService.kt` | iLink消息轮询服务 | `IlinkPollingService` |
+| `IlinkPollingService.kt` | iLink消息轮询服务，自动保存聊天记录 | `IlinkPollingService` |
 | `WechatBindActivity.kt` | 微信绑定Activity | `WechatBindActivity` |
+| `WechatChatActivity.kt` | 微信聊天记录查看Activity | `WechatChatActivity` |
+| `WechatChatAdapter.kt` | 微信风格聊天气泡适配器 | `WechatChatAdapter` |
 
 ### 唤醒 (wakeup/)
 
@@ -503,6 +505,9 @@ VirtualWorldManager.tick()
 | `activity_sticker.xml` | 表情包 | 表情包网格 |
 | `activity_activation.xml` | 激活页 | 激活表单 |
 | `activity_web_test.xml` | Web测试 | WebView |
+| `activity_wechat_chat.xml` | 微信聊天记录 | RecyclerView, 日期选择, 统计栏 |
+| `item_wechat_msg_user.xml` | 微信用户消息气泡 | TextView, 头像, 绿色气泡 |
+| `item_wechat_msg_ai.xml` | 微信AI消息气泡 | TextView, 头像, 白色气泡 |
 | `item_message_user.xml` | 用户消息气泡 | TextView, 头像 |
 | `item_message_pet.xml` | AI消息气泡 | TextView, 头像, 情绪指示器 |
 | `item_group_message.xml` | 群聊消息 | 角色名, 消息内容 |

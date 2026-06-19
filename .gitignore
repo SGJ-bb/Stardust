@@ -73,6 +73,12 @@ stradust-pc/dist/
 stradust-pc/src-tauri/target/
 stradust-pc/src-tauri/gen/
 
+# PC runtime data (API keys stored in SQLite)
+*.db
+*.db-shm
+*.db-wal
+stradust-pc/data/
+
 # Temp files
 *.png
 !stradust-ios/src-tauri/icons/*.png
