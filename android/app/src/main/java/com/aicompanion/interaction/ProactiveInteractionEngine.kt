@@ -1,6 +1,7 @@
-/** 主动交互引擎: 根据时间/用户活跃度/好感度决定何时主动搭话, 支持不同频率策略 */
+/** 主动交互引擎: 根据时间/用户活跃度/好感度/驱动力决定何时主动搭话, 支持不同频率策略 */
 package com.aicompanion.interaction
 
+import com.aicompanion.emotion.SubjectivityEngine
 import com.aicompanion.models.Emotion
 import com.aicompanion.models.Action
 import com.aicompanion.settings.SettingsManager
@@ -42,8 +43,32 @@ class ProactiveInteractionEngine(private val settingsManager: SettingsManager) {
         "感觉好久没聊天了呢", "今天有什么新鲜事吗？", "主人不在的时候我自己想了很多..."
     )
 
+    // 驱动力驱动的主动行为话术
+    private val curiosityPhrases = listOf(
+        "对了，你之前说的那个事，后来怎么样了？",
+        "我一直很好奇，你为什么喜欢那个？",
+        "你有没有想过试试别的方法？"
+    )
+
+    private val socialPhrases = listOf(
+        "你今天过得怎么样？想听你说说~",
+        "最近有没有什么开心的事？",
+        "我有点想你了..."
+    )
+
+    private val autonomyPhrases = listOf(
+        "我觉得我们可以换个方式聊，不要总是问我问题嘛~",
+        "让我也主动说点什么吧！"
+    )
+
     private var lastInteractionTime = System.currentTimeMillis()
     private var lastNagTime = 0L
+
+    // 各类主动行为冷却计时器
+    private var lastCuriosityAction = 0L
+    private var lastSocialAction = 0L
+    private var lastAutonomyAction = 0L
+    private val ACTION_COOLDOWN_MS = 60 * 1000L  // 60秒冷却
 
     fun shouldTriggerInteraction(nagFrequency: String): Boolean {
         if (!settingsManager.shouldTriggerNag()) return false
@@ -55,6 +80,55 @@ class ProactiveInteractionEngine(private val settingsManager: SettingsManager) {
             else -> 10 * 60 * 1000L
         }
         return (now - lastNagTime) > interval
+    }
+
+    /**
+     * 根据驱动力状态决定是否应该触发主动行为
+     * 返回: 主动行为类型 (null=不触发)
+     */
+    fun shouldTriggerDriveAction(subjectivityEngine: SubjectivityEngine?): DriveActionType? {
+        if (subjectivityEngine == null) return null
+        val state = subjectivityEngine.loadState()
+        val now = System.currentTimeMillis()
+
+        // 收集所有满足条件的驱动力类型，随机选择一个（避免优先级饿死）
+        val candidates = mutableListOf<DriveActionType>()
+        if (state.shouldAskFollowUp() && now - lastCuriosityAction > ACTION_COOLDOWN_MS) {
+            candidates.add(DriveActionType.CURIOSITY)
+        }
+        if (state.shouldShowCare() && now - lastSocialAction > ACTION_COOLDOWN_MS) {
+            candidates.add(DriveActionType.SOCIAL)
+        }
+        if (state.shouldResistRepetition() && now - lastAutonomyAction > ACTION_COOLDOWN_MS) {
+            candidates.add(DriveActionType.AUTONOMY)
+        }
+
+        // 30% 概率触发，从候选中随机选择
+        return if (candidates.isNotEmpty() && Random.nextFloat() < 0.3f) {
+            candidates.random()
+        } else null
+    }
+
+    /**
+     * 获取驱动力驱动的主动行为话术
+     */
+    fun getDriveActionPhrase(type: DriveActionType): Triple<String, Emotion, Action> {
+        val now = System.currentTimeMillis()
+        val (phrases, emotion, action) = when (type) {
+            DriveActionType.CURIOSITY -> {
+                lastCuriosityAction = now
+                Triple(curiosityPhrases, Emotion.HAPPY, Action.EAR_TWITCH)
+            }
+            DriveActionType.SOCIAL -> {
+                lastSocialAction = now
+                Triple(socialPhrases, Emotion.HAPPY, Action.TAIL_FLICK)
+            }
+            DriveActionType.AUTONOMY -> {
+                lastAutonomyAction = now
+                Triple(autonomyPhrases, Emotion.TSUNDERE, Action.TAP)
+            }
+        }
+        return Triple(phrases.random(), emotion, action)
     }
 
     fun getNagPhrase(nagFrequency: String): String {
@@ -94,4 +168,11 @@ class ProactiveInteractionEngine(private val settingsManager: SettingsManager) {
         lastInteractionTime = System.currentTimeMillis()
         return Triple(phrase, emotion, action)
     }
+}
+
+/** 驱动力驱动的主动行为类型 */
+enum class DriveActionType {
+    CURIOSITY,   // 好奇心驱动: 追问
+    SOCIAL,      // 亲和需求驱动: 关心
+    AUTONOMY     // 自主性驱动: 主动建议
 }

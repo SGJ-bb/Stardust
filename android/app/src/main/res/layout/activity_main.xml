@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    星尘设计系统 - 主界面布局
+    基于 Impeccable 8pt 网格 + 语义化间距/尺寸引用
+-->
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -25,11 +29,17 @@
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:background="@color/color_toolbar_bg"
+            android:layout_height="@dimen/toolbar_height"
+            android:background="@drawable/bg_toolbar_glass"
+            android:elevation="4dp"
             android:clickable="true"
             android:focusable="true"
-            app:titleTextColor="@android:color/white">
+            android:paddingEnd="0dp"
+            android:paddingStart="0dp"
+            app:contentInsetStart="0dp"
+            app:contentInsetEnd="0dp"
+            app:contentInsetStartWithNavigation="0dp"
+            app:titleTextColor="@color/text_primary">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -41,14 +51,14 @@
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/iv_ai_avatar_small_card"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="16dp"
+                    android:layout_width="@dimen/avatar_medium"
+                    android:layout_height="@dimen/avatar_medium"
+                    android:layout_marginStart="@dimen/space_1"
+                    android:layout_marginEnd="@dimen/space_3"
+                    app:cardCornerRadius="@dimen/avatar_medium"
                     app:cardElevation="0dp"
                     app:cardBackgroundColor="@color/bg_end"
-                    app:strokeWidth="1.5dp"
+                    app:strokeWidth="@dimen/avatar_border"
                     app:strokeColor="@color/accent_blue">
 
                     <ImageView
@@ -64,28 +74,28 @@
 
                 <ImageButton
                     android:id="@+id/btn_more"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="@dimen/icon_button_size"
+                    android:layout_height="@dimen/icon_button_size"
                     android:background="@drawable/bg_icon_button"
                     android:src="@drawable/ic_more"
                     android:contentDescription="更多"
                     android:scaleType="centerInside"
-                    android:padding="6dp"
+                    android:padding="@dimen/space_3"
                     app:tint="@color/accent_purple" />
 
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="6dp">
+                    android:layout_marginStart="@dimen/space_3"
+                    android:layout_marginEnd="@dimen/space_2">
 
                     <TextView
                         android:id="@+id/tv_pet_name"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text=""
-                        android:textColor="@android:color/white"
+                        style="@style/TextAppearance.Stardust.Title"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -100,54 +110,54 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="第1天"
+                            style="@style/TextAppearance.Stardust.Overline"
                             android:textColor="@color/accent_purple"
                             android:textSize="9sp" />
 
                         <ProgressBar
                             android:id="@+id/progress_affection"
-                            style="?android:attr/progressBarStyleHorizontal"
+                            style="@style/Widget.Stardust.ProgressBar"
                             android:layout_width="36dp"
-                            android:layout_height="2.5dp"
-                            android:layout_marginStart="3dp"
+                            android:layout_height="@dimen/progress_height"
+                            android:layout_marginStart="@dimen/space_1"
                             android:max="100"
                             android:progress="50"
                             android:progressTint="@color/accent_pink"
-                            android:progressBackgroundTint="@color/color_white_alpha_20" />
+                            android:progressBackgroundTint="@color/white_alpha_20" />
 
                         <TextView
                             android:id="@+id/tv_affection_title"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text=""
+                            style="@style/TextAppearance.Stardust.Overline"
                             android:textColor="@color/accent_pink"
                             android:textSize="8sp"
-                            android:layout_marginStart="3dp"
+                            android:layout_marginStart="@dimen/space_1"
                             android:ellipsize="end"
                             android:maxEms="6"
                             android:singleLine="true" />
                     </LinearLayout>
                 </LinearLayout>
 
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:layout_weight="1" />
-
                 <TextView
                     android:id="@+id/tv_weather"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="☀️ 25°"
-                    android:textColor="@color/color_text_link"
+                    style="@style/TextAppearance.Stardust.Caption"
+                    android:textColor="@color/text_link"
                     android:textSize="11sp"
-                    android:layout_marginEnd="6dp"
+                    android:layout_marginEnd="@dimen/space_2"
                     android:visibility="gone" />
 
                 <HorizontalScrollView
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:scrollbars="none"
-                    android:overScrollMode="never">
+                    android:overScrollMode="never"
+                    android:layout_marginEnd="@dimen/space_1">
 
                     <LinearLayout
                         android:layout_width="wrap_content"
@@ -157,77 +167,66 @@
 
                         <ImageButton
                             android:id="@+id/btn_moments"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
+                            android:layout_width="@dimen/icon_button_size"
+                            android:layout_height="@dimen/icon_button_size"
                             android:background="@drawable/bg_icon_button"
                             android:src="@drawable/ic_diary"
                             android:contentDescription="动态"
                             android:scaleType="centerInside"
-                            android:padding="7dp"
-                            android:layout_marginEnd="4dp"
-                            app:tint="@color/color_text_chat_secondary" />
+                            android:padding="@dimen/space_2"
+                            android:layout_marginEnd="@dimen/space_1"
+                            app:tint="@color/text_secondary" />
 
                         <ImageButton
                             android:id="@+id/btn_calendar"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
+                            android:layout_width="@dimen/icon_button_size"
+                            android:layout_height="@dimen/icon_button_size"
                             android:background="@drawable/bg_icon_button"
                             android:src="@drawable/ic_diary"
                             android:contentDescription="日历"
                             android:scaleType="centerInside"
-                            android:padding="7dp"
-                            android:layout_marginEnd="4dp"
-                            app:tint="@color/color_text_chat_secondary" />
+                            android:padding="@dimen/space_2"
+                            android:layout_marginEnd="@dimen/space_1"
+                            app:tint="@color/text_secondary" />
 
                         <ImageButton
                             android:id="@+id/btn_album"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
+                            android:layout_width="@dimen/icon_button_size"
+                            android:layout_height="@dimen/icon_button_size"
                             android:background="@drawable/bg_icon_button"
                             android:src="@android:drawable/ic_menu_gallery"
                             android:contentDescription="纪念相册"
                             android:scaleType="centerInside"
-                            android:padding="7dp"
-                            android:layout_marginEnd="4dp"
-                            app:tint="@color/color_text_chat_secondary" />
+                            android:padding="@dimen/space_2"
+                            android:layout_marginEnd="@dimen/space_1"
+                            app:tint="@color/text_secondary" />
 
                         <ImageButton
                             android:id="@+id/btn_diary"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
+                            android:layout_width="@dimen/icon_button_size"
+                            android:layout_height="@dimen/icon_button_size"
                             android:background="@drawable/bg_icon_button"
                             android:src="@drawable/ic_diary"
                             android:contentDescription="日记"
                             android:scaleType="centerInside"
-                            android:padding="7dp"
-                            android:layout_marginEnd="4dp"
-                            app:tint="@color/color_text_chat_secondary" />
+                            android:padding="@dimen/space_2"
+                            android:layout_marginEnd="@dimen/space_1"
+                            app:tint="@color/text_secondary" />
                     </LinearLayout>
                 </HorizontalScrollView>
 
                 <ImageButton
-                    android:id="@+id/btn_persona_switch"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_icon_button"
-                    android:src="@drawable/ic_avatar_default_ai"
-                    android:contentDescription="切换角色"
-                    android:scaleType="centerInside"
-                    android:padding="7dp"
-                    android:layout_marginStart="4dp"
-                    app:tint="@color/color_text_chat_secondary" />
-
-                <ImageButton
                     android:id="@+id/btn_settings"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="@dimen/icon_button_size"
+                    android:layout_height="@dimen/icon_button_size"
                     android:background="@drawable/bg_icon_button"
                     android:src="@drawable/ic_settings"
                     android:contentDescription="设置"
                     android:scaleType="centerInside"
-                    android:padding="7dp"
-                    android:layout_marginStart="4dp"
-                    app:tint="@color/color_text_chat_secondary" />
+                    android:padding="@dimen/space_2"
+                    android:layout_marginStart="@dimen/space_1"
+                    android:layout_marginEnd="@dimen/space_1"
+                    app:tint="@color/text_secondary" />
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
@@ -235,12 +234,12 @@
             android:id="@+id/recycler_chat"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginTop="56dp"
-            android:layout_marginBottom="68dp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="48dp"
+            android:layout_marginTop="@dimen/toolbar_height"
+            android:layout_marginBottom="@dimen/bottom_bar_height"
+            android:paddingStart="@dimen/space_4"
+            android:paddingEnd="@dimen/space_4"
+            android:paddingTop="@dimen/space_4"
+            android:paddingBottom="@dimen/space_10"
             android:clipToPadding="false" />
 
         <ViewStub
@@ -248,8 +247,8 @@
             android:layout="@layout/stub_live2d"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginTop="80dp"
-            android:layout_marginBottom="68dp" />
+            android:layout_marginTop="@dimen/space_10"
+            android:layout_marginBottom="@dimen/bottom_bar_height" />
 
         <LinearLayout
             android:id="@+id/layout_bottom_bar"
@@ -257,16 +256,16 @@
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
             android:orientation="vertical"
-            android:elevation="0dp">
+            android:elevation="8dp">
 
             <HorizontalScrollView
                 android:id="@+id/scroll_predictions"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@color/bg_end"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:paddingTop="6dp"
+                android:paddingStart="@dimen/space_4"
+                android:paddingEnd="@dimen/space_4"
+                android:paddingTop="@dimen/space_2"
                 android:visibility="gone"
                 android:scrollbars="none">
 
@@ -283,9 +282,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="6dp"
-                android:background="@color/color_card_dark_alpha"
+                android:paddingHorizontal="@dimen/space_4"
+                android:paddingVertical="@dimen/space_3"
+                android:background="@drawable/bg_input_bar_glass"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical">
@@ -295,13 +294,13 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:hint="发消息给星尘..."
-                app:boxCornerRadiusTopStart="20dp"
-                app:boxCornerRadiusTopEnd="20dp"
-                app:boxCornerRadiusBottomStart="20dp"
-                app:boxCornerRadiusBottomEnd="20dp"
-                app:boxBackgroundColor="@color/color_input_bg_variant"
-                app:hintTextColor="@color/color_text_hint"
+                android:hint="发消息给TA..."
+                app:boxCornerRadiusTopStart="@dimen/input_radius"
+                app:boxCornerRadiusTopEnd="@dimen/input_radius"
+                app:boxCornerRadiusBottomStart="@dimen/input_radius"
+                app:boxCornerRadiusBottomEnd="@dimen/input_radius"
+                app:boxBackgroundColor="@color/surface_input"
+                app:hintTextColor="@color/text_muted"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -310,69 +309,69 @@
                     android:layout_height="wrap_content"
                     android:maxLines="4"
                     android:inputType="textMultiLine"
-                    android:textColor="@color/color_text_chat_primary"
+                    android:textColor="@color/text_primary"
                     android:textColorHint="@color/text_muted"
                     android:textSize="14sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <ImageButton
                 android:id="@+id/btn_image_upload"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="@dimen/icon_button_size"
+                android:layout_height="@dimen/icon_button_size"
                 android:src="@android:drawable/ic_menu_gallery"
                 android:scaleType="centerInside"
-                android:padding="8dp"
-                android:layout_marginStart="4dp"
+                android:padding="@dimen/space_3"
+                android:layout_marginStart="@dimen/space_1"
                 android:background="@drawable/bg_icon_button"
                 app:tint="@color/accent_purple"
                 android:contentDescription="上传图片" />
 
             <ImageButton
                 android:id="@+id/btn_sticker_chat"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="@dimen/icon_button_size"
+                android:layout_height="@dimen/icon_button_size"
                 android:src="@drawable/ic_sticker"
                 android:scaleType="centerInside"
-                android:padding="8dp"
-                android:layout_marginStart="4dp"
+                android:padding="@dimen/space_3"
+                android:layout_marginStart="@dimen/space_1"
                 android:background="@drawable/bg_icon_button"
                 app:tint="@color/accent_purple"
                 android:contentDescription="表情包" />
 
             <ImageButton
                 android:id="@+id/btn_voice"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="@dimen/icon_button_size"
+                android:layout_height="@dimen/icon_button_size"
                 android:src="@drawable/ic_voice"
                 android:scaleType="centerInside"
-                android:padding="8dp"
-                android:layout_marginStart="4dp"
+                android:padding="@dimen/space_3"
+                android:layout_marginStart="@dimen/space_1"
                 android:background="@drawable/bg_icon_button"
                 app:tint="@color/accent_purple"
                 android:contentDescription="语音" />
 
             <ImageButton
                 android:id="@+id/btn_phone_call"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="@dimen/icon_button_size"
+                android:layout_height="@dimen/icon_button_size"
                 android:src="@drawable/ic_phone_call"
                 android:scaleType="centerInside"
-                android:padding="8dp"
-                android:layout_marginStart="4dp"
+                android:padding="@dimen/space_3"
+                android:layout_marginStart="@dimen/space_1"
                 android:background="@drawable/bg_icon_button"
                 app:tint="@color/accent_purple"
                 android:contentDescription="语音通话" />
 
             <ImageButton
                 android:id="@+id/btn_send"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="@dimen/icon_button_size"
+                android:layout_height="@dimen/icon_button_size"
                 android:src="@drawable/ic_send"
                 android:scaleType="centerInside"
-                android:padding="8dp"
-                android:layout_marginStart="4dp"
+                android:padding="@dimen/space_3"
+                android:layout_marginStart="@dimen/space_1"
                 android:background="@drawable/bg_send_button"
-                app:tint="#ffffff"
+                app:tint="@color/text_on_accent"
                 android:contentDescription="发送" />
         </LinearLayout>
     </LinearLayout>

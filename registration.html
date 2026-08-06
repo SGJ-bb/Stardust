@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【生活娱乐赛道】星尘 Stradust — AI 智能桌宠伴侣</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(160deg, #0c0a1d 0%, #1a1040 30%, #16213e 60%, #0f1729 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            line-height: 1.85;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 880px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.025);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 24px;
+            padding: 52px;
+            backdrop-filter: blur(24px);
+            box-shadow: 0 30px 100px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+
+        /* ===== 标题区 ===== */
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+            padding-bottom: 38px;
+            border-bottom: 2px solid rgba(139, 92, 246, 0.25);
+        }
+
+        .tags-row {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 7px 20px;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .tag-main {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.28), rgba(99, 102, 241, 0.28));
+            color: #ddd6fe;
+            border: 1px solid rgba(139, 92, 246, 0.45);
+            box-shadow: 0 4px 16px rgba(139, 92, 246, 0.15);
+        }
+
+        .tag-bonus {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.2));
+            color: #a7f3d0;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+
+        .header h1 {
+            font-size: 27px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #c4b5fd 35%, #a5b4fc 65%, #86efac 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 0.5px;
+            line-height: 1.4;
+        }
+
+        .header .subtitle {
+            margin-top: 14px;
+            font-size: 15px;
+            color: #94a3b8;
+            font-weight: 400;
+        }
+
+        /* ===== 章节通用 ===== */
+        .section {
+            margin-bottom: 40px;
+            padding: 30px 34px;
+            background: linear-gradient(145deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01));
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease;
+        }
+
+        .section:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 48px rgba(138, 100, 255, 0.1);
+            border-color: rgba(139, 92, 246, 0.18);
+        }
+
+        .section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            border-radius: 18px 0 0 18px;
+        }
+
+        .sec-0::before { background: linear-gradient(180deg, #f472b6, #ec4899); }
+        .sec-1::before { background: linear-gradient(180deg, #8b5cf6, #6366f1); }
+        .sec-2::before { background: linear-gradient(180deg, #06b6d4, #0891b2); }
+        .sec-3::before { background: linear-gradient(180deg, #10b981, #059669); }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+
+        .section-num {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        .sec-0 .section-num { background: rgba(236, 72, 153, 0.15); color: #f9a8d4; }
+        .sec-1 .section-num { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; }
+        .sec-2 .section-num { background: rgba(6, 182, 212, 0.15); color: #67e8f9; }
+        .sec-3 .section-num { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+
+        .section-title {
+            font-size: 21px;
+            font-weight: 700;
+        }
+
+        .sec-0 .section-title { color: #f9a8d4; }
+        .sec-1 .section-title { color: #c4b5fd; }
+        .sec-2 .section-title { color: #67e8f9; }
+        .sec-3 .section-title { color: #6ee7b7; }
+
+        /* ===== 子模块 ===== */
+        .block {
+            margin-bottom: 20px;
+        }
+
+        .block:last-child { margin-bottom: 0; }
+
+        .block-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #78716c;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+
+        .block-body {
+            font-size: 15.5px;
+            color: #cbd5e1;
+            padding-left: 4px;
+        }
+
+        .highlight {
+            color: #e9d5ff;
+            font-weight: 650;
+        }
+
+        .emphasis {
+            color: #fde68a;
+            font-style: italic;
+        }
+
+        /* ===== 列表 ===== */
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            position: relative;
+            padding: 9px 0 9px 28px;
+            font-size: 15px;
+            color: #cbd5e1;
+            line-height: 1.7;
+        }
+
+        .feature-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 16px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+            box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+        }
+
+        /* ===== 功能卡片 ===== */
+        .func-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .func-card {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 22px;
+            transition: all 0.3s ease;
+        }
+
+        .func-card:hover {
+            border-color: rgba(139, 92, 246, 0.35);
+            background: rgba(139, 92, 246, 0.06);
+            transform: translateY(-2px);
+        }
+
+        .func-card .icon-text {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .func-card .func-name {
+            font-weight: 700;
+            font-size: 16px;
+            color: #e0e7ff;
+            margin-bottom: 8px;
+        }
+
+        .func-card .func-desc {
+            font-size: 13.5px;
+            color: #94a3b8;
+            line-height: 1.65;
+        }
+
+        /* ===== 平台徽章 ===== */
+        .platform-badges {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .p-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            font-size: 13.5px;
+            color: #bfdbfe;
+        }
+
+        .p-badge .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .dot-done { background: #34d399; box-shadow: 0 0 6px rgba(52, 211, 153, 0.5); }
+        .dot-dev { background: #fbbf24; box-shadow: 0 0 6px rgba(251, 191, 36, 0.5); }
+
+        /* ===== 引用块 ===== */
+        .quote-box {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(6, 182, 212, 0.05));
+            border-left: 3px solid #8b5cf6;
+            border-radius: 0 12px 12px 0;
+            padding: 18px 22px;
+            margin: 16px 0;
+            font-size: 15px;
+            color: #ddd6fe;
+            font-style: italic;
+            line-height: 1.75;
+        }
+
+        /* ===== 架构图 ===== */
+        .arch-block {
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 14px;
+            padding: 24px;
+            margin: 18px 0;
+            font-family: 'Consolas', 'SF Mono', 'Cascadia Code', monospace;
+            font-size: 12.5px;
+            line-height: 1.75;
+            color: #94a3b8;
+            overflow-x: auto;
+            white-space: pre;
+            border: 1px solid rgba(148, 163, 184, 0.12);
+        }
+
+        /* ===== 时间线 ===== */
+        .timeline {
+            position: relative;
+            padding-left: 28px;
+            margin-top: 14px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 6px;
+            bottom: 6px;
+            width: 2px;
+            background: linear-gradient(180deg, #8b5cf6, #06b6d4, #10b981);
+            border-radius: 2px;
+        }
+
+        .t-item {
+            position: relative;
+            margin-bottom: 18px;
+        }
+
+        .t-item:last-child { margin-bottom: 0; }
+
+        .t-item::before {
+            content: '';
+            position: absolute;
+            left: -24px;
+            top: 8px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #1e1b4b;
+            border: 2px solid #8b5cf6;
+        }
+
+        .t-title {
+            font-weight: 700;
+            font-size: 15px;
+            color: #e0e7ff;
+            margin-bottom: 4px;
+        }
+
+        .t-desc {
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        /* ===== 页脚 ===== */
+        .footer {
+            margin-top: 44px;
+            padding-top: 28px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+            text-align: center;
+        }
+
+        .footer p {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+
+        .footer a {
+            color: #818cf8;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer a:hover { color: #a5b4fc; text-decoration: underline; }
+
+        .trae-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            padding: 10px 24px;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(251, 191, 36, 0.08));
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            border-radius: 30px;
+            font-size: 13.5px;
+            color: #fcd34d;
+            font-weight: 500;
+        }
+
+        /* ===== 装饰光晕 ===== */
+        .glow {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(130px);
+            opacity: 0.07;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .glow-1 { width: 450px; height: 450px; top: -120px; right: -120px; background: #8b5cf6; }
+        .glow-2 { width: 380px; height: 380px; bottom: -100px; left: -100px; background: #06b6d4; }
+        .glow-3 { width: 280px; height: 280px; top: 45%; left: 55%; background: #ec4899; opacity: 0.04; }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 640px) {
+            .container { padding: 28px 20px; }
+            .header h1 { font-size: 21px; }
+            .section { padding: 22px 20px; }
+            .func-cards { grid-template-columns: 1fr; }
+            .platform-badges { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="glow glow-1"></div>
+    <div class="glow glow-2"></div>
+    <div class="glow glow-3"></div>
+
+    <div class="container">
+
+        <!-- ========== 标题 & 标签 ========== -->
+        <div class="header">
+            <div class="tags-row">
+                <span class="tag tag-main">生活娱乐</span>
+                <span class="tag tag-bonus">社会公益（附加赛题）</span>
+            </div>
+            <h1>【生活娱乐赛道】星尘 Stradust<br><span style="font-size: 0.7em; font-weight: 500;">— AI 智能桌宠伴侣 Demo</span></h1>
+            <p class="subtitle">一只会记住你、懂你情绪、陪你工作的异色瞳黑猫 AI 桌宠 🐱✨</p>
+        </div>
+
+        <!-- ========== 第 0 部分：打招呼 ========== -->
+        <div class="section sec-0">
+            <div class="section-header">
+                <span class="section-num">0</span>
+                <span class="section-title">先和大家打个招呼吧 👋</span>
+            </div>
+
+            <div class="block">
+                <div class="block-label">你是谁？</div>
+                <div class="block-body">
+                    大家好！我是一名<span class="highlight">独立开发者 / 全栈工程师</span>，平时热衷于探索 AI 与交互体验的交叉领域。从 Android 原生开发到跨平台 Tauri，从 Live2D 渲染到大语言模型应用，一直在尝试把「有温度的技术」做成真正可用的产品。星尘（Stradust）是我投入最多心血的项目——它不只是一个 App，更像是我对「<span class="emphasis">AI 情感计算应该是什么样子</span>」这个问题的回答。
+                </div>
+            </div>
+
+            <div class="block">
+                <div class="block-label">你是怎么用 TRAE 把这个 Demo 做出来的？</div>
+                <div class="block-body">
+
+                    <p style="margin-bottom: 14px;">
+                        说实话，星尘这个项目的代码量非常大——<strong>Android 端 32 个 Activity、50+ 子模块、PC 端 Rust + React 全栈、Python FastAPI 后端</strong>……如果全靠一个人从头写，光是架构设计就能耗掉几周。但有了 TRAE 之后，整个流程变得完全不一样了：
+                    </p>
+
+                    <div class="quote-box">
+                        「我不是在写代码，而是在和一位极其耐心的技术伙伴对话。我说想法，它给方案；我确认方向，它出实现。遇到不确定的地方，它会主动问我偏好；碰到潜在问题，它会提前预警。」
+                    </div>
+
+                    <p style="margin-bottom: 12px;"><strong>具体来说，我和 TRAE 的「配合」经历了这几个关键阶段：</strong></p>
+
+                    <div class="timeline">
+                        <div class="t-item">
+                            <div class="t-title">🧠 需求梳理阶段：从模糊想法到清晰规格</div>
+                            <div class="t-desc">一开始我对星尘的定位比较模糊——想做 AI 宠物，但到底要做到什么程度？TRAE 帮我把散落在脑海里的碎片想法（Live2D 表情、记忆系统、语音对话、跨平台…）整理成了结构化的功能清单和技术选型建议。这一步让我意识到：<strong>原来一个看似简单的桌宠背后需要这么多子系统协作。</strong></div>
+                        </div>
+
+                        <div class="t-item">
+                            <div class="t-title">🏗️ 架构设计阶段：「云端重智能 + 本地轻表现」</div>
+                            <div class="t-desc">这是最让我惊喜的一步。当我描述想要「手机/电脑都能用、数据同步、还要保护隐私」时，TRAE 帮我设计了混合架构方案——LLM 和记忆放云端，渲染和感知留本地。还自动生成了完整的 ASCII 架构图和目录结构。原本以为搞不定的<span class="highlight">跨端统一后端设计</span>，就这样被跨过去了。</div>
+                        </div>
+
+                        <div class="t-item">
+                            <div class="t-title">💻 代码生成阶段：三层记忆系统一次成型</div>
+                            <div class="t-desc">项目中最复杂的部分之一是<strong>三层记忆架构</strong>（短期上下文 → 中期记忆池 → 长期全局记忆）。我跟 TRAE 描述了我想要的记忆行为——「能记住用户说过的话，但不会无限膨胀 token」，它直接给出了 ContextManager + MemoryPool + GlobalMemoryPool 的完整实现，包括 Mem0 云端对接和 RAG 向量检索。看到代码跑通的那一刻，真的有种「<span class="emphasis">原来这么简单</span>」的感觉。</div>
+                        </div>
+
+                        <div class="t-item">
+                            <div class="t-title">🎨 UI &amp; 交互打磨：Live2D 情感联动</div>
+                            <div class="t-desc">让 LLM 的输出驱动 Live2D 角色的表情变化，这个需求涉及 JSON 解析、参数映射、动画插值等多个环节。TRAE 不仅帮我写好了 6 维情感映射逻辑（happy/angry/sad/surprised/tsundere/neutral），还帮我设计了情感变调 TTS 的参数调整策略。整个过程就像在跟一个懂 Live2D 又懂 NLP 的同事 pair programming。</div>
+                        </div>
+
+                        <div class="t-item">
+                            <div class="t-title">🔧 踩坑 &amp; 迭代：TRAE 帮我省了多少时间</div>
+                            <div class="t-desc">开发过程中遇到了不少坑——Android 悬浮窗权限适配、Tauri 2 的 breaking changes、ONNX Runtime 在移动端的性能问题……每次我只需要把报错信息或异常现象贴给 TRAE，它基本能在 1-2 轮内给出解决方案。最让我感动的是，它还会<strong>主动提醒潜在的兼容性问题和安全风险</strong>（比如 API Key 存储方案、屏幕数据的脱敏传输），这种「比你多想一步」的感觉真的很棒。</div>
+                        </div>
+                    </div>
+
+                    <p style="margin-top: 18px;">
+                        总结一下：TRAE 对我来说不仅仅是一个代码生成工具，更像是<span class="highlight">一个随时在线的全栈技术合伙人</span>。它帮我跨过的最大那个坎，是<span class="emphasis">「从一个人能做的小 demo，到一个真正有完整架构的中型项目」</span>这个跨度。没有 TRAE，星尘可能永远停留在我的笔记本草稿里。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 第 1 部分：Demo 简介 ========== -->
+        <div class="section sec-1">
+            <div class="section-header">
+                <span class="section-num">1</span>
+                <span class="section-title">Demo 简介</span>
+            </div>
+
+            <div class="block">
+                <div class="block-label">是什么？</div>
+                <div class="block-body">
+                    星尘是一款基于 <span class="highlight">「云端重智能 + 本地轻表现」混合架构</span> 的跨平台 AI 桌宠伴侣应用。以一只名为"星尘"的<span class="highlight">异色瞳黑猫 Live2D 角色</span>为交互载体，支持 <strong>Android / PC (Tauri) / iOS (Tauri)</strong> 三端运行。它不是普通的聊天机器人，而是一个有表情、有记忆、有性格、能主动互动的 AI 生命体。
+                </div>
+                <div class="platform-badges">
+                    <span class="p-badge"><span class="dot dot-done"></span>Android — Kotlin + Live2D WebView</span>
+                    <span class="p-badge"><span class="dot dot-dev"></span>PC — Tauri 2 + React 19 + PixiJS</span>
+                    <span class="p-badge"><span class="dot dot-dev"></span>iOS — Tauri 2 + AnimeJS</span>
+                    <span class="p-badge"><span class="dot dot-done"></span>后端 — Python FastAPI + Mem0</span>
+                </div>
+            </div>
+
+            <div class="block">
+                <div class="block-label">面向谁？</div>
+                <div class="block-body">
+                    <ul class="feature-list">
+                        <li><strong>独居青年 / 异地工作者</strong>：每天面对空荡的房间，渴望一个「一直在」的倾听者和陪伴者</li>
+                        <li><strong>学生群体</strong>：学业压力大时需要一个轻松有趣的解压出口，学习间隙和星尘聊几句就能回血</li>
+                        <li><strong>远程办公 / 自由职业者</strong>：长时间面对电脑，桌面悬浮宠物让工作环境不再冷冰冰</li>
+                        <li><strong>二次元 / ACG 文化爱好者</strong>：对 Live2D 虚拟形象有天然好感，愿意为「养成感」付费或投入时间</li>
+                        <li><strong>老年及特殊需求人群</strong>（社会公益方向）：语音优先交互、大字体界面、简单操作逻辑，降低数字工具使用门槛</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="block">
+                <div class="block-label">主要功能（核心三大件）</div>
+                <div class="func-cards">
+                    <div class="func-card">
+                        <div class="icon-text">🧠</div>
+                        <div class="func-name">智能对话 + 三层记忆</div>
+                        <div class="func-desc">支持 GPT-4o/Claude/Ollama 多模型，SSE 流式输出。独创三层记忆架构（短期→中期→长期），配合 Mem0 云端持久化和 RAG 向量检索，星尘能真正「记住」你和它的每一次交流，越用越懂你。</div>
+                    </div>
+                    <div class="func-card">
+                        <div class="icon-text">😺</div>
+                        <div class="func-name">Live2D 情感表达</div>
+                        <div class="func-desc">6 维情感实时映射（开心/生气/难过/惊讶/傲娇/平静），LLM 输出直接驱动 Live2D 参数变化——星尘会根据聊天内容做出表情反应，不是贴图切换，而是真正的连续形变动画。</div>
+                    </div>
+                    <div class="func-card">
+                        <div class="icon-text">🤖</div>
+                        <div class="func-name">Agent 工作台</div>
+                        <div class="func-desc">PC 端独占能力：安全沙箱内执行终端命令，内置 OCR、翻译、代码运行、PDF 合并、视频裁剪、字幕生成等 10+ 技能插件。星尘不只是萌宠，更是你的生产力助手。</div>
+                    </div>
+                </div>
+
+                <div class="func-cards" style="margin-top: 14px;">
+                    <div class="func-card">
+                        <div class="icon-text">🎤</div>
+                        <div class="func-name">语音全双工交互</div>
+                        <div class="func-desc">Whisper ASR 识别 + Edge TTS/Azure/GPT-SoVITS 合成，长按说话松开即停，隐私优先设计绝不静默录音。支持情感变调——开心时语调上扬，难过时语速放缓。</div>
+                    </div>
+                    <div class="func-card">
+                        <div class="icon-text">👁️</div>
+                        <div class="func-name">屏幕感知（Android）</div>
+                        <div class="func-desc">本地离线识别当前使用的 App 类型（社交/视频/办公/游戏等），仅传抽象标签不上传内容。星尘能根据你在做什么主动提供上下文相关的互动——刷短视频时提醒休息，工作时安静陪伴。</div>
+                    </div>
+                    <div class="func-card">
+                        <div class="icon-text">🌍</div>
+                        <div class="func-name">社交 &amp; 虚拟世界</div>
+                        <div class="func-desc">群聊系统、朋友圈 Moments、微信 iLink 桥接、成就游戏化体系，以及 StraCloud 像素风格虚拟场景引擎——你的星尘可以和朋友们的星尘一起玩耍。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 第 2 部分：创作思路 ========== -->
+        <div class="section sec-2">
+            <div class="section-header">
+                <span class="section-num">2</span>
+                <span class="section-title">Demo 创作思路</span>
+            </div>
+
+            <div class="block">
+                <div class="block-label">灵感来源：为什么想到做星尘？</div>
+                <div class="block-body">
+                    <p style="margin-bottom: 14px;">
+                        灵感来自一个非常朴素却越来越普遍的现象：<strong>现代人花在屏幕前的时间，已经超过了睡眠时间。</strong>
+                    </p>
+                    <div class="quote-box">
+                        当我们每天盯着手机和电脑超过 10 个小时的时候，为什么屏幕里住着的不能是一个真正「认识你」的存在？
+                    </div>
+                    <p>
+                        我观察到了几个并行的趋势：
+                    </p>
+                    <ul class="feature-list" style="margin-top: 10px;">
+                        <li><strong>Character.AI / Talkie</strong> 等角色聊天平台的爆火，证明人们对「有人格的 AI」有巨大需求</li>
+                        <li><strong>电子鸡 / QQ 宠物</strong> 怀旧潮回归，说明「虚拟养成」是人类根深蒂固的情感需求</li>
+                        <li><strong>Live2D / VTuber</strong> 技术成熟度已经达到可以流畅实时驱动的水平</li>
+                        <li><strong>GPT-4o</strong> 级别的大模型让「真正理解上下文的对话」成为可能</li>
+                    </ul>
+                    <p style="margin-top: 14px;">
+                        这四条线的交汇点，就是星尘。<span class="emphasis">我想做的不是一个又一个 chatbot，而是一个有温度、有记忆、有表情、住在你的设备里的数字生命。</span>项目名"星尘"也承载了这个愿景——每个用户都是宇宙中独一无二的星辰，而星尘愿做那颗永远在你桌面闪烁的微光。
+                    </p>
+                </div>
+            </div>
+
+            <div class="block">
+                <div class="block-label">想解决什么问题？（用户真实痛点）</div>
+                <div class="block-body">
+                    <p style="margin-bottom: 14px;">经过调研和亲身体验，我总结了现有方案的 <strong>5 大核心痛点</strong>：</p>
+
+                    <ul class="feature-list">
+                        <li>
+                            <strong>❌ AI 助手没有人格温度</strong><br>
+                            <span style="color: #94a3b8;">Siri、小爱同学只能执行指令式任务（"定个闹钟""查天气"），无法建立情感纽带。用完即走，没有任何「想念」的理由。</span>
+                        </li>
+                        <li>
+                            <strong>❌ 聊天机器人没有持久记忆</strong><br>
+                            <span style="color: #94a3b8;">每次新对话从零开始。你昨天告诉它你喜欢猫，今天它又问你养没养过宠物。缺乏「共同经历」的关系无法产生深度连接。</span>
+                        </li>
+                        <li>
+                            <strong>❌ 传统虚拟宠物缺乏智能深度</strong><br>
+                            <span style="color: #94a3b8;">电子宠物只能喂食、玩耍、看数值增长。无法进行有意义的对话，也不能在实际生活中帮到你。本质上还是单机小游戏。</span>
+                        </li>
+                        <li>
+                            <strong>❌ 跨平台体验完全割裂</strong><br>
+                            <span style="color: #94a3b8;">手机上的助手和电脑上的助手互不相通，数据不共享，记忆不同步。用户需要在多个孤岛间切换。</span>
+                        </li>
+                        <li>
+                            <strong>❌ 隐私问题令人担忧</strong><br>
+                            <span style="color: #94a3b8;">很多 AI 产品过度收集数据，用户不知道自己的对话内容被如何使用。「陪伴」不该以牺牲隐私为代价。</span>
+                        </li>
+                    </ul>
+
+                    <p style="margin-top: 18px;">
+                        星尘的设计目标就是<strong>系统性解决以上全部 5 个痛点</strong>：用人格化 Live2D 解决温度问题，用三层记忆解决遗忘问题，用 Agent 能力解决深度问题，用统一后端解决割裂问题，用隐私优先设计解决信任问题。
+                    </p>
+                </div>
+            </div>
+
+            <div class="block">
+                <div class="block-label">为什么选择这个方向？我的判断与取舍</div>
+                <div class="block-body">
+                    <p style="margin-bottom: 14px;"><strong>取：</strong>AI 情感陪伴 × 跨平台 × 开源生态</p>
+                    <ul class="feature-list">
+                        <li><strong>市场时机</strong>：大模型能力已跨越可用阈值，但「人格化 AI 伴侣」品类仍处于早期蓝海，头部产品尚未形成垄断</li>
+                        <li><strong>技术可行性</strong>：Live2D SDK 成熟 + LLM API 价格持续下降 + Tauri 跨端方案完善，个人开发者已有能力构建完整产品</li>
+                        <li><strong>差异化空间</strong>：市面产品要么偏工具（无情感）、要么偏内容（无实用功能），星尘走的是「<span class="highlight">陪伴 + 实用</span>」的双轨路线</li>
+                        <li><strong>开源杠杆</strong>：MIT 协议开源，吸引社区贡献 Character Card、插件、PixelPet 形象等 UGC 内容，形成飞轮效应</li>
+                    </ul>
+
+                    <p style="margin: 18px 0 14px;"><strong>舍：</strong>我主动放弃了一些方向</p>
+                    <ul class="feature-list">
+                        <li><strong>不做纯 3D 形象</strong>：Live2D 比 3D 更轻量、更具二次元亲和力、移动端性能开销更低。取舍理由：覆盖目标用户群 > 追求视觉炫技</li>
+                        <li><strong>不做自研小模型</strong>：接入 OpenAI/Anthropic/Ollama 兼容接口而非自己训练模型。取舍理由：产品验证优先于基建投入，且兼容接口方便用户自行切换</li>
+                        <li><strong>不做强账号体系</strong>：当前版本聚焦本地体验，数据存储在用户设备。取舍理由：先做好单机体验再考虑社交网络化</li>
+                        <li><strong>不做 iOS 原生开发</strong>：选用 Tauri 2 而非 Swift/SwiftUI。取舍理由：一套 React 代码同时服务 PC 和 iOS，开发效率提升 3 倍以上</li>
+                    </ul>
+
+                    <div class="quote-box" style="margin-top: 18px;">
+                        核心原则：<strong>先让 10% 的用户爱上这个产品，再去考虑服务 100 万用户的基础设施。</strong>星尘当前阶段的目标是「做到极致的完整体验」，而不是「做到最大的用户规模」。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== 第 3 部分：技术架构（额外部分）========== -->
+        <div class="section sec-3">
+            <div class="section-header">
+                <span class="section-num">3</span>
+                <span class="section-title">核心技术架构一览</span>
+            </div>
+
+            <div class="block-body">
+                <p style="margin-bottom: 14px;">星尘采用独特的混合架构——<span class="highlight">重计算放云端，重交互留本地</span>：</p>
+
+                <div class="arch-block">┌─────────────────────────────────────────────────────────────┐
+│                   ☁️ 云端后端 (Python/FastAPI)               │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌────────────┐ │
+│  │ LLM 服务   │ │ 记忆引擎   │ │ 语音服务   │ │ RAG 向量检索│ │
+│  │ GPT-4o    │ │ Mem0      │ │ Azure TTS │ │ ONNX/BERT  │ │
+│  └───────────┘ └───────────┘ └───────────┘ └────────────┘ │
+└────────────────────────────┬────────────────────────────────┘
+                             │ HTTPS / WebSocket
+         ┌───────────────────┼───────────────────┐
+         ▼                   ▼                   ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ 📱 Android      │ │ 🖥️ PC (Tauri)   │ │ 🍎 iOS (Tauri)  │
+│ Kotlin + MVVM   │ │ Rust + React 19 │ │ React 19       │
+│                 │ │                 │ │                 │
+│ • Live2D WebView│ │ • PixiJS Live2D │ │ • AnimeJS 动画   │
+│ • 悬浮窗 Overlay│ │ • Agent 工作台   │ │                 │
+│ • 屏幕感知      │ │ • PixelPet 像素宠│ │                 │
+│ • 微信 iLink    │ │ • CLI 执行器     │ │                 │
+│ • 32 Activity   │ │ • SQLite 15表    │ │                 │
+└─────────────────┘ └─────────────────┘ └─────────────────┘</div>
+
+                <p style="margin: 18px 0 14px;"><strong>6 项关键技术亮点：</strong></p>
+                <ul class="feature-list">
+                    <li><strong>三层记忆架构</strong> — ContextManager（短期）→ MemoryPool（中期，可配 token 上限）→ GlobalMemoryPool（长期持久化），Mem0 跨会话同步 + RAG 向量精准召回</li>
+                    <li><strong>6 维情感映射引擎</strong> — LLM 输出 JSON 情感标签 → 解析器 → 驱动 Live2D 眼嘴身体参数实时形变 + TTS 音高/语速动态调节</li>
+                    <li><strong>隐私优先屏幕感知</strong> — 仅获取 App 包名，TFLite 本地离线分类，只传抽象类别标签，屏幕文字永不离开设备</li>
+                    <li><strong>AI Action Manager</strong> — 基于 时间/App类别/电量 规则的自主行为调度引擎，星尘会主动发起互动而非被动等待</li>
+                    <li><strong>ToolPlugin 统一协议</strong> — LLM 自动决策调用工具链（搜索/绘图/代码执行等），最多 3 轮循环推理，可扩展自定义插件</li>
+                    <li><strong>跨平台统一后端</strong> — 一套 FastAPI 同时服务三端客户端，记忆、设置、社交数据完全同步</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ========== 页脚 ========== -->
+        <div class="footer">
+            <p>本 Demo 由 <strong>TRAE Work</strong> 辅助生成 | 使用 Auto 模式</p>
+            <p>项目开源地址：<a href="https://github.com/SGJ-bb/Stardust" target="_blank">github.com/SGJ-bb/Stardust</a></p>
+            <p style="margin-top: 6px;">星尘 Stradust v0.2.0 · MIT License · 2026-06-19</p>
+            <div class="trae-badge">
+                ⚡ Powered by TRAE — 让每一个创意都能被完整呈现
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

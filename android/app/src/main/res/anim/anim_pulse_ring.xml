@@ -1,0 +1,72 @@
+<!-- 脉冲扩散环动画 - 用于在线状态、活跃指示等场景，同心圆向外扩散并淡出 -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/avd_pulse_ring_vector">
+    
+    <!-- 内环：从中心向外扩散并淡出 -->
+    <target android:name="ring_inner">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <set>
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.3"
+                    android:valueTo="1.5"
+                    android:duration="1200"
+                    android:interpolator="@android:anim/accelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="restart" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.3"
+                    android:valueTo="1.5"
+                    android:duration="1200"
+                    android:interpolator="@android:anim/accelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="restart" />
+                <objectAnimator
+                    android:propertyName="alpha"
+                    android:valueFrom="255"
+                    android:valueTo="0"
+                    android:duration="1200"
+                    android:interpolator="@android:anim/accelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="restart" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <!-- 外环：延迟400ms启动，扩散范围更大 -->
+    <target android:name="ring_outer">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <set>
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.3"
+                    android:valueTo="1.8"
+                    android:duration="1400"
+                    android:startOffset="400"
+                    android:interpolator="@android:anim/accelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="restart" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.3"
+                    android:valueTo="1.8"
+                    android:duration="1400"
+                    android:startOffset="400"
+                    android:interpolator="@android:anim/accelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="restart" />
+                <objectAnimator
+                    android:propertyName="alpha"
+                    android:valueFrom="200"
+                    android:valueTo="0"
+                    android:duration="1400"
+                    android:startOffset="400"
+                    android:interpolator="@android:anim/accelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="restart" />
+            </set>
+        </aapt:attr>
+    </target>
+
+</animated-vector>

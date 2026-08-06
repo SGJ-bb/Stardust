@@ -1,21 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    星尘设计系统 - 浅色主题色彩
+    Day模式（MODE_NIGHT_NO）使用此文件
+-->
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
 
-    <color name="bg_start">#0a0a1a</color>
-    <color name="bg_center">#12122e</color>
-    <color name="bg_end">#1a1a3e</color>
+    <!-- ===== 品牌色 (Brand) — 全局不变 ===== -->
+    <color name="brand_primary">#667eea</color>
+    <color name="brand_primary_light">#8b9cf7</color>
+    <color name="brand_secondary">#9c7cff</color>
+    <color name="brand_accent">#c4b5fd</color>
+    <color name="brand_accent_container">#e8e0ff</color>
 
-    <color name="surface_dark">#14142a</color>
-    <color name="surface_card">#1a1a38</color>
-    <color name="surface_input">#1e1e44</color>
+    <!-- ===== 背景层 (Background) — 浅色 ===== -->
+    <color name="bg_base">#f5f6fa</color>
+    <color name="bg_start">#f8f9fc</color>
+    <color name="bg_center">#eef0f6</color>
+    <color name="bg_end">#e4e7f0</color>
+    <color name="bg_elevated">#ffffff</color>
 
+    <!-- ===== 表面层 (Surface) — 浅色 ===== -->
+    <color name="surface_dark">#ffffff</color>
+    <color name="surface_card">#f5f6fa</color>
+    <color name="surface_input">#f0f1f5</color>
+    <color name="surface_hover">#eaebed</color>
+    <color name="surface_selected">#e0e3ec</color>
+
+    <!-- ===== 内容层 (Content / Text) — 浅色 ===== -->
+    <color name="text_primary">#1a1a2e</color>
+    <color name="text_secondary">#4a5568</color>
+    <color name="text_muted">#6b7280</color>           <!-- 修复: 原#9ca3af太亮，hint文字看不清 -->
+    <color name="text_disabled">#9ca3af</color>
+    <color name="text_on_accent">#ffffff</color>
+    <color name="text_link">#667eea</color>
+
+    <!-- ===== 描边层 (Stroke) — 浅色 ===== -->
+    <color name="stroke_subtle">#e8eaef</color>
+    <color name="stroke_default">#d4d7de</color>
+    <color name="stroke_medium">#b8bcc8</color>
+    <color name="stroke_emphasis">#9ca2b4</color>
+
+    <!-- ===== 强调色 (Accent) — 不变 ===== -->
     <color name="accent_purple">#c4b5fd</color>
     <color name="accent_pink">#ff6b9d</color>
     <color name="accent_blue">#667eea</color>
@@ -24,77 +49,105 @@
     <color name="accent_orange">#ff9f43</color>
     <color name="accent_lime">#a3e635</color>
 
+    <!-- ===== 发光色 (Glow) — 不变 ===== -->
     <color name="glow_purple">#9c7cff</color>
     <color name="glow_blue">#4facfe</color>
     <color name="glow_pink">#f093fb</color>
     <color name="glow_cyan">#43e97b</color>
 
-    <color name="text_primary">#ececf4</color>
-    <color name="text_secondary">#99aabb</color>
-    <color name="text_muted">#556677</color>
+    <!-- ===== 语义色 (Semantic) — 不变 ===== -->
+    <color name="semantic_success">#4ade80</color>
+    <color name="semantic_warning">#fbbf24</color>
+    <color name="semantic_error">#f87171</color>
+    <color name="semantic_info">#60a5fa</color>
 
+    <!-- ===== 渐变色 (Gradient) — 浅色微调 ===== -->
+    <color name="gradient_purple_start">#7c8ff5</color>
+    <color name="gradient_purple_end">#8b5fb5</color>
+    <color name="gradient_pink_start">#ff7aa8</color>
+    <color name="gradient_pink_end">#cf5dff</color>
+    <color name="gradient_cyan_start">#5fb6fe</color>
+    <color name="gradient_cyan_end">#1af5fe</color>
+    <color name="gradient_sunset_start">#fb80a5</color>
+    <color name="gradient_sunset_end">#fee85a</color>
+    <color name="gradient_ocean_start">#5fb6fe</color>
+    <color name="gradient_ocean_end">#7c8ff5</color>
+    <color name="gradient_aurora_start">#53eb88</color>
+    <color name="gradient_aurora_end">#4afada</color>
+
+    <!-- ===== 气泡色 (Bubble) — 浅色 ===== -->
     <color name="bubble_user_start">#667eea</color>
     <color name="bubble_user_end">#764ba2</color>
-    <color name="bubble_pet_start">#1a1a3a</color>
-    <color name="bubble_pet_end">#2a2a5a</color>
+    <color name="bubble_pet_start">#f0f1f5</color>
+    <color name="bubble_pet_end">#e4e7f0</color>
 
-    <color name="gradient_purple_start">#667eea</color>
-    <color name="gradient_purple_end">#764ba2</color>
-    <color name="gradient_pink_start">#ff6b9d</color>
-    <color name="gradient_pink_end">#c44dff</color>
-    <color name="gradient_cyan_start">#4facfe</color>
-    <color name="gradient_cyan_end">#00f2fe</color>
-    <color name="gradient_sunset_start">#fa709a</color>
-    <color name="gradient_sunset_end">#fee140</color>
-    <color name="gradient_ocean_start">#4facfe</color>
-    <color name="gradient_ocean_end">#667eea</color>
-    <color name="gradient_aurora_start">#43e97b</color>
-    <color name="gradient_aurora_end">#38f9d7</color>
+    <!-- ===== 反馈色 (Ripple) — 浅色 ===== -->
+    <color name="ripple_light">#1a000000</color>
+    <color name="ripple_accent">#1a667eea</color>
 
-    <color name="divider">#1a2030</color>
-    <color name="stroke">#2a2a4a</color>
+    <!-- ===== 半透明色 (Alpha) — 浅色 ===== -->
+    <color name="white_alpha_67">#aa000000</color>
+    <color name="white_alpha_20">#33000000</color>
+    <color name="white_alpha_13">#22000000</color>
+    <color name="white_alpha_08">#14000000</color>
+    <color name="dark_alpha_80">#ccf5f6fa</color>
+    <color name="dark_alpha_60">#99f5f6fa</color>
+    <color name="brand_alpha_20">#33667eea</color>
+    <color name="accent_alpha_20">#33c4b5fd</color>
+    <color name="card_alpha_80">#ccf5f6fa</color>
+    <color name="surface_alpha_70">#b3ffffff</color>
 
-    <color name="ripple_light">#1affffff</color>
-    <color name="ripple_accent">#1ac4b5fd</color>
+    <!-- ===== 兼容旧色名 (Legacy) — 浅色值 ===== -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
 
     <color name="color_primary">#667eea</color>
     <color name="color_primary_light">#c4b5fd</color>
     <color name="color_secondary">#9c7cff</color>
-    <color name="color_text_chat_primary">#e0e0f0</color>
-    <color name="color_text_chat_secondary">#8899bb</color>
-    <color name="color_text_input">#d0d0e0</color>
-    <color name="color_text_hint">#667788</color>
-    <color name="color_text_title">#e8e8f0</color>
-    <color name="color_text_label">#8899cc</color>
-    <color name="color_section_header">#8899dd</color>
-    <color name="color_text_link">#aabbdd</color>
-    <color name="color_card_dark">#1a1a3e</color>
-    <color name="color_card_dark_alt">#1a1a2e</color>
-    <color name="color_card_selected">#1e1e44</color>
-    <color name="color_stroke_dark">#2a2a5a</color>
-    <color name="color_stroke_medium">#3a3a6e</color>
-    <color name="color_divider_dark">#2a2a4a</color>
-    <color name="color_background_github">#0d1117</color>
-    <color name="color_surface_github">#161b22</color>
-    <color name="color_success_green">#07c160</color>
-    <color name="color_danger">#cc3344</color>
-    <color name="color_error_red">#ff5252</color>
+    <color name="color_text_chat_primary">#374151</color>
+    <color name="color_text_chat_secondary">#4a5568</color>   <!-- 修复: 原#6b7280对比度不够 -->
+    <color name="color_text_input">#1a1a2e</color>
+    <color name="color_text_hint">#6b7280</color>             <!-- 修复: 原#9ca3af太亮 -->
+    <color name="color_text_title">#1a1a2e</color>
+    <color name="color_text_label">#4a5568</color>            <!-- 修复: 原#6b7280 -->
+    <color name="color_section_header">#5555aa</color>       <!-- 修复: 原#667eea在浅色上太艳 -->
+    <color name="color_text_link">#667eea</color>
+    <color name="color_card_dark">#f5f6fa</color>
+    <color name="color_card_dark_alt">#f0f1f5</color>
+    <color name="color_card_selected">#e4e7f0</color>
+    <color name="color_stroke_dark">#d4d7de</color>
+    <color name="color_stroke_medium">#b8bcc8</color>
+    <color name="color_divider_dark">#e8eaef</color>
+    <color name="color_background_github">#fafbfc</color>
+    <color name="color_surface_github">#ffffff</color>
+    <color name="color_success_green">#4ade80</color>
+    <color name="color_danger">#f87171</color>
+    <color name="color_error_red">#f87171</color>
     <color name="color_link_blue">#60a5fa</color>
     <color name="color_accent_teal">#64ffda</color>
     <color name="color_accent_orange">#ffb347</color>
-    <color name="color_white_alpha_67">#ffffffaa</color>
-    <color name="color_white_alpha_20">#33ffffff</color>
-    <color name="color_white_alpha_13">#22ffffff</color>
-    <color name="color_dark_alpha_80">#cc0a0a1a</color>
+    <color name="color_white_alpha_67">#aa000000</color>
+    <color name="color_white_alpha_20">#33000000</color>
+    <color name="color_white_alpha_13">#22000000</color>
+    <color name="color_dark_alpha_80">#ccf5f6fa</color>
     <color name="color_primary_alpha_20">#33c4b5fd</color>
-    <color name="color_card_dark_alpha">#cc1a1a3e</color>
-    <color name="color_main_bg_alpha">#b316162a</color>
-    <color name="color_input_bg_variant">#1e1e3a</color>
-    <color name="color_toolbar_bg">#16162a</color>
-    <color name="color_text_gray">#888888</color>
-    <color name="color_text_disabled">#aaaaaa</color>
-    <color name="color_text_light_gray">#e8e8e8</color>
+    <color name="color_card_dark_alpha">#ccf5f6fa</color>
+    <color name="color_main_bg_alpha">#b3f5f6fa</color>
+    <color name="color_input_bg_variant">#f0f1f5</color>
+    <color name="color_toolbar_bg">#ffffff</color>
+    <color name="color_text_gray">#4a5568</color>              <!-- 修复: 更深的灰 -->
+    <color name="color_text_disabled">#9ca3af</color>
+    <color name="color_text_light_gray">#1a1a2e</color>
     <color name="color_emotion_label">#667eea</color>
     <color name="color_material_green">#4caf50</color>
+    <color name="wechat_green">#07c160</color>
     <color name="color_material_red">#e53935</color>
+    <color name="divider">#e8eaef</color>
+    <color name="stroke">#d4d7de</color>
+
 </resources>

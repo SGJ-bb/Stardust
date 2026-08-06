@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    星尘设计系统 - 深色主题色彩
+    Night模式（MODE_NIGHT_YES）使用此文件
+
+    对比度修复说明:
+    - text_muted: #5c6688 → #8888aa (对比度 ~4.5:1)
+    - color_text_hint: #5c6688 → #8888aa
+    - color_text_chat_secondary: #8899bb → #99aacc
+    - color_text_label: #8899cc → #99aacc
+    - color_section_header: #8899dd → #99aaee
+    - color_text_gray: #7a80a0 → #9098b0
+-->
+<resources>
+
+    <!-- ===== 品牌色 (Brand) ===== -->
+    <color name="brand_primary">#667eea</color>           <!-- 主品牌色：蓝紫 -->
+    <color name="brand_primary_light">#8b9cf7</color>     <!-- 主品牌色亮色 -->
+    <color name="brand_secondary">#9c7cff</color>         <!-- 次品牌色：紫 -->
+    <color name="brand_accent">#c4b5fd</color>            <!-- 强调色：淡紫 -->
+    <color name="brand_accent_container">#2a1f55</color>  <!-- 强调色容器背景 -->
+
+    <!-- ===== 背景层 (Background) ===== -->
+    <!-- Impeccable: 深色背景不是纯黑，而是带紫蓝调的深色 -->
+    <color name="bg_base">#0c0c1e</color>                 <!-- 最深背景 -->
+    <color name="bg_start">#0a0a1a</color>                <!-- 渐变起点 -->
+    <color name="bg_center">#12122e</color>               <!-- 渐变中点 -->
+    <color name="bg_end">#1a1a3e</color>                  <!-- 渐变终点 -->
+    <color name="bg_elevated">#16162e</color>             <!-- 提升背景（工具栏等） -->
+
+    <!-- ===== 表面层 (Surface) ===== -->
+    <!-- Impeccable: 表面层比背景层稍亮，带紫色调 -->
+    <color name="surface_dark">#14142a</color>            <!-- 基础表面 -->
+    <color name="surface_card">#1a1a38</color>            <!-- 卡片表面 -->
+    <color name="surface_input">#1e1e44</color>           <!-- 输入框表面 -->
+    <color name="surface_hover">#242450</color>           <!-- 悬停表面 -->
+    <color name="surface_selected">#2a2a5a</color>        <!-- 选中表面 -->
+
+    <!-- ===== 内容层 (Content / Text) ===== -->
+    <!-- Impeccable: 文本不是纯白/纯灰，而是带色调的暖白/冷灰 -->
+    <color name="text_primary">#ececf4</color>            <!-- 主文本：暖白 -->
+    <color name="text_secondary">#9aa4c0</color>          <!-- 次文本：紫蓝灰 -->
+    <color name="text_muted">#8888aa</color>              <!-- [修复] 弱文本：原#5c6688对比度不足 -->
+    <color name="text_disabled">#4a5070</color>           <!-- 禁用文本 -->
+    <color name="text_on_accent">#ffffff</color>          <!-- 强调色上的文本 -->
+    <color name="text_link">#7ba4f7</color>               <!-- 链接文本 -->
+
+    <!-- ===== 描边层 (Stroke) ===== -->
+    <!-- Impeccable: 描边用带色调的半透明，而非纯灰 -->
+    <color name="stroke_subtle">#1a2244</color>           <!-- 微弱描边：卡片/分隔 -->
+    <color name="stroke_default">#2a2a5a</color>          <!-- 标准描边 -->
+    <color name="stroke_medium">#3a3a6e</color>           <!-- 中等描边 -->
+    <color name="stroke_emphasis">#4a4a8e</color>         <!-- 强调描边 -->
+
+    <!-- ===== 强调色 (Accent) ===== -->
+    <color name="accent_purple">#c4b5fd</color>           <!-- 紫色强调 -->
+    <color name="accent_pink">#ff6b9d</color>             <!-- 粉色强调 -->
+    <color name="accent_blue">#667eea</color>             <!-- 蓝色强调 -->
+    <color name="accent_cyan">#64ffda</color>             <!-- 青色强调 -->
+    <color name="accent_magenta">#e040fb</color>          <!-- 品红强调 -->
+    <color name="accent_orange">#ff9f43</color>           <!-- 橙色强调 -->
+    <color name="accent_lime">#a3e635</color>             <!-- 青柠强调 -->
+
+    <!-- ===== 发光色 (Glow) ===== -->
+    <color name="glow_purple">#9c7cff</color>             <!-- 紫色发光 -->
+    <color name="glow_blue">#4facfe</color>               <!-- 蓝色发光 -->
+    <color name="glow_pink">#f093fb</color>               <!-- 粉色发光 -->
+    <color name="glow_cyan">#43e97b</color>               <!-- 青色发光 -->
+
+    <!-- ===== 语义色 (Semantic) ===== -->
+    <color name="semantic_success">#4ade80</color>        <!-- 成功：绿 -->
+    <color name="semantic_warning">#fbbf24</color>        <!-- 警告：黄 -->
+    <color name="semantic_error">#f87171</color>          <!-- 错误：红 -->
+    <color name="semantic_info">#60a5fa</color>           <!-- 信息：蓝 -->
+
+    <!-- ===== 渐变色 (Gradient) ===== -->
+    <color name="gradient_purple_start">#667eea</color>
+    <color name="gradient_purple_end">#764ba2</color>
+    <color name="gradient_pink_start">#ff6b9d</color>
+    <color name="gradient_pink_end">#c44dff</color>
+    <color name="gradient_cyan_start">#4facfe</color>
+    <color name="gradient_cyan_end">#00f2fe</color>
+    <color name="gradient_sunset_start">#fa709a</color>
+    <color name="gradient_sunset_end">#fee140</color>
+    <color name="gradient_ocean_start">#4facfe</color>
+    <color name="gradient_ocean_end">#667eea</color>
+    <color name="gradient_aurora_start">#43e97b</color>
+    <color name="gradient_aurora_end">#38f9d7</color>
+
+    <!-- ===== 气泡色 (Bubble) ===== -->
+    <color name="bubble_user_start">#667eea</color>
+    <color name="bubble_user_end">#764ba2</color>
+    <color name="bubble_pet_start">#1a1a3a</color>
+    <color name="bubble_pet_end">#2a2a5a</color>
+
+    <!-- ===== 反馈色 (Ripple) ===== -->
+    <color name="ripple_light">#1affffff</color>
+    <color name="ripple_accent">#1ac4b5fd</color>
+
+    <!-- ===== 半透明色 (Alpha) ===== -->
+    <color name="white_alpha_67">#ffffffaa</color>
+    <color name="white_alpha_20">#33ffffff</color>
+    <color name="white_alpha_13">#22ffffff</color>
+    <color name="white_alpha_08">#14ffffff</color>
+    <color name="dark_alpha_80">#cc0c0c1e</color>
+    <color name="dark_alpha_60">#990c0c1e</color>
+    <color name="brand_alpha_20">#33667eea</color>
+    <color name="accent_alpha_20">#33c4b5fd</color>
+    <color name="card_alpha_80">#cc1a1a38</color>
+    <color name="surface_alpha_70">#b314142a</color>
+
+    <!-- ===== 兼容旧色名 (Legacy Compatibility) ===== -->
+    <!-- 以下颜色保留以兼容现有代码，新代码应使用上方语义化命名 -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <color name="color_primary">#667eea</color>
+    <color name="color_primary_light">#c4b5fd</color>
+    <color name="color_secondary">#9c7cff</color>
+    <color name="color_text_chat_primary">#e0e0f0</color>
+    <color name="color_text_chat_secondary">#99aacc</color>   <!-- [修复] 原#8899bb对比度不足 -->
+    <color name="color_text_input">#d0d0e0</color>
+    <color name="color_text_hint">#8888aa</color>             <!-- [修复] 原#5c6688对比度不足 -->
+    <color name="color_text_title">#e8e8f0</color>
+    <color name="color_text_label">#99aacc</color>            <!-- [修复] 原#8899cc对比度不足 -->
+    <color name="color_section_header">#99aaee</color>       <!-- [修复] 原#8899dd对比度不足 -->
+    <color name="color_text_link">#7ba4f7</color>
+    <color name="color_card_dark">#1a1a3e</color>
+    <color name="color_card_dark_alt">#1a1a2e</color>
+    <color name="color_card_selected">#1e1e44</color>
+    <color name="color_stroke_dark">#2a2a5a</color>
+    <color name="color_stroke_medium">#3a3a6e</color>
+    <color name="color_divider_dark">#2a2a4a</color>
+    <color name="color_background_github">#0d1117</color>
+    <color name="color_surface_github">#161b22</color>
+    <color name="color_success_green">#4ade80</color>
+    <color name="color_danger">#f87171</color>
+    <color name="color_error_red">#f87171</color>
+    <color name="color_link_blue">#60a5fa</color>
+    <color name="color_accent_teal">#64ffda</color>
+    <color name="color_accent_orange">#ffb347</color>
+    <color name="color_white_alpha_67">#ffffffaa</color>
+    <color name="color_white_alpha_20">#33ffffff</color>
+    <color name="color_white_alpha_13">#22ffffff</color>
+    <color name="color_dark_alpha_80">#cc0a0a1a</color>
+    <color name="color_primary_alpha_20">#33c4b5fd</color>
+    <color name="color_card_dark_alpha">#cc1a1a3e</color>
+    <color name="color_main_bg_alpha">#b316162a</color>
+    <color name="color_input_bg_variant">#1e1e3a</color>
+    <color name="color_toolbar_bg">#16162a</color>
+    <color name="color_text_gray">#9098b0</color>              <!-- [修复] 原#7a80a0对比度不足 -->
+    <color name="color_text_disabled">#4a5070</color>
+    <color name="color_text_light_gray">#e8e8e8</color>
+    <color name="color_emotion_label">#667eea</color>
+    <color name="color_material_green">#4caf50</color>
+    <color name="wechat_green">#07c160</color>               <!-- 微信绿 -->
+    <color name="color_material_red">#e53935</color>
+    <color name="divider">#1a2244</color>
+    <color name="stroke">#2a2a5a</color>
+
+</resources>

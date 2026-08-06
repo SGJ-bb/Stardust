@@ -3,12 +3,17 @@ package com.aicompanion.ui
 
 import android.app.Activity
 import android.os.Bundle
+import android.view.View
 import android.widget.*
 import com.aicompanion.R
 import com.aicompanion.live2d.ModelManager
 import com.aicompanion.models.TextureQuality
 
 class ModelSettingsActivity : Activity() {
+
+    companion object {
+        private const val TAG = "ModelSettingsActivity"
+    }
 
     private var modelManager: ModelManager? = null
     private var modelId: String = ""
@@ -32,6 +37,19 @@ class ModelSettingsActivity : Activity() {
 
         initViews()
         setupClickListeners()
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
+        }
     }
 
     private fun initViews() {

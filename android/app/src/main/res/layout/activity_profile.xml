@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0f0c29"
+    android:background="@color/bg_base"
     android:fillViewport="true">
 
     <LinearLayout
@@ -16,13 +16,13 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="#00ffffff"
+            android:background="@android:color/transparent"
             android:elevation="0dp"
             app:title="AI 档案"
-            app:titleTextColor="#e8e8f0"
+            app:titleTextColor="@color/text_primary"
             app:titleTextAppearance="@style/ToolbarTitleStyle"
             app:navigationIcon="@android:drawable/ic_menu_close_clear_cancel"
-            app:navigationIconTint="#c4b5fd"
+            app:navigationIconTint="@color/brand_primary"
             android:layout_marginBottom="8dp" />
 
         <LinearLayout
@@ -43,10 +43,11 @@
                     android:layout_width="72dp"
                     android:layout_height="72dp"
                     app:cardCornerRadius="36dp"
-                    app:cardElevation="0dp"
-                    app:cardBackgroundColor="#1a1a3e"
+                    app:cardElevation="2dp"
+                    app:rippleColor="@color/white_alpha_20"
+                    app:cardBackgroundColor="@color/surface_card"
                     app:strokeWidth="2dp"
-                    app:strokeColor="#667eea">
+                    app:strokeColor="@color/brand_primary">
 
                     <ImageView
                         android:id="@+id/iv_ai_avatar"
@@ -62,8 +63,8 @@
                     android:layout_height="wrap_content"
                     android:text="点击更换"
                     android:textSize="10sp"
-                    android:textColor="#667eea"
-                    android:layout_marginTop="4dp" />
+                    android:textColor="@color/brand_primary"
+                    android:layout_marginTop="2dp" />
 
                 <TextView
                     android:id="@+id/tv_ai_name_profile"
@@ -71,8 +72,7 @@
                     android:layout_height="wrap_content"
                     android:text="星尘"
                     android:textSize="13sp"
-                    android:textColor="#e8e8f0"
-                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
                     android:layout_marginTop="2dp" />
             </LinearLayout>
 
@@ -89,7 +89,7 @@
                     android:layout_height="wrap_content"
                     android:text="朋友"
                     android:textSize="16sp"
-                    android:textColor="#ff6b9d"
+                    android:textColor="@color/accent_pink"
                     android:textStyle="bold" />
 
                 <ProgressBar
@@ -100,8 +100,8 @@
                     android:layout_marginTop="6dp"
                     android:max="100"
                     android:progress="50"
-                    android:progressTint="#ff6b9d"
-                    android:progressBackgroundTint="#22ff6b9d" />
+                    android:progressTint="@color/accent_pink"
+                    android:progressBackgroundTint="@color/accent_alpha_20" />
 
                 <TextView
                     android:id="@+id/tv_affection_value"
@@ -109,7 +109,7 @@
                     android:layout_height="wrap_content"
                     android:text="50 / 100"
                     android:textSize="11sp"
-                    android:textColor="#8899cc"
+                    android:textColor="@color/brand_primary"
                     android:layout_marginTop="2dp" />
             </LinearLayout>
 
@@ -125,9 +125,9 @@
                     android:layout_height="72dp"
                     app:cardCornerRadius="36dp"
                     app:cardElevation="0dp"
-                    app:cardBackgroundColor="#1a1a3e"
+                    app:cardBackgroundColor="@color/surface_card"
                     app:strokeWidth="2dp"
-                    app:strokeColor="#ff6b9d">
+                    app:strokeColor="@color/accent_pink">
 
                     <ImageView
                         android:id="@+id/iv_user_avatar"
@@ -143,7 +143,7 @@
                     android:layout_height="wrap_content"
                     android:text="点击更换"
                     android:textSize="10sp"
-                    android:textColor="#ff6b9d"
+                    android:textColor="@color/accent_pink"
                     android:layout_marginTop="4dp" />
 
                 <TextView
@@ -152,7 +152,7 @@
                     android:layout_height="wrap_content"
                     android:text="主人"
                     android:textSize="13sp"
-                    android:textColor="#e8e8f0"
+                    android:textColor="@color/text_primary"
                     android:textStyle="bold"
                     android:layout_marginTop="2dp" />
             </LinearLayout>
@@ -163,11 +163,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="14dp"
-            app:cardBackgroundColor="#1a1a3e"
+            app:cardBackgroundColor="@color/color_card_dark"
             app:cardCornerRadius="16dp"
             app:cardElevation="2dp"
             app:strokeWidth="1dp"
-            app:strokeColor="#2a2a5a">
+            app:strokeColor="@color/color_divider_dark">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -181,7 +181,7 @@
                     android:text="📊 相遇数据"
                     android:textSize="15sp"
                     android:textStyle="bold"
-                    android:textColor="#9c7cff"
+                    android:textColor="@color/brand_accent"
                     android:layout_marginBottom="12dp" />
 
                 <LinearLayout
@@ -206,7 +206,7 @@
                             android:layout_height="wrap_content"
                             android:text="0"
                             android:textSize="20sp"
-                            android:textColor="#9c7cff"
+                            android:textColor="@color/brand_accent"
                             android:textStyle="bold" />
 
                         <TextView
@@ -214,7 +214,7 @@
                             android:layout_height="wrap_content"
                             android:text="💬 消息"
                             android:textSize="10sp"
-                            android:textColor="#8899bb" />
+                            android:textColor="@color/color_text_chat_secondary" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -234,7 +234,7 @@
                             android:layout_height="wrap_content"
                             android:text="0"
                             android:textSize="20sp"
-                            android:textColor="#64ffda"
+                            android:textColor="@color/accent_cyan"
                             android:textStyle="bold" />
 
                         <TextView
@@ -242,7 +242,7 @@
                             android:layout_height="wrap_content"
                             android:text="📅 天数"
                             android:textSize="10sp"
-                            android:textColor="#8899bb" />
+                            android:textColor="@color/color_text_chat_secondary" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -261,7 +261,7 @@
                             android:layout_height="wrap_content"
                             android:text="0"
                             android:textSize="20sp"
-                            android:textColor="#ff6b9d"
+                            android:textColor="@color/accent_pink"
                             android:textStyle="bold" />
 
                         <TextView
@@ -269,7 +269,7 @@
                             android:layout_height="wrap_content"
                             android:text="🔥 连续"
                             android:textSize="10sp"
-                            android:textColor="#8899bb" />
+                            android:textColor="@color/color_text_chat_secondary" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -294,7 +294,7 @@
                             android:layout_height="wrap_content"
                             android:text="0"
                             android:textSize="16sp"
-                            android:textColor="#ff6b9d"
+                            android:textColor="@color/accent_pink"
                             android:textStyle="bold" />
 
                         <TextView
@@ -302,7 +302,7 @@
                             android:layout_height="wrap_content"
                             android:text="✍️ 我发的"
                             android:textSize="9sp"
-                            android:textColor="#8899bb" />
+                            android:textColor="@color/color_text_chat_secondary" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -322,7 +322,7 @@
                             android:layout_height="wrap_content"
                             android:text="0"
                             android:textSize="16sp"
-                            android:textColor="#667eea"
+                            android:textColor="@color/brand_primary"
                             android:textStyle="bold" />
 
                         <TextView
@@ -330,7 +330,7 @@
                             android:layout_height="wrap_content"
                             android:text="🤖 TA回的"
                             android:textSize="9sp"
-                            android:textColor="#8899bb" />
+                            android:textColor="@color/color_text_chat_secondary" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -350,7 +350,7 @@
                             android:layout_height="wrap_content"
                             android:text="0"
                             android:textSize="16sp"
-                            android:textColor="#ffb347"
+                            android:textColor="@color/color_accent_orange"
                             android:textStyle="bold" />
 
                         <TextView
@@ -358,7 +358,7 @@
                             android:layout_height="wrap_content"
                             android:text="😄 表情包"
                             android:textSize="9sp"
-                            android:textColor="#8899bb" />
+                            android:textColor="@color/color_text_chat_secondary" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -377,7 +377,7 @@
                             android:layout_height="wrap_content"
                             android:text="0"
                             android:textSize="16sp"
-                            android:textColor="#e8a0bf"
+                            android:textColor="@color/accent_pink"
                             android:textStyle="bold" />
 
                         <TextView
@@ -385,7 +385,7 @@
                             android:layout_height="wrap_content"
                             android:text="📝 字数"
                             android:textSize="9sp"
-                            android:textColor="#8899bb" />
+                            android:textColor="@color/color_text_chat_secondary" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -411,7 +411,7 @@
                             android:layout_height="wrap_content"
                             android:text="0"
                             android:textSize="16sp"
-                            android:textColor="#7fdbda"
+                            android:textColor="@color/accent_cyan"
                             android:textStyle="bold" />
 
                         <TextView
@@ -419,7 +419,7 @@
                             android:layout_height="wrap_content"
                             android:text="📈 日均"
                             android:textSize="9sp"
-                            android:textColor="#8899bb" />
+                            android:textColor="@color/color_text_chat_secondary" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -438,7 +438,7 @@
                             android:layout_height="wrap_content"
                             android:text="--"
                             android:textSize="16sp"
-                            android:textColor="#c4b5fd"
+                            android:textColor="@color/brand_accent"
                             android:textStyle="bold" />
 
                         <TextView
@@ -446,7 +446,7 @@
                             android:layout_height="wrap_content"
                             android:text="🌙 活跃"
                             android:textSize="9sp"
-                            android:textColor="#8899bb" />
+                            android:textColor="@color/color_text_chat_secondary" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -456,11 +456,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="14dp"
-            app:cardBackgroundColor="#1a1a3e"
+            app:cardBackgroundColor="@color/color_card_dark"
             app:cardCornerRadius="16dp"
             app:cardElevation="2dp"
             app:strokeWidth="1dp"
-            app:strokeColor="#2a2a5a">
+            app:strokeColor="@color/color_divider_dark">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -476,13 +476,13 @@
                     android:layout_weight="1"
                     android:text="相伴 1 天"
                     android:textSize="12sp"
-                    android:textColor="#8899cc"
+                    android:textColor="@color/text_secondary"
                     android:gravity="center" />
 
                 <View
                     android:layout_width="1dp"
                     android:layout_height="16dp"
-                    android:background="#22c4b5fd" />
+                    android:background="@color/accent_alpha_20" />
 
                 <TextView
                     android:id="@+id/tv_ach_count"
@@ -491,13 +491,13 @@
                     android:layout_weight="1"
                     android:text="0 成就"
                     android:textSize="12sp"
-                    android:textColor="#8899cc"
+                    android:textColor="@color/text_secondary"
                     android:gravity="center" />
 
                 <View
                     android:layout_width="1dp"
                     android:layout_height="16dp"
-                    android:background="#22c4b5fd" />
+                    android:background="@color/accent_alpha_20" />
 
                 <TextView
                     android:id="@+id/tv_diary_count"
@@ -506,7 +506,7 @@
                     android:layout_weight="1"
                     android:text="0 日记"
                     android:textSize="12sp"
-                    android:textColor="#8899cc"
+                    android:textColor="@color/text_secondary"
                     android:gravity="center" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -516,11 +516,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="14dp"
-            app:cardBackgroundColor="#1a1a3e"
+            app:cardBackgroundColor="@color/surface_card"
             app:cardCornerRadius="24dp"
             app:cardElevation="2dp"
             app:strokeWidth="1dp"
-            app:strokeColor="#2a2a5a">
+            app:strokeColor="@color/color_divider_dark">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -535,7 +535,7 @@
                     android:text="他/她眼中的你"
                     android:textSize="16sp"
                     android:textStyle="bold"
-                    android:textColor="#c4b5fd"
+                    android:textColor="@color/brand_accent"
                     android:layout_marginBottom="10dp" />
 
                 <TextView
@@ -544,7 +544,7 @@
                     android:layout_height="wrap_content"
                     android:text=""
                     android:textSize="14sp"
-                    android:textColor="#e8e8f0"
+                    android:textColor="@color/text_primary"
                     android:lineSpacingExtra="4dp"
                     android:layout_marginBottom="8dp" />
 
@@ -554,7 +554,7 @@
                     android:layout_height="wrap_content"
                     android:text=""
                     android:textSize="11sp"
-                    android:textColor="#667788" />
+                    android:textColor="@color/text_muted" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -564,7 +564,7 @@
             android:text="  🏆 已解锁的成就"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="#8899dd"
+            android:textColor="@color/color_section_header"
             android:letterSpacing="0.05"
             android:layout_marginBottom="10dp" />
 
@@ -572,11 +572,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="14dp"
-            app:cardBackgroundColor="#1a1a3e"
+            app:cardBackgroundColor="@color/surface_card"
             app:cardCornerRadius="16dp"
             app:cardElevation="2dp"
             app:strokeWidth="1dp"
-            app:strokeColor="#2a2a5a">
+            app:strokeColor="@color/color_divider_dark">
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recycler_achievements"
@@ -592,7 +592,7 @@
             android:text="  💫 值得铭记的事情"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="#ff6b9d"
+            android:textColor="@color/accent_pink"
             android:letterSpacing="0.05"
             android:layout_marginBottom="10dp" />
 
@@ -602,7 +602,7 @@
             android:layout_height="wrap_content"
             android:text="AI 正在了解你...\n多聊聊天，AI会记住关于你的珍贵瞬间"
             android:textSize="13sp"
-            android:textColor="#667788"
+            android:textColor="@color/text_muted"
             android:gravity="center"
             android:padding="24dp"
             android:visibility="gone" />
@@ -623,7 +623,7 @@
             android:text="  ⭐ 收藏的消息"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="#ffb347"
+            android:textColor="@color/color_accent_orange"
             android:letterSpacing="0.05"
             android:layout_marginBottom="10dp" />
 
@@ -633,7 +633,7 @@
             android:layout_height="wrap_content"
             android:text="还没有收藏任何消息\n长按聊天气泡可以收藏哦~"
             android:textSize="13sp"
-            android:textColor="#667788"
+            android:textColor="@color/text_muted"
             android:gravity="center"
             android:padding="24dp"
             android:visibility="visible" />
@@ -656,8 +656,8 @@
             android:layout_height="48dp"
             android:text="编辑人格设定"
             android:textSize="14sp"
-            android:textColor="#FFFFFF"
-            app:backgroundTint="#667eea"
+            android:textColor="@color/text_on_accent"
+            app:backgroundTint="@color/brand_primary"
             app:cornerRadius="12dp"
             android:layout_marginBottom="8dp" />
 

@@ -1,0 +1,22 @@
+// 业务逻辑层模块
+pub mod llm_service;
+pub mod memory_service;
+pub mod prompt_builder;
+pub mod emotion_service;
+pub mod affection_service;
+pub mod voice_service;
+pub mod rag_service;
+pub mod virtual_world_service;
+pub mod diary_service;
+pub mod search_service;
+pub mod safety_service;
+pub mod humanizer;
+pub mod interaction_engine;
+pub mod stats_service;
+pub mod theme_service;
+pub mod sticker_service;
+pub mod moments_service;
+pub mod group_chat_service;
+pub mod nickname_service;
+pub mod favorite_service;
+pub mod migration_service;

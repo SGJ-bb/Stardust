@@ -21,6 +21,9 @@ class ContextManager(private val context: Context, private val personaId: String
     val globalMemoryPool = GlobalMemoryPool(context, personaId)
     val sessionManager = SessionManager(context)
 
+    /** 虚拟世界记忆池（按需初始化） */
+    private var vwMemoryPool: com.aicompanion.memory.VirtualWorldMemoryPool? = null
+
     private var rawTurns: MutableList<ConversationTurn> = mutableListOf()
     private var turnsSinceLastEval = 0
     private var totalTurns = 0
@@ -139,14 +142,23 @@ class ContextManager(private val context: Context, private val personaId: String
                     try {
                         globalMemoryPool.consolidate(client)
                     } catch (e: Exception) {
-                        AppLogger.e(TAG, "globalMemoryPool consolidate error: ${e.message}")
+                        AppLogger.e(TAG, "[Memory-Global] 全局记忆池整合失败: ${e.javaClass.simpleName}: ${e.message}")
                     }
                 }
             }
 
             if (memoryPool.needsConsolidate()) {
                 //AppLogger.d(TAG, "evaluateAndUpdateMemory: consolidating after eval")
-                memoryPool.consolidate(client)
+                val archived = memoryPool.consolidate(client)
+                // 将溢出的归档内容写入日记作为长期记忆
+                if (archived.isNotBlank()) {
+                    try {
+                        val diaryMgr = com.aicompanion.diary.DiaryManager(context)
+                        diaryMgr.appendMemoryArchive(archived)
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG, "[Memory-Archive] 记忆归档写入日记失败: ${e.javaClass.simpleName}: ${e.message}")
+                    }
+                }
             }
 
             memoryPool.saveToStorage()
@@ -157,7 +169,7 @@ class ContextManager(private val context: Context, private val personaId: String
             AppLogger.w(TAG, "evaluateAndUpdateMemory: success, ${result.size} entries extracted")
         } catch (e: Exception) {
             evalFailCount++
-            AppLogger.e(TAG, "evaluateAndUpdateMemory: exception (failCount=$evalFailCount) - ${e.message}")
+            AppLogger.e(TAG, "[Memory-Eval] evaluateAndUpdateMemory评估异常(failCount=$evalFailCount): ${e.javaClass.simpleName}: ${e.message}")
             if (evalFailCount >= MAX_EVAL_RETRIES) {
                 AppLogger.e(TAG, "evaluateAndUpdateMemory: failed $evalFailCount times, resetting counter")
                 turnsSinceLastEval = 0
@@ -172,7 +184,15 @@ class ContextManager(private val context: Context, private val personaId: String
     }
 
     suspend fun compress() {
-        memoryPool.consolidate(apiClient())
+        val archived = memoryPool.consolidate(apiClient())
+        if (archived.isNotBlank()) {
+            try {
+                val diaryMgr = com.aicompanion.diary.DiaryManager(context)
+                diaryMgr.appendMemoryArchive(archived)
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "[Memory-Archive] 压缩归档写入日记失败: ${e.javaClass.simpleName}: ${e.message}")
+            }
+        }
         memoryPool.saveToStorage()
     }
 
@@ -189,19 +209,39 @@ class ContextManager(private val context: Context, private val personaId: String
 
     fun getFullContextBlock(): String {
         val sb = StringBuilder()
+
+        // 第一层：跨场景共享记忆
         val globalBlock = globalMemoryPool.getGlobalBlock()
         if (globalBlock.isNotBlank()) {
             sb.appendLine(globalBlock)
         }
+
+        // 第二层：私聊/群聊场景记忆（650字上限）
         val poolBlock = memoryPool.getPoolBlock()
         if (poolBlock.isNotBlank()) {
             sb.appendLine(poolBlock)
         }
+
+        // 第三层：虚拟世界记忆（自动懒加载）
+        val vwPool = vwMemoryPool ?: run {
+            val pool = com.aicompanion.memory.VirtualWorldMemoryPool(context)
+            vwMemoryPool = pool
+            pool
+        }
+        if (!vwPool.isEmpty) {
+            val vwBlock = vwPool.getVwBlock()
+            if (vwBlock.isNotBlank()) {
+                sb.appendLine(vwBlock)
+            }
+        }
+
+        // 第四层：细节记忆
         val detailBlock = memoryPool.getDetailBlock()
         if (detailBlock.isNotBlank()) {
             sb.appendLine()
             sb.appendLine(detailBlock)
         }
+
         return sb.toString().trimEnd()
     }
 
@@ -233,6 +273,17 @@ class ContextManager(private val context: Context, private val personaId: String
         rawTurns.clear()
     }
 
+    /** 获取或初始化虚拟世界记忆池 */
+    fun getOrCreateVwMemoryPool(worldId: String = ""): com.aicompanion.memory.VirtualWorldMemoryPool {
+        if (vwMemoryPool == null) {
+            vwMemoryPool = com.aicompanion.memory.VirtualWorldMemoryPool(context, worldId)
+        }
+        return vwMemoryPool!!
+    }
+
+    /** 虚拟世界是否活跃且有记忆 */
+    fun hasVwMemory(): Boolean = vwMemoryPool?.isEmpty == false
+
     fun getSessionStats(): String {
         val remaining = maxOf(0, contextTurns - turnsSinceLastEval)
         val failInfo = if (evalFailCount > 0) " [评估失败${evalFailCount}次]" else ""
@@ -247,6 +298,8 @@ class ContextManager(private val context: Context, private val personaId: String
         memoryPool.clear()
         globalMemoryPool.clear()
         sessionManager.clear()
+        vwMemoryPool?.clear()
+        vwMemoryPool = null
         cachedContextBlock = null
         turnsSinceLastEval = 0
         totalTurns = 0

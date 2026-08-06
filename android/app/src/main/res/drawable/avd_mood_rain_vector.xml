@@ -1,0 +1,104 @@
+<!--
+    avd_mood_rain_vector.xml — 雨云矢量图（anim_mood_rain 的 drawable 源）
+    包含：云朵形状（多个重叠圆组成）+ 3滴雨滴
+    viewport: 32x36, 云朵中心区域在上方
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="36dp"
+    android:viewportWidth="32"
+    android:viewportHeight="36">
+
+    <!-- ===== 云朵组（整体浮动） ===== -->
+    <group android:name="cloud_group"
+        android:pivotX="16"
+        android:pivotY="14">
+
+        <!-- 云朵主体 - 多圆组合成云形 (灰蓝色) -->
+        <path
+            android:name="cloud_body"
+            android:pathData="
+                M6,20
+                A5,5 0 0,1 6,10
+                A7,7 0 0,1 18,8
+                A6,6 0 0,1 28,13
+                A4.5,4.5 0 0,1 26,21
+                Z"
+            android:fillColor="#8899bb"
+            android:pivotX="16"
+            android:pivotY="15"/>
+
+        <!-- 云朵高光（增加立体感） -->
+        <path
+            android:name="cloud_highlight"
+            android:pathData="
+                M9,16
+                A3,3 0 0,1 11,11
+                A4,4 0 0,1 19,10
+                A3,3 0 0,1 24,14
+                Q22,17 18,17
+                Q12,18 9,16 Z"
+            android:fillColor="#aabbcc"
+            android:alpha="0.4"/>
+
+        <!-- 难过表情 - 左眼（向下弯的弧线） -->
+        <path
+            android:name="sad_left_eye"
+            android:pathData="M10,14 Q12,16 14,14"
+            android:strokeColor="#667799"
+            android:strokeWidth="1.2"
+            android:strokeLineCap="round"
+            android:fillColor="@android:color/transparent"/>
+
+        <!-- 难过表情 - 右眼（向下弯的弧线） -->
+        <path
+            android:name="sad_right_eye"
+            android:pathData="M18,14 Q20,16 22,14"
+            android:strokeColor="#667799"
+            android:strokeWidth="1.2"
+            android:strokeLineCap="round"
+            android:fillColor="@android:color/transparent"/>
+
+        <!-- 难过表情 - 嘴巴（向下弯） -->
+        <path
+            android:name="sad_mouth"
+            android:pathData="M12,18 Q16,15 20,18"
+            android:strokeColor="#667799"
+            android:strokeWidth="1.2"
+            android:strokeLineCap="round"
+            android:fillColor="@android:color/transparent"/>
+
+    </group>
+
+    <!-- ===== 雨滴 ===== -->
+    <!-- 雨滴1 (左侧) -->
+    <group android:name="raindrop1"
+        android:pivotX="10"
+        android:pivotY="25">
+        <path
+            android:name="drop1_path"
+            android:pathData="M10,23 Q8,27 10,29 Q12,27 10,23 Z"
+            android:fillColor="#667eea"/>
+    </group>
+
+    <!-- 雨滴2 (中间) -->
+    <group android:name="raindrop2"
+        android:pivotX="16"
+        android:pivotY="26">
+        <path
+            android:name="drop2_path"
+            android:pathData="M16,24 Q14,28 16,30 Q18,28 16,24 Z"
+            android:fillColor="#667eea"/>
+    </group>
+
+    <!-- 雨滴3 (右侧) -->
+    <group android:name="raindrop3"
+        android:pivotX="22"
+        android:pivotY="25">
+        <path
+            android:name="drop3_path"
+            android:pathData="M22,23 Q20,27 22,29 Q24,27 22,23 Z"
+            android:fillColor="#667eea"/>
+    </group>
+
+</vector>

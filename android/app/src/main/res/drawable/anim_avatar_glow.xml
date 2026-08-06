@@ -1,0 +1,153 @@
+<!--
+    anim_avatar_glow.xml — 头像光环装饰动画
+    用途：用于头像周围的动态光环效果，增加精致感
+    包含：椭圆形外框光环 + 4个沿轨道运行的光点
+    动画效果：光点旋转绕行 + 光环呼吸透明度变化 + 光点独立闪烁
+    尺寸：56dp x 56dp（比头像稍大）
+-->
+<animated-vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/avd_avatar_glow_vector">
+
+    <!-- 光环整体呼吸 alpha -->
+    <target android:name="glow_ring">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="3000"
+                android:valueFrom="80"
+                android:valueTo="200"
+                android:valueType="intType"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- ===== 光点轨道旋转组 ===== -->
+    <!-- 轨道组整体旋转 -->
+    <target android:name="orbit_group">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="rotation"
+                android:duration="8000"
+                android:valueFrom="0"
+                android:valueTo="360"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/linear_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光点1 闪烁 scale -->
+    <target android:name="dot1">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1500"
+                android:valueFrom="0.6"
+                android:valueTo="1.2"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="dot1">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1500"
+                android:valueFrom="0.6"
+                android:valueTo="1.2"
+                android:startOffset="0"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光点2 闪烁 (错开375ms) -->
+    <target android:name="dot2">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1500"
+                android:valueFrom="0.6"
+                android:valueTo="1.2"
+                android:startOffset="375"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="dot2">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1500"
+                android:valueFrom="0.6"
+                android:valueTo="1.2"
+                android:startOffset="375"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光点3 闪烁 (错开750ms) -->
+    <target android:name="dot3">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1500"
+                android:valueFrom="0.6"
+                android:valueTo="1.2"
+                android:startOffset="750"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="dot3">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1500"
+                android:valueFrom="0.6"
+                android:valueTo="1.2"
+                android:startOffset="750"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光点4 闪烁 (错开1125ms) -->
+    <target android:name="dot4">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1500"
+                android:valueFrom="0.6"
+                android:valueTo="1.2"
+                android:startOffset="1125"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="dot4">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1500"
+                android:valueFrom="0.6"
+                android:valueTo="1.2"
+                android:startOffset="1125"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+</animated-vector>

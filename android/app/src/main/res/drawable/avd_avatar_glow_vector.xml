@@ -1,0 +1,76 @@
+<!--
+    avd_avatar_glow_vector.xml — 头像光环矢量图（anim_avatar_glow 的 drawable 源）
+    包含：椭圆形外框光环 + 4个沿轨道运行的光点
+    viewport: 56x56, 中心在 (28, 28)
+    光环使用 brand_primary 20%透明度，光点为白色
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="56dp"
+    android:viewportWidth="56"
+    android:viewportHeight="56">
+
+    <!-- ===== 外框光环椭圆 (半透明品牌色) ===== -->
+    <path
+        android:name="glow_ring"
+        android:pathData="M28,2 A26,24 0 1,1 28,50 A26,24 0 1,1 28,2 Z"
+        android:strokeColor="#33667eea"
+        android:strokeWidth="1.5"
+        android:fillColor="@android:color/transparent"/>
+
+    <!-- 内层光环 (更细更淡) -->
+    <path
+        android:name="glow_ring_inner"
+        android:pathData="M28,5 A23,21 0 1,1 28,47 A23,21 0 1,1 28,5 Z"
+        android:strokeColor="#1a667eea"
+        android:strokeWidth="0.8"
+        android:fillColor="@android:color/transparent"/>
+
+    <!-- ===== 轨道旋转组（包含4个光点） ===== -->
+    <!-- 光点分布在椭圆轨道上，通过整体 rotation 模拟绕行 -->
+    <group android:name="orbit_group"
+        android:pivotX="28"
+        android:pivotY="28">
+
+        <!-- 光点1: 上方位置 (0°) -->
+        <group android:name="dot1"
+            android:pivotX="28"
+            android:pivotY="4">
+            <path
+                android:name="dot1_path"
+                android:pathData="M28,2 A2,2 0 1,1 28,6 A2,2 0 1,1 28,2 Z"
+                android:fillColor="#ffffff"/>
+        </group>
+
+        <!-- 光点2: 右侧位置 (90°) -->
+        <group android:name="dot2"
+            android:pivotX="52"
+            android:pivotY="28">
+            <path
+                android:name="dot2_path"
+                android:pathData="M50,28 A2,2 0 1,1 54,28 A2,2 0 1,1 50,28 Z"
+                android:fillColor="#ffffff"/>
+        </group>
+
+        <!-- 光点3: 下方位置 (180°) -->
+        <group android:name="dot3"
+            android:pivotX="28"
+            android:pivotY="52">
+            <path
+                android:name="dot3_path"
+                android:pathData="M28,50 A2,2 0 1,1 28,54 A2,2 0 1,1 28,50 Z"
+                android:fillColor="#ffffff"/>
+        </group>
+
+        <!-- 光点4: 左侧位置 (270°) -->
+        <group android:name="dot4"
+            android:pivotX="4"
+            android:pivotY="28">
+            <path
+                android:name="dot4_path"
+                android:pathData="M2,28 A2,2 0 1,1 6,28 A2,2 0 1,1 2,28 Z"
+                android:fillColor="#ffffff"/>
+        </group>
+    </group>
+
+</vector>

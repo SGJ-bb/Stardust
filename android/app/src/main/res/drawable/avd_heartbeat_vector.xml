@@ -1,0 +1,23 @@
+<!-- 心跳动画 - Vector定义：标准贝塞尔曲线心形 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- 心形容器组，用于整体缩放和透明度动画 -->
+    <group android:name="heart_group"
+        android:pivotX="12"
+        android:pivotY="12">
+        
+        <!-- 标准心形路径，使用贝塞尔曲线 -->
+        <path
+            android:name="heart_path"
+            android:pathData="M12,21.35l-1.45-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z"
+            android:fillColor="@color/accent_pink"
+            android:strokeColor="@color/brand_primary"
+            android:strokeWidth="0.5" />
+            
+    </group>
+
+</vector>

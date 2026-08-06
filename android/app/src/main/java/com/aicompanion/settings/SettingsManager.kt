@@ -10,6 +10,13 @@ import com.aicompanion.settings.ScheduledWake
 
 class SettingsManager(context: Context) {
 
+    companion object {
+        /** TTS 播放模式：AI 回复后直接朗读 */
+        const val TTS_MODE_AUTO_PLAY = "auto_play"
+        /** TTS 播放模式：只生成语音气泡，用户点击才播放 */
+        const val TTS_MODE_BUBBLE_ONLY = "bubble_only"
+    }
+
     private val appContext: Context = context.applicationContext
 
     private val prefs: SharedPreferences = appContext.getSharedPreferences(
@@ -78,6 +85,11 @@ class SettingsManager(context: Context) {
     var ttsEngineMode: String
         get() = prefs.getString("tts_engine_mode", com.aicompanion.voice.TtsManager.ENGINE_EDGE) ?: com.aicompanion.voice.TtsManager.ENGINE_EDGE
         set(value) { prefs.edit().putString("tts_engine_mode", value).apply() }
+
+    /** TTS 播放模式：auto_play（直接朗读）/ bubble_only（仅语音气泡） */
+    var ttsPlayMode: String
+        get() = prefs.getString("tts_play_mode", TTS_MODE_AUTO_PLAY) ?: TTS_MODE_AUTO_PLAY
+        set(value) { prefs.edit().putString("tts_play_mode", value).apply() }
 
     var offlineMode: Boolean
         get() = offlineModeEnabled
@@ -306,19 +318,6 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean("simple_screen_mode", false)
         set(value) { prefs.edit().putBoolean("simple_screen_mode", value).apply() }
 
-    var languageStyle: LanguageStyle
-        get() {
-            val value = prefs.getString("language_style", "normal") ?: "normal"
-            return try {
-                LanguageStyle.valueOf(value.uppercase())
-            } catch (e: Exception) {
-                LanguageStyle.NORMAL
-            }
-        }
-        set(value) {
-            prefs.edit().putString("language_style", value.name.lowercase()).apply()
-        }
-
     var nagFrequency: NagFrequency
         get() {
             val value = prefs.getString("nag_frequency", "medium") ?: "medium"
@@ -459,10 +458,6 @@ class SettingsManager(context: Context) {
 
 enum class NagFrequency {
     LOW, MEDIUM, HIGH, OFF
-}
-
-enum class LanguageStyle {
-    NORMAL, TSUNDERE, CUTE
 }
 
 enum class DiaryTriggerMode {

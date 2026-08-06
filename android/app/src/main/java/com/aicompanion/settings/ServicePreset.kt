@@ -6,23 +6,34 @@ data class ServicePreset(
     val url: String,
     val defaultModel: String,
     val defaultVoice: String = "",
-    val formatType: String = "openai"
+    val formatType: String = "openai",
+    val models: List<String> = emptyList()
 )
 
 object ServicePresets {
 
     val llmPresets = listOf(
-        ServicePreset("custom", "自定义", "", "", "", "openai"),
-        ServicePreset("openai", "OpenAI", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini", "", "openai"),
-        ServicePreset("aliyun", "阿里云百炼", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-plus", "", "openai"),
-        ServicePreset("zhipu", "智谱AI", "https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4-flash", "", "openai"),
-        ServicePreset("minimax", "MiniMax", "https://api.minimax.chat/v1/text/chatcompletion_v2", "MiniMax-M1", "", "openai"),
-        ServicePreset("moonshot", "月之暗面", "https://api.moonshot.cn/v1/chat/completions", "moonshot-v1-8k", "", "openai"),
-        ServicePreset("n1n", "n1n", "https://api.n1n.ai/v1/chat/completions", "gpt-4o-mini", "", "openai"),
-        ServicePreset("deepseek", "DeepSeek", "https://api.deepseek.com/v1/chat/completions", "deepseek-v4-flash", "", "openai"),
-        ServicePreset("siliconflow", "硅基流动", "https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen2.5-7B-Instruct", "", "openai"),
-        ServicePreset("openrouter", "OpenRouter", "https://openrouter.ai/api/v1/chat/completions", "google/gemini-2.0-flash-001", "", "openai"),
-        ServicePreset("qwen", "通义千问", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-max", "", "openai")
+        ServicePreset("custom", "自定义", "", "", "", "openai", emptyList()),
+        ServicePreset("openai", "OpenAI", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini", "", "openai",
+            listOf("gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo", "o1-mini", "o1-preview")),
+        ServicePreset("aliyun", "阿里云百炼", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-plus", "", "openai",
+            listOf("qwen-max", "qwen-plus", "qwen-turbo", "qwen-long", "qwen-vl-max", "qwen-vl-plus")),
+        ServicePreset("zhipu", "智谱AI", "https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4-flash", "", "openai",
+            listOf("glm-4-plus", "glm-4", "glm-4-air", "glm-4-airx", "glm-4-flash", "glm-4-flashx", "glm-4v")),
+        ServicePreset("minimax", "MiniMax", "https://api.minimax.chat/v1/text/chatcompletion_v2", "MiniMax-M1", "", "openai",
+            listOf("MiniMax-M1", "MiniMax-Text-01", "abab6.5s-chat", "abab6.5-chat")),
+        ServicePreset("moonshot", "月之暗面", "https://api.moonshot.cn/v1/chat/completions", "moonshot-v1-8k", "", "openai",
+            listOf("moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k", "moonshot-v1-auto")),
+        ServicePreset("n1n", "n1n", "https://api.n1n.ai/v1/chat/completions", "gpt-4o-mini", "", "openai",
+            listOf("gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "claude-3.5-sonnet", "deepseek-chat")),
+        ServicePreset("deepseek", "DeepSeek", "https://api.deepseek.com/v1/chat/completions", "deepseek-chat", "", "openai",
+            listOf("deepseek-chat", "deepseek-reasoner", "deepseek-coder", "deepseek-v4-flash")),
+        ServicePreset("siliconflow", "硅基流动", "https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen2.5-7B-Instruct", "", "openai",
+            listOf("Qwen/Qwen2.5-7B-Instruct", "Qwen/Qwen2.5-72B-Instruct", "deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-R1", "meta-llama/Llama-3.3-70B-Instruct")),
+        ServicePreset("openrouter", "OpenRouter", "https://openrouter.ai/api/v1/chat/completions", "google/gemini-2.0-flash-001", "", "openai",
+            listOf("google/gemini-2.0-flash-001", "openai/gpt-4o", "openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet", "deepseek/deepseek-chat")),
+        ServicePreset("qwen", "通义千问", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen-max", "", "openai",
+            listOf("qwen-max", "qwen-plus", "qwen-turbo", "qwen-long"))
     )
 
     val ttsPresets = listOf(
@@ -30,7 +41,8 @@ object ServicePresets {
         ServicePreset("openai", "OpenAI", "https://api.openai.com/v1/audio/speech", "tts-1", "alloy", "openai"),
         ServicePreset("siliconflow", "硅基流动", "https://api.siliconflow.cn/v1/audio/speech", "FunAudioLLM/CosyVoice2-0.5B", "FunAudioLLM/CosyVoice2-0.5B:alex", "openai"),
         ServicePreset("fish_audio", "Fish Audio", "https://api.fish.audio/v1/tts", "fish-speech-1.5", "", "fish_audio"),
-        ServicePreset("aliyun", "阿里云百炼", "https://dashscope.aliyuncs.com/compatible-mode/v1/audio/speech", "cosyvoice-v1", "longxiaochun", "openai")
+        ServicePreset("aliyun", "阿里云百炼", "https://dashscope.aliyuncs.com/compatible-mode/v1/audio/speech", "cosyvoice-v1", "longxiaochun", "openai"),
+        ServicePreset("mimo", "小米 MiMoTTS", "https://api.xiaomimimo.com/v1/chat/completions", "mimo-v2.5-tts", "冰糖", "mimo")
     )
 
     val asrPresets = listOf(
@@ -44,7 +56,9 @@ object ServicePresets {
         ServicePreset("custom", "自定义", "", "", "", "openai"),
         ServicePreset("openai", "OpenAI (DALL-E)", "https://api.openai.com/v1/images/generations", "dall-e-3", "", "openai"),
         ServicePreset("siliconflow", "硅基流动", "https://api.siliconflow.cn/v1/images/generations", "Kwai-Kolors/Kolors", "", "siliconflow"),
-        ServicePreset("aliyun_kling", "阿里云百炼 (可灵)", "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation", "kling-v3-image-generation", "", "aliyun_async"),
+        ServicePreset("kling", "可灵AI (快手官方)", "https://api-beijing.klingai.com/v1/images/generations", "kling-v2-master", "", "kling"),
+        ServicePreset("aliyun_kling", "阿里云百炼-可灵 (快手)", "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation", "kling/kling-v3-image-generation", "", "aliyun_async"),
+        ServicePreset("aliyun_wan", "阿里云百炼-万相", "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation", "wan2.1-t2i-turbo", "", "aliyun_async"),
         ServicePreset("zhipu", "智谱AI (CogView)", "https://open.bigmodel.cn/api/paas/v4/images/generations", "cogview-4-250304", "", "openai")
     )
 

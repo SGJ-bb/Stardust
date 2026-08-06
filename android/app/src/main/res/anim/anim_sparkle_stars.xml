@@ -1,0 +1,123 @@
+<!-- 星光闪烁动画 - 用于成就解锁、特殊事件等庆祝场景，多颗星星旋转闪烁 -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/avd_sparkle_stars_vector">
+
+    <!-- 整体容器弹入效果 -->
+    <target android:name="stars_container">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <set>
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="0"
+                    android:valueTo="1.15"
+                    android:duration="600"
+                    android:interpolator="@android:anim/overshoot_interpolator"
+                    android:fillAfter="true" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="0"
+                    android:valueTo="1.15"
+                    android:duration="600"
+                    android:interpolator="@android:anim/overshoot_interpolator"
+                    android:fillAfter="true" />
+                <objectAnimator
+                    android:propertyName="alpha"
+                    android:valueFrom="0"
+                    android:valueTo="255"
+                    android:duration="800"
+                    android:interpolator="@android:anim/accelerate_decelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <!-- 左上角星星 - 金色，快速旋转 -->
+    <target android:name="star_top_left">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <objectAnimator
+                android:propertyName="rotation"
+                android:valueFrom="0"
+                android:valueTo="360"
+                android:duration="1500"
+                android:interpolator="@android:anim/linear_interpolator"
+                android:repeatCount="infinite"
+                android:repeatMode="restart" />
+        </aapt:attr>
+    </target>
+
+    <!-- 右上角星星 - 粉色，中速旋转 -->
+    <target android:name="star_top_right">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <objectAnimator
+                android:propertyName="rotation"
+                android:valueFrom="360"
+                android:valueTo="0"
+                android:duration="2000"
+                android:interpolator="@android:anim/linear_interpolator"
+                android:repeatCount="infinite"
+                android:repeatMode="restart" />
+        </aapt:attr>
+    </target>
+
+    <!-- 左下角星星 - 青色，慢速旋转 -->
+    <target android:name="star_bottom_left">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <objectAnimator
+                android:propertyName="rotation"
+                android:valueFrom="0"
+                android:valueTo="360"
+                android:duration="2500"
+                android:interpolator="@android:anim/linear_interpolator"
+                android:repeatCount="infinite"
+                android:repeatMode="restart" />
+        </aapt:attr>
+    </target>
+
+    <!-- 右下角星星 - 紫色，中速反向旋转 -->
+    <target android:name="star_bottom_right">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <objectAnimator
+                android:propertyName="rotation"
+                android:valueFrom="360"
+                android:valueTo="0"
+                android:duration="1800"
+                android:interpolator="@android:anim/linear_interpolator"
+                android:repeatCount="infinite"
+                android:repeatMode="restart" />
+        </aapt:attr>
+    </target>
+
+    <!-- 中心大星 - 金色，最慢旋转 -->
+    <target android:name="star_center">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <set>
+                <objectAnimator
+                    android:propertyName="rotation"
+                    android:valueFrom="0"
+                    android:valueTo="-360"
+                    android:duration="2200"
+                    android:interpolator="@android:anim/linear_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="restart" />
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="1.0"
+                    android:valueTo="1.15"
+                    android:duration="1000"
+                    android:interpolator="@android:anim/accelerate_decelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="1.0"
+                    android:valueTo="1.15"
+                    android:duration="1000"
+                    android:interpolator="@android:anim/accelerate_decelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse" />
+            </set>
+        </aapt:attr>
+    </target>
+
+</animated-vector>

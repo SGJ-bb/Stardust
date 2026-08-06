@@ -35,6 +35,30 @@ data class ProviderProfile(
                 )
             ),
             ProviderProfile(
+                id = "nvidia",
+                displayName = "NVIDIA NIM",
+                apiUrl = "https://integrate.api.nvidia.com/v1/chat/completions",
+                defaultModel = "meta/llama-3.3-70b-instruct",
+                tempRange = 0f..2f,
+                topPRange = 0f..1f,
+                freqPenaltyRange = null,  // NVIDIA 不支持 frequency_penalty
+                presPenaltyRange = null,  // NVIDIA 不支持 presence_penalty
+                maxTokensLimit = 131072,
+                defaultTemp = 0.7f,
+                defaultTopP = 0.9f,
+                defaultFreqPenalty = 0f,
+                defaultPresPenalty = 0f,
+                defaultMaxTokens = 1024,
+                supportsFreqPenalty = false,  // NVIDIA 不支持
+                supportsPresPenalty = false,  // NVIDIA 不支持
+                supportsVision = true,
+                paramHints = mapOf(
+                    "freq_penalty" to "NVIDIA NIM 不支持此参数",
+                    "pres_penalty" to "NVIDIA NIM 不支持此参数",
+                    "model" to "推荐: meta/llama-3.3-70b-instruct"
+                )
+            ),
+            ProviderProfile(
                 id = "openai",
                 displayName = "OpenAI",
                 apiUrl = ServicePresets.getLlmUrl("openai"),

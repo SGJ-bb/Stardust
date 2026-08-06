@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 增强版皮肤商店卡片: 更大圆角 + 阴影 + 按压反馈 -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
-    app:cardCornerRadius="14dp"
-    app:cardElevation="0dp"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="3dp"
     app:cardBackgroundColor="#1a1a38"
-    app:contentPadding="10dp"
-    app:strokeWidth="0.5dp"
-    app:strokeColor="#33c4b5fd">
+    app:contentPadding="12dp"
+    app:strokeWidth="0.7dp"
+    app:strokeColor="#44C4B5FD"
+    app:rippleColor="#33FFFFFF"
+    android:clickable="true"
+    android:focusable="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -20,7 +24,7 @@
         <ImageView
             android:id="@+id/iv_skin_preview"
             android:layout_width="match_parent"
-            android:layout_height="80dp"
+            android:layout_height="88dp"
             android:scaleType="fitCenter"
             android:contentDescription="预览" />
 
@@ -28,9 +32,10 @@
             android:id="@+id/tv_skin_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="#c8c8e0"
-            android:layout_marginTop="6dp" />
+            android:textSize="14sp"
+            android:textColor="#d0d0e8"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginTop="8dp" />
 
         <TextView
             android:id="@+id/tv_skin_status"
@@ -38,7 +43,7 @@
             android:layout_height="wrap_content"
             android:textSize="11sp"
             android:textColor="#9c7cff"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
             android:visibility="gone" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

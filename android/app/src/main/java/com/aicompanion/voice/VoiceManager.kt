@@ -9,6 +9,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import com.aicompanion.config.AppConfig
 import com.aicompanion.models.Emotion
 import com.aicompanion.settings.SettingsManager
 import com.aicompanion.util.AppLogger
@@ -25,7 +26,9 @@ class VoiceManager(private val context: Context) {
         val text: String,
         val emotion: Emotion,
         val pitchOffset: Float,
-        val rateOffset: Float
+        val rateOffset: Float,
+        val timestamp: Long = System.currentTimeMillis(),  // 新增时间戳
+        val id: String = java.util.UUID.randomUUID().toString().take(8)  // 新增唯一ID用于确认移除
     )
 
     private val pendingSpeechQueue = java.util.concurrent.ConcurrentLinkedDeque<PendingSpeechData>()
@@ -149,18 +152,62 @@ class VoiceManager(private val context: Context) {
         utteranceCompleteListener = listener
     }
 
-    fun speak(text: String, emotion: Emotion = Emotion.NEUTRAL, emotionPitchOffset: Float = 0f, emotionRateOffset: Float = 0f) {
-        if (text.isBlank()) return
-        if (!isTTSReady) {
-            if (pendingSpeechQueue.size < 3) {
-                AppLogger.w(TAG, "TTS未就绪，缓存语音等待初始化完成: ${text.take(30)}...")
-                pendingSpeechQueue.addLast(PendingSpeechData(text, emotion, emotionPitchOffset, emotionRateOffset))
+    /**
+     * 清理过期消息(超过配置时间)
+     */
+    fun cleanupExpiredQueue() {
+        val now = System.currentTimeMillis()
+        while (pendingSpeechQueue.isNotEmpty()) {
+            val first = pendingSpeechQueue.peek()
+            if (first == null) break
+
+            if (now - first.timestamp > AppConfig.VOICE_PENDING_QUEUE_EXPIRE_MS) {
+                val removed = pendingSpeechQueue.poll()
+                // 确保移除的是同一个对象（防止并发导致peek和poll操作不同对象）
+                if (removed != null && removed.id == first.id) {
+                    AppLogger.d(TAG, "Removed expired pending speech: ${removed.text.take(20)}...")
+                }
             } else {
-                AppLogger.w(TAG, "TTS未就绪且缓存已满，丢弃: ${text.take(30)}...")
+                break
+            }
+        }
+    }
+
+    fun speak(text: String, emotion: Emotion = Emotion.NEUTRAL, emotionPitchOffset: Float = 0f, emotionRateOffset: Float = 0f) {
+        cleanupExpiredQueue()  // 每次播放前清理过期消息
+        if (text.isBlank()) return
+        // 过滤括号内的动作/状态描述，避免TTS读出(微笑)(点头)等内容
+        val cleanText = filterActionText(text)
+        if (cleanText.isBlank()) return
+        if (!isTTSReady) {
+            if (pendingSpeechQueue.size < AppConfig.VOICE_PENDING_QUEUE_MAX) {
+                AppLogger.w(TAG, "TTS未就绪，缓存语音等待初始化完成: ${cleanText.take(30)}...")
+                pendingSpeechQueue.addLast(PendingSpeechData(cleanText, emotion, emotionPitchOffset, emotionRateOffset))
+            } else {
+                AppLogger.w(TAG, "TTS未就绪且缓存已满，丢弃: ${cleanText.take(30)}...")
             }
             return
         }
-        speakInternal(text, emotion, emotionPitchOffset, emotionRateOffset, TextToSpeech.QUEUE_FLUSH)
+        speakInternal(cleanText, emotion, emotionPitchOffset, emotionRateOffset, TextToSpeech.QUEUE_FLUSH)
+    }
+
+    /**
+     * 过滤文本中的动作/状态描述（括号内容），返回纯净的可朗读文本
+     * 支持格式：(微笑) （轻轻点头） *叹气* 【思考】 等
+     */
+    private fun filterActionText(text: String): String {
+        var result = text
+        // 移除中文全角括号 （...）
+        result = result.replace("（[^）]*）".toRegex(), "")
+        // 移除英文半角括号 (...)
+        result = result.replace("\\([^)]*\\)".toRegex(), "")
+        // 移除星号动作标记 *...*
+        result = result.replace("\\*[^*]*\\*".toRegex(), "")
+        // 移除方括号动作标记 [...]
+        result = result.replace("\\[[^\\]]*\\]".toRegex(), "")
+        // 清理多余空格（连续空格→单空格，首尾空格）
+        result = result.replace("\\s+".toRegex(), " ").trim()
+        return result
     }
 
     fun stopSpeaking() {
@@ -258,6 +305,7 @@ class VoiceManager(private val context: Context) {
     }
 
     fun cleanup() {
+        pendingSpeechQueue.clear()  // 清空队列
         isListening = false
         isTTSReady = false
         try {

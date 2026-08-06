@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0a0a1a">
+    android:background="@color/bg_base">
 
     <ImageView
         android:id="@+id/iv_group_chat_bg"
@@ -22,8 +22,8 @@
             android:layout_height="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="#cc0a0a1a"
-            android:elevation="6dp"
+            android:background="@drawable/bg_toolbar_glass"
+            android:elevation="4dp"
             android:paddingStart="4dp"
             android:paddingEnd="12dp">
 
@@ -48,7 +48,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="17sp"
-                    android:textColor="@android:color/white"
+                    android:textColor="@color/text_primary"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -56,7 +56,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="11sp"
-                    android:textColor="#8899bb" />
+                    android:textColor="@color/text_secondary" />
             </LinearLayout>
 
             <TextView
@@ -68,7 +68,7 @@
                 android:paddingEnd="10dp"
                 android:text="🤖 自动"
                 android:textSize="12sp"
-                android:textColor="#aabbdd"
+                android:textColor="@color/text_secondary"
                 android:background="@drawable/bg_edit_moment"
                 android:clickable="true"
                 android:focusable="true" />
@@ -139,7 +139,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:background="#1a1a3e"
+            android:background="@color/surface_card"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
             android:paddingTop="6dp"
@@ -158,7 +158,7 @@
             android:id="@+id/scroll_predictions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#14142a"
+            android:background="@color/surface_card"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
             android:paddingTop="4dp"
@@ -179,7 +179,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="#14142a"
+            android:background="@color/surface_input"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
             android:paddingTop="8dp"
@@ -218,8 +218,8 @@
                 android:layout_weight="1"
                 android:hint="说点什么..."
                 android:textSize="14sp"
-                android:textColor="#e0e0f0"
-                android:textColorHint="#556677"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
                 android:background="@drawable/bg_edit_moment"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
@@ -250,10 +250,10 @@
             android:layout_height="44dp"
             android:text="🌍 虚拟世界"
             android:textSize="14sp"
-            android:textColor="#c4b5fd"
+            android:textColor="@color/brand_primary"
             app:cornerRadius="0dp"
-            app:backgroundTint="#1a1a3e"
-            app:strokeColor="#3a3a6e"
+            app:backgroundTint="@color/surface_card"
+            app:strokeColor="@color/stroke_subtle"
             app:strokeWidth="0.5dp"
             style="@style/Widget.Material3.Button.TextButton"
             android:drawableEnd="@android:drawable/ic_media_play"

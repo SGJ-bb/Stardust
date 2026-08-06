@@ -7,8 +7,10 @@ import com.aicompanion.models.CharacterCard
 import com.aicompanion.models.WorldInfo
 import com.aicompanion.models.WorldInfoEntry
 import com.aicompanion.models.UserPersona
+import com.aicompanion.util.AppLogger
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.util.UUID
 
 class CharacterCardManager(private val context: Context) {
@@ -17,9 +19,9 @@ class CharacterCardManager(private val context: Context) {
         private const val TAG = "CharacterCardManager"
         private const val PREFS_NAME = "character_cards"
         private const val KEY_CARDS = "cards"
-        private const val KEY_ACTIVE_CARD = "active_card_id"
         private const val KEY_WORLD_INFOS = "world_infos"
         private const val KEY_USER_PERSONA = "user_persona"
+        private const val KEY_LEGACY_MIGRATED = "legacy_personas_migrated"
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -35,21 +37,150 @@ class CharacterCardManager(private val context: Context) {
         }
     }
 
-    fun getActiveCard(): CharacterCard {
-        val cards = getAllCards()
-        val activeId = prefs.getString(KEY_ACTIVE_CARD, null)
-        return cards.find { it.id == activeId } ?: cards.firstOrNull { it.isActive } ?: cards.first()
-    }
-
-    fun setActiveCard(cardId: String) {
-        val cards = getAllCards().toMutableList()
-        cards.forEach { card ->
-            val updated = if (card.id == cardId) card.copy(isActive = true) else card.copy(isActive = false)
-            val idx = cards.indexOf(card)
-            if (idx >= 0) cards[idx] = updated
+    /**
+     * 兜底迁移：扫描旧版 persona_data_* SharedPreferences，将旧角色导入为 CharacterCard
+     *
+     * 适用场景：
+     * - 用户在旧版 PersonaEditorActivity 创建过角色，数据存在 persona_data_{id} SharedPreferences
+     * - PersonaManager 索引文件丢失或损坏，导致 migratePersonasToCharacterCards() 通过 PersonaManager 拿不到数据
+     * - CharacterCardManager 中只有默认卡，没有任何用户卡
+     *
+     * 字段映射（参照 PersonaManager.recoverFromSharedPreferences）：
+     * - persona_name → name
+     * - persona_desc → description
+     * - persona_personality → personality
+     * - persona_speech_style → 拼入 systemPrompt
+     * - persona_appearance → 拼入 systemPrompt
+     * - persona_catchphrases → 拼入 systemPrompt
+     * - persona_preferences → 拼入 systemPrompt
+     * - world_setting / world_relationship / world_rules → 拼入 scenario
+     * - user_nickname → 拼入 systemPrompt
+     * - free_mode → 拼入 postHistoryInstructions
+     * - persona_avatar_path → avatarPath
+     *
+     * @return 实际迁移的角色数量
+     */
+    fun migrateFromLegacyPersonas(): Int {
+        if (prefs.getBoolean(KEY_LEGACY_MIGRATED, false)) {
+            // 即使已标记迁移，如果没有任何用户卡，仍要尝试（修复之前的 bug）
+            val hasUserCards = getAllCards().any { it.id != "default_stardust" && it.id != "default" }
+            if (hasUserCards) {
+                AppLogger.i(TAG, "[Legacy-Migrate] 已迁移且存在用户卡，跳过")
+                return 0
+            }
+            AppLogger.w(TAG, "[Legacy-Migrate] 标记已迁移但无用户卡，重新扫描")
         }
+
+        val sharedPrefsDir = File(context.filesDir.parent, "shared_prefs")
+        if (!sharedPrefsDir.exists()) {
+            AppLogger.i(TAG, "[Legacy-Migrate] shared_prefs 目录不存在，无旧数据可迁移")
+            prefs.edit().putBoolean(KEY_LEGACY_MIGRATED, true).apply()
+            return 0
+        }
+
+        val prefsFiles = sharedPrefsDir.listFiles { f ->
+            f.name.startsWith("persona_data_") && f.name.endsWith(".xml")
+        } ?: run {
+            AppLogger.i(TAG, "[Legacy-Migrate] 未找到 persona_data_* 文件")
+            prefs.edit().putBoolean(KEY_LEGACY_MIGRATED, true).apply()
+            return 0
+        }
+
+        val existingCards = getAllCards()
+        val existingIds = existingCards.map { it.id }.toMutableSet()
+        val existingNames = existingCards.map { it.name }.toMutableSet()
+        val toAdd = mutableListOf<CharacterCard>()
+
+        for (file in prefsFiles) {
+            val personaId = file.name.removePrefix("persona_data_").removeSuffix(".xml")
+            val personaPrefs = context.getSharedPreferences("persona_data_$personaId", Context.MODE_PRIVATE)
+            val name = personaPrefs.getString("persona_name", null) ?: continue
+            // 跳过默认星尘（CharacterCardManager 已有 default_stardust）
+            if (personaId == "default" && name == "星尘") continue
+            // 去重：id 或 name 已存在则跳过
+            if (personaId in existingIds || name in existingNames) {
+                AppLogger.d(TAG, "[Legacy-Migrate] 跳过已存在: id=$personaId name=$name")
+                continue
+            }
+
+            val desc = personaPrefs.getString("persona_desc", "") ?: ""
+            val personality = personaPrefs.getString("persona_personality", "") ?: ""
+            val speechStyle = personaPrefs.getString("persona_speech_style", "") ?: ""
+            val appearance = personaPrefs.getString("persona_appearance", "") ?: ""
+            val catchphrases = personaPrefs.getString("persona_catchphrases", "") ?: ""
+            val preferences = personaPrefs.getString("persona_preferences", "") ?: ""
+            val worldSetting = personaPrefs.getString("world_setting", "") ?: ""
+            val worldRelationship = personaPrefs.getString("world_relationship", "") ?: ""
+            val worldRules = personaPrefs.getString("world_rules", "") ?: ""
+            val nickname = personaPrefs.getString("user_nickname", "") ?: ""
+            val freeMode = personaPrefs.getString("free_mode", "") ?: ""
+            val avatarPath = personaPrefs.getString("persona_avatar_path", "") ?: ""
+            val greeting = personaPrefs.getString("persona_greeting", "") ?: ""
+
+            // 构建 systemPrompt（与 PersonaManager.recoverFromSharedPreferences 一致）
+            val systemPrompt = buildString {
+                append("你是「$name」。")
+                if (desc.isNotBlank()) append("\n简介：$desc")
+                if (appearance.isNotBlank()) append("\n外貌：$appearance")
+                if (personality.isNotBlank()) append("\n性格：$personality")
+                if (speechStyle.isNotBlank()) append("\n说话风格：$speechStyle")
+                if (catchphrases.isNotBlank()) append("\n常用口头禅：$catchphrases")
+                if (preferences.isNotBlank()) append("\n喜好：$preferences")
+                if (nickname.isNotBlank()) append("\n你称呼用户为「$nickname」。")
+            }
+
+            // scenario 包含世界观设定
+            val scenario = buildString {
+                if (worldSetting.isNotBlank()) append("世界观设定：$worldSetting")
+                if (worldRelationship.isNotBlank()) {
+                    if (isNotEmpty()) append("\n")
+                    append("你和用户的关系：$worldRelationship")
+                }
+                if (worldRules.isNotBlank()) {
+                    if (isNotEmpty()) append("\n")
+                    append("规则：$worldRules")
+                }
+            }
+
+            val card = CharacterCard(
+                id = personaId,
+                name = name,
+                description = desc,
+                personality = personality,
+                scenario = scenario,
+                firstMes = greeting,
+                mesExample = "",
+                creatorNotes = "",
+                systemPrompt = systemPrompt,
+                postHistoryInstructions = freeMode,
+                alternateGreetings = emptyList(),
+                tags = listOf("migrated"),
+                creator = "legacy_migration",
+                characterVersion = "1.0",
+                avatarPath = avatarPath,
+                isActive = false,
+                createdAt = System.currentTimeMillis(),
+                worldInfoId = ""
+            )
+            toAdd.add(card)
+            existingIds += personaId
+            existingNames += name
+            AppLogger.i(TAG, "[Legacy-Migrate] 准备迁移: id=$personaId name=$name avatar=${avatarPath.isNotEmpty()}")
+        }
+
+        if (toAdd.isEmpty()) {
+            AppLogger.i(TAG, "[Legacy-Migrate] 无可迁移角色")
+            prefs.edit().putBoolean(KEY_LEGACY_MIGRATED, true).apply()
+            return 0
+        }
+
+        // 批量添加
+        val cards = getAllCards().toMutableList()
+        cards.addAll(toAdd)
         saveCards(cards)
-        prefs.edit().putString(KEY_ACTIVE_CARD, cardId).apply()
+        AppLogger.i(TAG, "[Legacy-Migrate] 成功迁移 ${toAdd.size} 个角色")
+        prefs.edit().putBoolean(KEY_LEGACY_MIGRATED, true).apply()
+        return toAdd.size
     }
 
     fun addCard(card: CharacterCard): CharacterCard {
@@ -73,11 +204,10 @@ class CharacterCardManager(private val context: Context) {
         val cards = getAllCards().toMutableList()
         if (cards.size <= 1) return
         cards.removeAll { it.id == cardId }
-        if (cards.none { it.isActive }) {
-            cards[0] = cards[0].copy(isActive = true)
-            prefs.edit().putString(KEY_ACTIVE_CARD, cards[0].id).apply()
-        }
         saveCards(cards)
+        // 清理 persona_data_{cardId}，否则 recoverFromSharedPreferences 会恢复已删除角色
+        context.getSharedPreferences("persona_data_$cardId", Context.MODE_PRIVATE)
+            .edit().clear().apply()
     }
 
     fun importFromJson(jsonStr: String): CharacterCard? {

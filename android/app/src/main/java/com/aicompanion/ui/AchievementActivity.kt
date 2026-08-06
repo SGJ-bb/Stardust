@@ -12,6 +12,10 @@ import com.aicompanion.models.Achievement
 
 class AchievementActivity : Activity() {
 
+    companion object {
+        private const val TAG = "AchievementActivity"
+    }
+
     private lateinit var achievementManager: AchievementManager
     private lateinit var listView: ListView
     private lateinit var tvProgress: TextView
@@ -35,6 +39,19 @@ class AchievementActivity : Activity() {
         initViews()
         setupListeners()
         loadAchievements()
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
+        }
     }
 
     private fun initViews() {

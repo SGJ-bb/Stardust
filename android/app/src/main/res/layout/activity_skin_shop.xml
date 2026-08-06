@@ -1,18 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 星尘皮肤商店 - 增强版: 毛玻璃头部 + 现代化 TabLayout + 主题背景 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0a0a1a">
+    android:background="@color/bg_base">
 
+    <!-- 毛玻璃头部导航栏 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="#cc0a0a1a"
-        android:elevation="6dp"
+        android:background="@drawable/bg_toolbar_glass"
+        android:elevation="4dp"
         android:paddingStart="4dp"
         android:paddingEnd="12dp">
 
@@ -31,20 +33,26 @@
             android:layout_weight="1"
             android:text="🎨 皮肤商店"
             android:textSize="18sp"
-            android:textColor="@android:color/white"
+            android:textColor="@color/text_primary"
             android:fontFamily="sans-serif-medium"
             android:gravity="center" />
     </LinearLayout>
 
+    <!-- 现代化 TabLayout: 带微妙背景分隔 -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tab_layout"
         android:layout_width="match_parent"
         android:layout_height="44dp"
+        android:background="#0D0D22"
         app:tabTextColor="#8899bb"
         app:tabSelectedTextColor="#c4b5fd"
         app:tabIndicatorColor="#9c7cff"
+        app:tabIndicatorHeight="2.5dp"
         app:tabMode="fixed"
-        app:tabGravity="fill" />
+        app:tabGravity="fill"
+        app:tabPaddingStart="12dp"
+        app:tabPaddingEnd="12dp"
+        app:tabTextAppearance="@style/TextAppearance.Stardust.Caption" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/view_pager"

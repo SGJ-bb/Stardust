@@ -2,7 +2,9 @@ package com.aicompanion.network
 
 /** AI后端API客户端: 聊天请求(sendChat)支持工具调用/解析tool_calls, 以及persona/记忆/历史消息注入, 天气查询/角色生成/图片生成/TTS语音/日记生成 */
 
+import android.content.SharedPreferences
 import android.util.Log
+import com.aicompanion.config.AppConfig
 import com.aicompanion.models.*
 import com.aicompanion.util.AppLogger
 import okhttp3.*
@@ -11,6 +13,50 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import org.json.JSONArray
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * 超时配置类
+ * 支持多种预设配置和用户自定义
+ */
+data class TimeoutConfig(
+    val connectTimeoutMs: Long = AppConfig.NETWORK_TIMEOUT_CONNECT_DEFAULT,
+    val readTimeoutMs: Long = AppConfig.NETWORK_TIMEOUT_READ_DEFAULT,
+    val writeTimeoutMs: Long = AppConfig.NETWORK_TIMEOUT_WRITE_DEFAULT
+) {
+    companion object {
+        /** 默认配置（标准网络环境） */
+        fun default() = TimeoutConfig()
+
+        /** 慢速网络配置（网络不稳定或远程服务器） */
+        fun forSlowNetwork() = TimeoutConfig(
+            connectTimeoutMs = AppConfig.NETWORK_TIMEOUT_CONNECT_DEFAULT * 2,
+            readTimeoutMs = AppConfig.NETWORK_TIMEOUT_READ_DEFAULT * 2,
+            writeTimeoutMs = AppConfig.NETWORK_TIMEOUT_WRITE_DEFAULT * 2
+        )
+
+        /** 图片生成配置（上传下载耗时长） */
+        fun forImageGeneration() = TimeoutConfig(
+            connectTimeoutMs = AppConfig.NETWORK_TIMEOUT_CONNECT_DEFAULT,
+            readTimeoutMs = AppConfig.NETWORK_TIMEOUT_READ_DEFAULT * 3,
+            writeTimeoutMs = AppConfig.NETWORK_TIMEOUT_WRITE_DEFAULT
+        )
+
+        /** 从用户偏好设置创建配置 */
+        fun fromUserPreference(prefs: SharedPreferences): TimeoutConfig {
+            val fastMode = prefs.getBoolean("fast_response_mode", false)
+            return if (fastMode) {
+                TimeoutConfig(
+                    AppConfig.NETWORK_TIMEOUT_CONNECT_DEFAULT * 2 / 3,
+                    AppConfig.NETWORK_TIMEOUT_READ_DEFAULT * 2 / 3,
+                    AppConfig.NETWORK_TIMEOUT_WRITE_DEFAULT * 2 / 3
+                )
+            } else {
+                default()
+            }
+        }
+    }
+}
 
 class ApiClient(
     val chatApiUrl: String,
@@ -21,20 +67,116 @@ class ApiClient(
     val frequencyPenalty: Float = 0.35f,
     val presencePenalty: Float = 0.5f,
     val maxTokens: Int = 500,
-    val providerId: String = "custom"
+    val providerId: String = "custom",
+    val timeoutConfig: TimeoutConfig = TimeoutConfig.default()
 ) {
     companion object {
         private const val TAG = "ApiClient"
-        val sharedClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build()
+        private const val MAX_GLOBAL_RETRIES = 3
+        private val globalRetryCount = AtomicInteger(0)
+
+        /** 共享的OkHttpClient实例（用于简单的HTTP请求，不涉及AI API） */
+        val sharedClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(AppConfig.NETWORK_TIMEOUT_CONNECT_DEFAULT, TimeUnit.MILLISECONDS)
+                .readTimeout(AppConfig.NETWORK_TIMEOUT_READ_DEFAULT, TimeUnit.MILLISECONDS)
+                .writeTimeout(AppConfig.NETWORK_TIMEOUT_WRITE_DEFAULT, TimeUnit.MILLISECONDS)
+                .build()
+        }
+
+        /** 重置重试计数器（每次新请求开始时调用） */
+        fun resetRetryCount() = globalRetryCount.set(0)
     }
 
-    private val client = sharedClient
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(timeoutConfig.connectTimeoutMs, TimeUnit.MILLISECONDS)
+        .readTimeout(timeoutConfig.readTimeoutMs, TimeUnit.MILLISECONDS)
+        .writeTimeout(timeoutConfig.writeTimeoutMs, TimeUnit.MILLISECONDS)
+        .build()
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
+    /** 粗略估算 token 数（中文约2字符/token，英文约4字符/tool） */
+    private fun estimateTokens(text: String): Int {
+        var tokens = 0
+        for (c in text) {
+            tokens += if (c.code > 0x7E) 1 else 1 // 统一按字符计，安全偏大估计
+        }
+        return (tokens / 3).coerceAtLeast(1) // 平均每3个字符≈1token（中英混合）
+    }
+
+    /** 估算 messages 数组的总 token 数 */
+    private fun estimateMessagesTokens(messagesArray: JSONArray, toolsJson: String = ""): Int {
+        var total = 0
+        for (i in 0 until messagesArray.length()) {
+            val msg = messagesArray.getJSONObject(i)
+            total += estimateTokens(msg.optString("content", "") ?: "")
+            // tool_calls 也算 token
+            val tcArray = msg.optJSONArray("tool_calls")
+            if (tcArray != null) {
+                total += tcArray.length() * 50 // 每个 tool_call 约50 token
+            }
+            // tool_call_id 字段
+            val toolCallId = msg.optString("tool_call_id", "")
+            if (toolCallId.isNotBlank()) total += 10
+        }
+        // tools 定义本身的 token 开销
+        if (toolsJson.isNotBlank()) {
+            total += estimateTokens(toolsJson)
+        }
+        return total + messagesArray.length() * 4 // 每条消息的 role/元数据开销
+    }
+
+    /** 智能裁剪历史：优先保留工具定义，从最老的对话开始裁剪；最少保留2轮 */
+    private fun smartTrimHistory(
+        chatHistory: List<Pair<Boolean, String>>,
+        systemPrompt: String,
+        userContent: String,
+        extraMessages: List<Pair<String, String>>,
+        tools: List<ToolDefinition>,
+        maxBudget: Int = 120_000  // 默认120K上下文窗口，留30%给输出
+    ): List<Pair<Boolean, String>> {
+        val outputReserve = maxBudget / 3 // 预留输出空间
+        val targetBudget = maxBudget - outputReserve
+
+        // 先算工具的固定开销
+        val toolsJson = if (tools.isNotEmpty()) buildToolsJson(tools).toString() else ""
+        val toolsTokenCost = if (toolsJson.isNotEmpty()) estimateTokens(toolsJson) else 0
+
+        // 系统 prompt + 用户消息 的固定成本
+        val fixedCost = estimateTokens(systemPrompt) + estimateTokens(userContent)
+
+        // extraMessages (tool loop 历史不可裁剪)
+        var extraCost = 0
+        for ((_, content) in extraMessages) {
+            extraCost += estimateTokens(content)
+        }
+
+        // 可用于历史对话的预算
+        val historyBudget = targetBudget - fixedCost - toolsTokenCost - extraCost
+
+        if (historyBudget <= 0) {
+            AppLogger.w(TAG, "smartTrimHistory: 预算已耗尽(固定${fixedCost}+工具${toolsTokenCost}+额外${extraCost})，只保留最后2条")
+            return chatHistory.takeLast(2)
+        }
+
+        // 从最老的消息开始逐条累加，找到能装下的最大数量
+        var accumulated = 0
+        var keepFromIndex = chatHistory.size
+        for (i in chatHistory.indices.reversed()) {
+            val cost = estimateTokens(chatHistory[i].second)
+            if (accumulated + cost > historyBudget && (chatHistory.size - i) >= 2) {
+                keepFromIndex = i + 1
+                break
+            }
+            accumulated += cost
+        }
+
+        val trimmed = chatHistory.drop(maxOf(0, keepFromIndex))
+        AppLogger.w(TAG, "smartTrimHistory: ${chatHistory.size}条→${trimmed.size}条, " +
+            "历史token=${accumulated}/${historyBudget}, 工具token=${toolsTokenCost}, 固定=${fixedCost}")
+        return trimmed
+    }
 
     fun sendChat(
         userId: String,
@@ -56,6 +198,9 @@ class ApiClient(
         overridePresencePenalty: Float? = null,
         overrideMaxTokens: Int? = null
     ): ChatResponse? {
+        // 每次新请求重置计数器，防止多次调用累积计数
+        globalRetryCount.set(0)
+
         val useModel = modelName ?: "gpt-4o-mini"
         AppLogger.w(TAG, "sendChat: model=$useModel, url=${chatApiUrl.take(30)}, history=${chatHistory.size}条")
 
@@ -66,19 +211,7 @@ class ApiClient(
             }
         }
 
-        val messagesArray = JSONArray()
-        messagesArray.put(JSONObject().apply {
-            put("role", "system")
-            put("content", systemPrompt)
-        })
-
-        chatHistory.takeLast(10).forEach { (isUser, text) ->
-            messagesArray.put(JSONObject().apply {
-                put("role", if (isUser) "user" else "assistant")
-                put("content", text)
-            })
-        }
-
+        // 先构建用户消息内容（smartTrimHistory 需要它来算 token）
         val userContent = buildString {
             if (systemContext.isNotBlank()) {
                 append("$systemContext\n")
@@ -97,6 +230,24 @@ class ApiClient(
             }
             append(message)
         }
+
+        val messagesArray = JSONArray()
+        messagesArray.put(JSONObject().apply {
+            put("role", "system")
+            put("content", systemPrompt)
+        })
+
+        // 智能裁剪：优先保留工具定义，按token预算裁剪历史（而非固定取最后10条）
+        val trimmedHistory = smartTrimHistory(
+            chatHistory, systemPrompt, userContent, extraMessages, tools
+        )
+        trimmedHistory.forEach { (isUser, text) ->
+            messagesArray.put(JSONObject().apply {
+                put("role", if (isUser) "user" else "assistant")
+                put("content", text)
+            })
+        }
+
         val userMsg = JSONObject()
         userMsg.put("role", "user")
         if (imageUrls.isNotEmpty() && com.aicompanion.settings.ProviderProfile.supportsVision(providerId)) {
@@ -188,6 +339,9 @@ class ApiClient(
                     if (response.code == 401) {
                         AppLogger.e(TAG, "聊天API认证失败(401), 请检查API Key是否正确")
                     }
+                    if (response.code == 402) {
+                        AppLogger.e(TAG, "聊天API余额不足(402), 请前往API厂商充值")
+                    }
                     if (response.code == 429) {
                         AppLogger.w(TAG, "聊天API限流(429), 请求过于频繁，请稍后重试")
                     }
@@ -196,30 +350,87 @@ class ApiClient(
                     }
 
                     if (response.code == 400 && tools.isNotEmpty()) {
-                        AppLogger.w(TAG, "HTTP 400 with tools, retrying without tools (model may not support function calling)")
-                        val retryBody = JSONObject(requestBody.toString()).apply {
-                            remove("tools")
+                        // 检查重试计数器，防止无限重试
+                        if (globalRetryCount.incrementAndGet() > MAX_GLOBAL_RETRIES) {
+                            AppLogger.e(TAG, "HTTP 400重试次数超过限制($MAX_GLOBAL_RETRIES)，停止重试")
+                            return ChatResponse("", Emotion.SAD, Action.IDLE,
+                                errorMessage = "请求失败(HTTP 400)，重试次数过多，请检查API配置或模型是否支持工具调用")
                         }
-                        val retryReq = Request.Builder()
+                        // 第一轮重试：保留工具，激进裁剪历史到最少2条
+                        AppLogger.w(TAG, "HTTP 400 with tools, retry: 激进裁剪历史(保留工具) [重试次数: ${globalRetryCount.get()}]")
+                        val aggressiveTrim = smartTrimHistory(
+                            chatHistory, systemPrompt, userContent,
+                            emptyList(), tools, maxBudget = 120_000
+                        ).takeLast(2)
+                        val retryMessages = JSONArray()
+                        retryMessages.put(JSONObject().apply {
+                            put("role", "system")
+                            put("content", systemPrompt)
+                        })
+                        aggressiveTrim.forEach { (isUser, text) ->
+                            retryMessages.put(JSONObject().apply {
+                                put("role", if (isUser) "user" else "assistant")
+                                put("content", text)
+                            })
+                        }
+                        retryMessages.put(userMsg)
+                        for ((role, content) in extraMessages) {
+                            val msgObj = if (content.startsWith("{") && (role == "assistant" || role == "tool")) {
+                                try { JSONObject(content) }
+                                catch (e: Exception) { JSONObject().apply { put("role", role); put("content", content) } }
+                            } else { JSONObject().apply { put("role", role); put("content", content) } }
+                            retryMessages.put(msgObj)
+                        }
+                        val retryBody1 = JSONObject().apply {
+                            put("model", useModel)
+                            put("messages", retryMessages)
+                            put("temperature", effectiveTemp.toDouble())
+                            put("max_tokens", effectiveMaxTokens)
+                            put("top_p", effectiveTopP.toDouble())
+                            if (profile.supportsFreqPenalty) put("frequency_penalty", effectiveFreqPenalty.toDouble())
+                            if (profile.supportsPresPenalty) put("presence_penalty", effectivePresPenalty.toDouble())
+                            put("tools", buildToolsJson(tools)) // 工具始终保留！
+                        }
+
+                        val retryReq1 = Request.Builder()
                             .url(chatApiUrl)
-                            .post(retryBody.toString().toRequestBody(jsonMediaType))
+                            .post(retryBody1.toString().toRequestBody(jsonMediaType))
                             .header("Content-Type", "application/json")
-                        if (!apiKey.isNullOrEmpty()) {
-                            retryReq.header("Authorization", "Bearer $apiKey")
-                        }
-                        return client.newCall(retryReq.build()).execute().use { retryResp ->
-                            val retryStr = retryResp.body?.string() ?: "{}"
-                            AppLogger.w(TAG, "Retry without tools: HTTP ${retryResp.code}")
-                            if (retryResp.isSuccessful) {
-                                parseOpenAIResponse(retryStr)
+                        if (!apiKey.isNullOrEmpty()) { retryReq1.header("Authorization", "Bearer $apiKey") }
+                        return client.newCall(retryReq1.build()).execute().use { r1 ->
+                            val s1 = r1.body?.string() ?: "{}"
+                            AppLogger.w(TAG, "Retry (trim+keep tools): HTTP ${r1.code}")
+                            if (r1.isSuccessful) {
+                                parseOpenAIResponse(s1)
+                            } else if (r1.code == 400) {
+                                // 第二轮：确认是模型不支持 function calling（非 token 问题）
+                                AppLogger.w(TAG, "Still 400 after trim, model may not support tools. Final retry without tools")
+                                retryBody1.remove("tools")
+                                val retryReq2 = Request.Builder()
+                                    .url(chatApiUrl)
+                                    .post(retryBody1.toString().toRequestBody(jsonMediaType))
+                                    .header("Content-Type", "application/json")
+                                if (!apiKey.isNullOrEmpty()) { retryReq2.header("Authorization", "Bearer $apiKey") }
+                                return client.newCall(retryReq2.build()).execute().use { r2 ->
+                                    val s2 = r2.body?.string() ?: "{}"
+                                    AppLogger.w(TAG, "Final retry (no tools): HTTP ${r2.code}")
+                                    if (r2.isSuccessful) parseOpenAIResponse(s2)
+                                    else ChatResponse("", Emotion.SAD, Action.IDLE,
+                                        errorMessage = "请求失败(HTTP ${r2.code})，模型「$useModel」可能不支持工具调用")
+                                }
                             } else {
-                                null
+                                val e1 = when (r1.code) {
+                                    in 400..499 -> "请求错误(HTTP ${r1.code})"
+                                    else -> "服务端错误(HTTP ${r1.code})"
+                                }
+                                ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = e1)
                             }
                         }
                     }
 
                     val errMsg = when (response.code) {
                         401 -> "API密钥无效，请检查设置中的API Key"
+                        402 -> "余额不足，请前往API厂商充值"
                         403 -> "无权限访问，请检查API密钥权限"
                         404 -> "接口地址不存在，请检查API地址是否正确"
                         429 -> "请求过于频繁或已超出配额"
@@ -234,7 +445,7 @@ class ApiClient(
                 parseOpenAIResponse(bodyStr)
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "sendChat error: ${e.javaClass.simpleName}: ${e.message}", e)
+            AppLogger.e(TAG, "[API-Chat] sendChat聊天请求失败: ${e.javaClass.simpleName}: ${e.message} | model=$useModel url=${sanitizeUrl(chatApiUrl)}", e)
             AppLogger.e(TAG, "聊天API连接失败, 常见原因: 1)URL错误 2)网络不通 3)代理设置问题 4)DNS解析失败")
             val errMsg = when {
                 e.message?.contains("Unable to resolve host") == true -> "无法解析域名，请检查网络和API地址"
@@ -262,6 +473,9 @@ class ApiClient(
         overrideTemperature: Float? = null,
         overrideTopP: Float? = null
     ): ChatResponse? {
+        // 重置重试计数器，防止多次调用累积计数
+        resetRetryCount()
+
         val maxIterations = 3
         var currentHistory = chatHistory.toMutableList()
         val allExtraMessages = mutableListOf<Pair<String, String>>()
@@ -511,7 +725,7 @@ class ApiClient(
                 }
 
                 client.newCall(requestBuilder.build()).execute().use { response ->
-                    val bodyStr = response.body?.string() ?: ""
+                    val bodyStr = response.body?.string() ?: "{}"
                     if (response.isSuccessful) {
                         val json = JSONObject(bodyStr)
                         val choices = json.optJSONArray("choices")
@@ -536,7 +750,7 @@ class ApiClient(
                 }
                 }
             } catch (e: Exception) {
-                com.aicompanion.util.AppLogger.e(TAG, "流式聊天连接错误: ${e.message}", e)
+                com.aicompanion.util.AppLogger.e(TAG, "[API-Stream] 流式聊天连接错误: ${e.javaClass.simpleName}: ${e.message}", e)
                 val msg = when {
                     e.message?.contains("Unable to resolve host") == true -> "无法解析域名，请检查网络和API地址"
                     e.message?.contains("timeout") == true -> "连接超时，请检查网络和API地址"
@@ -600,7 +814,7 @@ class ApiClient(
                 parseOpenAIResponse(bodyStr)
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "sendProactiveChat失败: ${e.message}", e)
+            AppLogger.e(TAG, "[API-Proactive] sendProactiveChat主动消息失败: ${e.javaClass.simpleName}: ${e.message}", e)
             null
         }
     }
@@ -664,7 +878,7 @@ class ApiClient(
                 } else emptyList()
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "scoreMemorableMoments: ${e.message}")
+            AppLogger.e(TAG, "[API-Score] scoreMemorableMoments评分难忘时刻失败: ${e.javaClass.simpleName}: ${e.message}")
             emptyList()
         }
     }
@@ -760,7 +974,7 @@ class ApiClient(
                 val json = JSONObject(responseBody as String)
                 val choices = json.optJSONArray("choices")
                 if (choices != null && choices.length() > 0) {
-                    choices.getJSONObject(0).getJSONObject("message").optString("content", "").trim()
+                    choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")?.trim()
                 } else null
             }
         } catch (e: Exception) {
@@ -822,7 +1036,7 @@ class ApiClient(
                 val json = JSONObject(responseBody as String)
                 val choices = json.optJSONArray("choices")
                 if (choices != null && choices.length() > 0) {
-                    choices.getJSONObject(0).getJSONObject("message").optString("content", "").trim()
+                    choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")?.trim()
                 } else null
             }
         } catch (e: Exception) {
@@ -901,7 +1115,7 @@ class ApiClient(
                 } else null
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "generateDiaryContent failed: ${e.message}")
+            AppLogger.e(TAG, "[API-Diary] generateDiaryContent生成日记内容失败: ${e.javaClass.simpleName}: ${e.message}")
             null
         }
     }
@@ -977,7 +1191,7 @@ class ApiClient(
                 parseOpenAIResponse(bodyStr)
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "generateNagContent failed: ${e.message}")
+            AppLogger.e(TAG, "[API-Nag] generateNagContent生成唠叨内容失败: ${e.javaClass.simpleName}: ${e.message}")
             null
         }
     }
@@ -1046,7 +1260,7 @@ class ApiClient(
                 } else "[]"
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "analyzeAutoOperation failed: ${e.message}")
+            AppLogger.e(TAG, "[API-Auto] analyzeAutoOperation分析自动操作失败: ${e.javaClass.simpleName}: ${e.message}")
             "[]"
         }
     }
@@ -1091,7 +1305,7 @@ class ApiClient(
                 parseOpenAIResponse(text)
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "sendSimplePrompt error: ${e.message}", e)
+            AppLogger.e(TAG, "[API-Simple] sendSimplePrompt简单请求失败: ${e.javaClass.simpleName}: ${e.message}", e)
             null
         }
     }
@@ -1127,7 +1341,7 @@ class ApiClient(
                 vec
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "Embedding解析失败: ${e.message}", e); null
+            AppLogger.e(TAG, "[API-Embed] Embedding响应解析失败: ${e.javaClass.simpleName}: ${e.message}", e); null
         }
     }
 
@@ -1135,5 +1349,53 @@ class ApiClient(
         return url
             .replace(Regex("(key|api[_-]?key|token|secret|access[_-]?token)=([^&\\s]+)", RegexOption.IGNORE_CASE), "$1=***")
             .replace(Regex("/sk-[a-zA-Z0-9_-]+"), "/sk-***")
+    }
+
+    /** 从 API 提供商获取可用模型列表 */
+    fun fetchAvailableModels(): List<String> {
+        if (chatApiUrl.isBlank()) return emptyList()
+        
+        return try {
+            // 从 chat/completions URL 推算 models 端点
+            val baseUrl = chatApiUrl
+                .removeSuffix("/chat/completions")
+                .removeSuffix("/")
+            val modelsUrl = "$baseUrl/models"
+            
+            val requestBuilder = Request.Builder()
+                .url(modelsUrl)
+                .get()
+                .header("Content-Type", "application/json")
+            
+            if (!apiKey.isNullOrEmpty()) {
+                requestBuilder.header("Authorization", "Bearer $apiKey")
+            }
+            
+            client.newCall(requestBuilder.build()).execute().use { response ->
+                if (!response.isSuccessful) {
+                    AppLogger.e(TAG, "fetchModels failed: HTTP ${response.code}")
+                    return emptyList()
+                }
+                
+                val bodyStr = response.body?.string() ?: return emptyList()
+                val json = JSONObject(bodyStr)
+                val dataArr = json.optJSONArray("data") ?: return emptyList()
+                
+                val models = mutableListOf<String>()
+                for (i in 0 until dataArr.length()) {
+                    val modelObj = dataArr.getJSONObject(i)
+                    val modelId = modelObj.optString("id", "")
+                    if (modelId.isNotBlank()) {
+                        models.add(modelId)
+                    }
+                }
+                
+                AppLogger.w(TAG, "fetchModels: 获取到 ${models.size} 个模型")
+                models.sorted()
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "[API-Models] fetchModels获取模型列表失败: ${e.javaClass.simpleName}: ${e.message}")
+            emptyList()
+        }
     }
 }

@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#0d0d1a"
+    android:background="@color/bg_base"
     android:padding="16dp">
 
     <TextView
@@ -13,7 +13,7 @@
         android:text="选择角色"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="#e8e8f0"
+        android:textColor="@color/text_primary"
         android:gravity="center"
         android:paddingBottom="12dp" />
 

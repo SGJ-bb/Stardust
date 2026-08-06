@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 增强版功能入口卡片: 圆角矩形 + 微妙边框 + 按压反馈 -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#33FFFFFF"
+    android:radius="20dp">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#00000000" />
+            <corners android:radius="20dp" />
+            <stroke
+                android:width="0.5dp"
+                android:color="#22FFFFFF" />
+        </shape>
+    </item>
+</ripple>

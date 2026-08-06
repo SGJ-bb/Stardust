@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_base">
+
+    <!-- 顶部工具栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        android:background="@drawable/bg_toolbar_glass"
+        android:elevation="4dp">
+
+    <TextView
+            android:id="@+id/tv_pixel_mode_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="当前模式: Live2D"
+            android:textSize="13sp"
+            android:textColor="#8b949e" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_toggle_pixel_mode"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="切换到像素宠物"
+            android:textSize="12sp"
+            android:textColor="#22c55e" />
+
+    </LinearLayout>
+
+    <!-- 活跃宠物信息 -->
+    <TextView
+        android:id="@+id/tv_active_pet_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="未选择宠物"
+        android:textSize="13sp"
+        android:textColor="@color/text_muted"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="8dp" />
+
+    <!-- 宠物列表 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- 空状态 -->
+        <LinearLayout
+            android:id="@+id/layout_empty_pets"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="还没有创建任何像素宠物"
+                android:textSize="15sp"
+                android:textColor="#9ca3af" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="点击下方按钮创建你的第一个宠物"
+                android:textSize="12sp"
+                android:textColor="@color/text_muted"
+                android:layout_marginTop="4dp" />
+
+        </LinearLayout>
+
+        <!-- 宠物列表 RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_pet_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:padding="16dp" />
+
+    </FrameLayout>
+
+    <!-- 底部新建按钮 -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_create_pet"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_margin="12dp"
+        android:text="+ 新建像素宠物"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        app:cornerRadius="12dp"
+        android:backgroundTint="#22c55e" />
+
+</LinearLayout>

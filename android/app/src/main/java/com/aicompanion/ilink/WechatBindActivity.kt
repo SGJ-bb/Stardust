@@ -1,5 +1,6 @@
 package com.aicompanion.ilink
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -191,6 +192,25 @@ class WechatBindActivity : AppCompatActivity() {
                 setOnClickListener { stopListening() }
             }
             rootLayout.addView(btnStop)
+
+            val btnViewChat = Button(this).apply {
+                text = "💬 查看微信聊天记录"
+                setTextColor(0xFFFFFFFF.toInt())
+                background = GradientDrawable().apply {
+                    setColor(0xFF07C160.toInt())
+                    setCornerRadius(12 * density)
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    (200 * density).toInt(),
+                    (44 * density).toInt()
+                ).apply { topMargin = (8 * density).toInt() }
+                setOnClickListener {
+                    val intent = Intent(this@WechatBindActivity, WechatChatActivity::class.java)
+                    intent.putExtra(WechatChatActivity.EXTRA_PERSONA_ID, personaManager.getActivePersona().id)
+                    startActivity(intent)
+                }
+            }
+            rootLayout.addView(btnViewChat)
         }
 
         val btnViewLogs = Button(this).apply {

@@ -6,6 +6,9 @@ import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.aicompanion.memory.MemoryManager
+import com.aicompanion.memory.MemoryPool
+import com.aicompanion.memory.MemoryEntry
+import com.aicompanion.memory.VirtualWorldMemoryPool
 import com.aicompanion.network.ApiClient
 import com.aicompanion.network.ProviderAdapter
 import com.aicompanion.persona.PersonaManager
@@ -79,6 +82,14 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
             context.getSharedPreferences("companion_secure_fallback", Context.MODE_PRIVATE)
         }
     }
+
+    /** 虚拟世界专用记忆池 */
+    val vwMemoryPool: VirtualWorldMemoryPool by lazy {
+        com.aicompanion.memory.VirtualWorldMemoryPool(context, worldId)
+    }
+
+    /** 私聊记忆池缓存（避免每次 tick 都新建实例） */
+    private var cachedChatMemoryPool: com.aicompanion.memory.MemoryPool? = null
 
     init {
         for (key in listOf("image_api_url", "image_api_key", "image_model")) {
@@ -259,9 +270,69 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
                 eventCount = 1,
                 eventType = result.eventType
             ))
+
+            // 同步推演结果到记忆池，实现双向同步
+            syncEventToMemoryPool(result, currentState, config.memberPersonaIds.firstOrNull() ?: "default")
         }
 
         return result
+    }
+
+    /**
+     * 将虚拟世界推演事件同步到专用 VW 记忆池
+     */
+    private suspend fun syncEventToMemoryPool(event: StoryEvent, state: WorldState, personaId: String) {
+        try {
+            // 写入专用 VW 记忆池（独立于聊天记忆池）
+            vwMemoryPool.addEvent(
+                day = event.virtualDay,
+                hour = event.virtualHour,
+                location = state.currentLocation,
+                weather = state.currentWeather,
+                mood = state.currentMood,
+                content = event.content
+            )
+
+            // 同时也写入私聊记忆池（保持与聊天界面的关联）
+            // 复用缓存的 MemoryPool 实例，避免并发竞态
+            val chatMemoryPool = cachedChatMemoryPool ?: run {
+                val pool = com.aicompanion.memory.MemoryPool(context, personaId, "private")
+                cachedChatMemoryPool = pool
+                pool
+            }.also { it.loadFromStorage() }
+
+            chatMemoryPool.add(com.aicompanion.memory.MemoryEntry(
+                content = "[虚拟世界·第${event.virtualDay}天${event.virtualHour}时] ${event.content}",
+                category = "虚拟世界",
+                sourceTurn = 0,
+                eventTime = "第${event.virtualDay}天 ${String.format("%02d:%02d", event.virtualHour, event.virtualMinute)}",
+                place = state.currentLocation,
+                people = event.speakerName.ifBlank { "AI" },
+                event = event.content,
+                scene = "虚拟世界·${state.currentLocation}",
+                details = "天气:${state.currentWeather} | 氛围:${state.currentMood}"
+            ))
+            chatMemoryPool.saveToStorage()
+
+            // 定期压缩 VW 记忆池
+            if (vwMemoryPool.needsConsolidate()) {
+                val sm = SettingsManager(context)
+                if (sm.chatApiUrl.isNotBlank()) {
+                    val client = ApiClient(sm.chatApiUrl, sm.chatApiKey, sm.chatModel,
+                        sm.llmTemperature, sm.llmTopP, sm.llmFrequencyPenalty, sm.llmPresencePenalty, sm.llmMaxTokens,
+                        sm.apiProvider)
+                    try {
+                        vwMemoryPool.consolidate(client)
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG, "VW记忆池压缩失败: ${e.message}")
+                    }
+                }
+            }
+
+            AppLogger.i(TAG, "推演事件已同步到VW记忆池+聊天记忆池: [第${event.virtualDay}天${event.virtualHour}时] ${event.content.take(40)}...")
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "推演事件同步失败: ${e.message}")
+        }
     }
 
     private suspend fun runSoloSimulation(
@@ -278,6 +349,9 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
         val memoryManager = MemoryManager(context, personaId)
         val memories = memoryManager.getLocalMemories().takeLast(5).map { it.fact }
 
+        // 同时读取 VW 记忆池中的近期事件
+        val vwMemories = vwMemoryPool.getRecentSummaries(5)
+
         val recentEvents = getStoryEvents().takeLast(5).map {
             "[第${it.virtualDay}天${it.virtualHour}时] ${it.content}"
         }.joinToString("\n")
@@ -288,15 +362,24 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
             if (identity.personality.isNotBlank()) append(" 性格${identity.personality}。")
             append("\n【世界观】${config.getFullLore()}")
             append("\n【当前状态】时间：$timeDesc。地点：${currentState.currentLocation}。天气：${currentState.currentWeather}。氛围：${currentState.currentMood}。")
-            if (memories.isNotEmpty()) {
-                append("\n【记忆】${memories.joinToString("；")}")
-            }
             if (recentEvents.isNotBlank()) {
                 append("\n【近期事件】\n$recentEvents")
             }
+            val allMemories = mutableListOf<String>()
+            if (memories.isNotEmpty()) allMemories.addAll(memories)
+            if (vwMemories.isNotEmpty()) allMemories.addAll(vwMemories)
+            if (allMemories.isNotEmpty()) {
+                append("\n【记忆】${allMemories.joinToString("；")}")
+            }
             append("\n【规则】根据当前时间和状态，描述你在这个时刻做了什么、遇到了什么、想了什么。1-3句话，像小说旁白。末尾用[[location:地点]][[weather:天气]][[mood:氛围]]标记状态变化。")
             if (config.imageGenEnabled && hasImageModelConfigured()) {
-                append("\n如果这个场景值得配图，调用generate_image工具生成图片。只在场景特别重要或视觉感强时才生成。")
+                append("\n\n[图片生成规则]\n")
+                append("仅在以下情况调用generate_image工具生成场景配图：\n")
+                append("① 重大剧情节点（首次登场/关键转折/情感高潮/重要决定/告别/重逢）\n")
+                append("② 场景具有强烈视觉冲击力（星空/花海/雨雪/火焰/夕阳等自然景观+人物互动）\n")
+                append("③ 与前一条记录相比有明显的场景切换或时间跨度变化\n")
+                append("④ 本轮推演未生成过图片且内容超过50字\n")
+                append("禁止：连续两条都生成图片；普通日常场景；纯对话无场景描写\n")
             }
         }
 
@@ -411,7 +494,13 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
             }
             append("\n【规则】推演这个时刻发生的事。描述2-3个角色的行动和互动，像小说片段。末尾用[[location:地点]][[weather:天气]][[mood:氛围]]标记状态变化。")
             if (config.imageGenEnabled && hasImageModelConfigured()) {
-                append("\n如果这个场景值得配图，调用generate_image工具生成图片。只在场景特别重要或视觉感强时才生成。")
+                append("\n\n[图片生成规则]\n")
+                append("仅在以下情况调用generate_image工具生成场景配图：\n")
+                append("① 重大剧情节点（首次登场/关键转折/情感高潮/重要决定/告别/重逢）\n")
+                append("② 场景具有强烈视觉冲击力（星空/花海/雨雪/火焰/夕阳等自然景观+人物互动）\n")
+                append("③ 与前一条记录相比有明显的场景切换或时间跨度变化\n")
+                append("④ 本轮推演未生成过图片且内容超过50字\n")
+                append("禁止：连续两条都生成图片；普通日常场景；纯对话无场景描写\n")
             }
         }
 
@@ -503,7 +592,7 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
             if (imageApiUrl.isBlank() || imageApiKey.isBlank()) return@withContext null
 
             try {
-                val prompt = content.take(200)
+                val prompt = content.take(500)   // 从200字放宽到500字
                 val settingsManager = com.aicompanion.settings.SettingsManager(context)
                 val presetFormatType = com.aicompanion.settings.ServicePresets.findImageGenPreset(
                     settingsManager.imageGenProvider

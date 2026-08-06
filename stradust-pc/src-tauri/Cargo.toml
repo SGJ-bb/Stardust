@@ -1,0 +1,45 @@
+[package]
+name = "stradust-pc"
+version = "0.1.0"
+description = "星尘AI桌宠 - 基于Live2D的智能AI桌宠应用"
+authors = ["Stradust Team"]
+edition = "2021"
+
+[lib]
+name = "stradust_pc_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "devtools"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-process = "2"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "1"
+async-trait = "0.1"
+futures = "0.3"
+tokio-stream = "0.1"
+regex = "1"
+aes-gcm = "0.10"
+base64 = "0.22"
+sha2 = "0.10"
+rand = "0.8"
+dirs = "5"
+http = "1"
+bytes = "1"

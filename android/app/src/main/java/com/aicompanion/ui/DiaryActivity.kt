@@ -19,6 +19,10 @@ import java.util.*
 
 class DiaryActivity : AppCompatActivity() {
 
+    companion object {
+        private const val TAG = "DiaryActivity"
+    }
+
     private lateinit var diaryManager: DiaryManager
     private lateinit var listView: ListView
     private lateinit var tvEmpty: TextView
@@ -50,6 +54,19 @@ class DiaryActivity : AppCompatActivity() {
         initViews()
         setupListeners()
         loadDiaries()
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
+        }
     }
 
     private fun initViews() {

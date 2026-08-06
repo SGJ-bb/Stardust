@@ -1,0 +1,176 @@
+<!--
+    avd_mood_sunny_vector.xml — 太阳笑脸矢量图（anim_mood_sunny 的 drawable 源）
+    包含：太阳圆形 + 8条光芒射线 + 笑脸
+    viewport: 32x32, 圆心在 (16, 16)
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+
+    <!-- 整体旋转组 -->
+    <group android:name="sun_group"
+        android:pivotX="16"
+        android:pivotY="16">
+
+        <!-- ===== 光芒射线 (8条，从圆心向外) ===== -->
+        <!-- ray1: 上 (0°) -->
+        <group android:name="ray1"
+            android:pivotX="16"
+            android:pivotY="16">
+            <path
+                android:name="ray1_path"
+                android:pathData="M16,6 L16,2"
+                android:strokeColor="#ffd700"
+                android:strokeWidth="1.5"
+                android:strokeLineCap="round"/>
+        </group>
+
+        <!-- ray2: 右上 (45°) -->
+        <group android:name="ray2"
+            android:pivotX="16"
+            android:pivotY="16">
+            <path
+                android:name="ray2_path"
+                android:pathData="M22.83,9.17 L25.66,6.34"
+                android:strokeColor="#ffd700"
+                android:strokeWidth="1.5"
+                android:strokeLineCap="round"/>
+        </group>
+
+        <!-- ray3: 右 (90°) -->
+        <group android:name="ray3"
+            android:pivotX="16"
+            android:pivotY="16">
+            <path
+                android:name="ray3_path"
+                android:pathData="M26,16 L30,16"
+                android:strokeColor="#ffd700"
+                android:strokeWidth="1.5"
+                android:strokeLineCap="round"/>
+        </group>
+
+        <!-- ray4: 右下 (135°) -->
+        <group android:name="ray4"
+            android:pivotX="16"
+            android:pivotY="16">
+            <path
+                android:name="ray4_path"
+                android:pathData="M22.83,22.83 L25.66,25.66"
+                android:strokeColor="#ffd700"
+                android:strokeWidth="1.5"
+                android:strokeLineCap="round"/>
+        </group>
+
+        <!-- ray5: 下 (180°) -->
+        <group android:name="ray5"
+            android:pivotX="16"
+            android:pivotY="16">
+            <path
+                android:name="ray5_path"
+                android:pathData="M16,26 L16,30"
+                android:strokeColor="#ffd700"
+                android:strokeWidth="1.5"
+                android:strokeLineCap="round"/>
+        </group>
+
+        <!-- ray6: 左下 (225°) -->
+        <group android:name="ray6"
+            android:pivotX="16"
+            android:pivotY="16">
+            <path
+                android:name="ray6_path"
+                android:pathData="M9.17,22.83 L6.34,25.66"
+                android:strokeColor="#ffd700"
+                android:strokeWidth="1.5"
+                android:strokeLineCap="round"/>
+        </group>
+
+        <!-- ray7: 左 (270°) -->
+        <group android:name="ray7"
+            android:pivotX="16"
+            android:pivotY="16">
+            <path
+                android:name="ray7_path"
+                android:pathData="M6,16 L2,16"
+                android:strokeColor="#ffd700"
+                android:strokeWidth="1.5"
+                android:strokeLineCap="round"/>
+        </group>
+
+        <!-- ray8: 左上 (315°) -->
+        <group android:name="ray8"
+            android:pivotX="16"
+            android:pivotY="16">
+            <path
+                android:name="ray8_path"
+                android:pathData="M9.17,9.17 L6.34,6.34"
+                android:strokeColor="#ffd700"
+                android:strokeWidth="1.5"
+                android:strokeLineCap="round"/>
+        </group>
+
+        <!-- ===== 太阳圆形主体 (暖橙色) ===== -->
+        <path
+            android:name="sun_body"
+            android:pathData="M16,8 A8,8 0 1,1 16,24 A8,8 0 1,1 16,8 Z"
+            android:fillColor="#ffb347"/>
+
+        <!-- ===== 笑脸 - 左眼弧线 ===== -->
+        <group android:name="left_eye"
+            android:pivotX="12.5"
+            android:pivotY="14">
+            <path
+                android:name="left_eye_path"
+                android:pathData="M11,14 Q12.5,12.5 14,14"
+                android:strokeColor="#cc8400"
+                android:strokeWidth="1.2"
+                android:strokeLineCap="round"
+                android:fillColor="@android:color/transparent"/>
+        </group>
+
+        <!-- ===== 笑脸 - 右眼弧线 ===== -->
+        <group android:name="right_eye"
+            android:pivotX="19.5"
+            android:pivotY="14">
+            <path
+                android:name="right_eye_path"
+                android:pathData="M18,14 Q19.5,12.5 21,14"
+                android:strokeColor="#cc8400"
+                android:strokeWidth="1.2"
+                android:strokeLineCap="round"
+                android:fillColor="@android:color/transparent"/>
+        </group>
+
+        <!-- ===== 笑脸 - 微笑弧线 ===== -->
+        <path
+            android:name="smile"
+            android:pathData="M11,18.5 Q16,23 21,18.5"
+            android:strokeColor="#cc8400"
+            android:strokeWidth="1.3"
+            android:strokeLineCap="round"
+            android:fillColor="@android:color/transparent"/>
+
+        <!-- 腮红左 -->
+        <path
+            android:name="blush_left"
+            android:pathData="M10,17 Q11.5,18.5 13,17"
+            android:strokeColor="#ffccaa"
+            android:strokeWidth="0.8"
+            android:strokeLineCap="round"
+            android:alpha="0.5"
+            android:fillColor="@android:color/transparent"/>
+
+        <!-- 腮红右 -->
+        <path
+            android:name="blush_right"
+            android:pathData="M19,17 Q20.5,18.5 22,17"
+            android:strokeColor="#ffccaa"
+            android:strokeWidth="0.8"
+            android:strokeLineCap="round"
+            android:alpha="0.5"
+            android:fillColor="@android:color/transparent"/>
+
+    </group>
+</vector>

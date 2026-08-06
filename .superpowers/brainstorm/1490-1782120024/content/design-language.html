@@ -1,0 +1,67 @@
+<h2>设计语言选择</h2>
+<p class="subtitle">星尘的 UI 风格应该往哪个方向走？这决定了配色、组件风格、交互模式。</p>
+
+<div class="cards">
+  <div class="card" data-choice="pc-sync" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:linear-gradient(135deg,#1a1a2e,#16213e);padding:24px;border-radius:12px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#7c4dff,#448aff)"></div>
+        <span style="color:#e0e0f0;font-size:14px;font-weight:600">星尘</span>
+      </div>
+      <div style="background:#0f346040;border-radius:12px;padding:12px">
+        <div style="width:70%;height:8px;background:#7c4dff60;border-radius:4px;margin-bottom:6px"></div>
+        <div style="width:90%;height:6px;background:#ffffff15;border-radius:3px"></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <div style="flex:1;height:28px;background:#7c4dff30;border-radius:8px"></div>
+        <div style="width:36px;height:28px;background:#448aff30;border-radius:8px"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>同步 PC 端设计 (推荐)</h3>
+      <p>与 stradust-pc 的 React 端保持一致的视觉语言：深色玻璃态、渐变色彩、流畅动画。三端统一体验。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="material3" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0f4ff;padding:24px;border-radius:12px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6750a4,#625b71)"></div>
+        <span style="color:#1c1b1f;font-size:14px;font-weight:600">星尘</span>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:12px;box-shadow:0 1px 3px #0000001a">
+        <div style="width:70%;height:8px;background:#6750a4;border-radius:4px;margin-bottom:6px"></div>
+        <div style="width:90%;height:6px;background:#1c1b1f1a;border-radius:3px"></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <div style="flex:1;height:28px;background:#e8def8;border-radius:8px"></div>
+        <div style="width:36px;height:28px;background:#6750a420;border-radius:8px"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Material 3 规范</h3>
+      <p>严格遵循 Google Material Design 3 设计规范，动态配色、圆角卡片、标准 MD 组件。最"原生"的 Android 感。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="original-enhanced" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:linear-gradient(135deg,#0d0d1a,#1a1033);padding:24px;border-radius:12px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#ff6b9d,#c44dff);border:2px solid #ff8fab80"></div>
+        <span style="color:#ffd6e7;font-size:14px;font-weight:600">✨ 星尘</span>
+      </div>
+      <div style="background:#ff6b9d15;border-radius:12px;padding:12px;border:1px solid #ff6b9d20">
+        <div style="width:70%;height:8px;background:linear-gradient(90deg,#ff6b9d,#c44dff);border-radius:4px;margin-bottom:6px"></div>
+        <div style="width:90%;height:6px;background:#ffffff12;border-radius:3px"></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <div style="flex:1;height:28px;background:#ff6b9d20;border-radius:8px;border:1px solid #ff6b9d30"></div>
+        <div style="width:36px;height:28px;background:#c44dff20;border-radius:8px;border:1px solid #c44dff30"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>保留原有调性 + 升级品质</h3>
+      <p>保留现有的暗紫/粉色调性和二次元氛围，但用 Compose 重写提升到现代水准。粉丝不会觉得"换了个app"。</p>
+    </div>
+  </div>
+</div>

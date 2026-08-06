@@ -110,31 +110,31 @@ object AppContainer {
         this.appContext = appContext
         settingsManager = SettingsManager(appContext)
         com.aicompanion.network.ProviderAdapter.init(appContext)
-        loadRagConfig(appContext)
+        // RagConfig已在CompanionApp.onCreate中初始化,这里只做模型降级检测
+        checkOnnxModelDegradation(appContext)
         registerBuiltinPlugins(appContext)
+        // 初始化 API 客户端（确保 HomeActivity 等页面可直接使用）
+        rebuildApiClient()
     }
 
-    private fun loadRagConfig(context: Context) {
-        val prefs = context.getSharedPreferences("rag_config", android.content.Context.MODE_PRIVATE)
-        com.aicompanion.rag.RagConfig.personaRagEnabled = prefs.getBoolean("persona_rag_enabled", true)
-        com.aicompanion.rag.RagConfig.useCloudEmbedding = prefs.getBoolean("use_cloud_embedding", false)
-        com.aicompanion.rag.RagConfig.cloudEmbeddingUrl = prefs.getString("cloud_embedding_url", "") ?: ""
-        com.aicompanion.rag.RagConfig.cloudEmbeddingApiKey = prefs.getString("cloud_embedding_api_key", "") ?: ""
-        com.aicompanion.rag.RagConfig.cloudEmbeddingModel = prefs.getString("cloud_embedding_model", "text-embedding-3-small") ?: "text-embedding-3-small"
-        com.aicompanion.rag.RagConfig.minSimilarity = prefs.getFloat("min_similarity", 0.12f)
-    }
-
-    fun saveRagConfig() {
-        val ctx = appContext ?: return
-        val prefs = ctx.getSharedPreferences("rag_config", android.content.Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            putBoolean("persona_rag_enabled", com.aicompanion.rag.RagConfig.personaRagEnabled)
-            putBoolean("use_cloud_embedding", com.aicompanion.rag.RagConfig.useCloudEmbedding)
-            putString("cloud_embedding_url", com.aicompanion.rag.RagConfig.cloudEmbeddingUrl)
-            putString("cloud_embedding_api_key", com.aicompanion.rag.RagConfig.cloudEmbeddingApiKey)
-            putString("cloud_embedding_model", com.aicompanion.rag.RagConfig.cloudEmbeddingModel)
-            putFloat("min_similarity", com.aicompanion.rag.RagConfig.minSimilarity)
-        }.apply()
+    /**
+     * ONNX模型自动降级: 如果选择了local模式但模型未就绪,降级到tfidf
+     */
+    private fun checkOnnxModelDegradation(context: Context) {
+        if (com.aicompanion.rag.RagConfig.embeddingMode == "local") {
+            try {
+                val onnxEmbedder = com.aicompanion.rag.OnnxEmbedder(context)
+                if (!onnxEmbedder.isModelReady()) {
+                    com.aicompanion.util.AppLogger.w("AppContainer", "ONNX模型未就绪,自动降级到tfidf模式")
+                    com.aicompanion.rag.RagConfig.embeddingMode = "tfidf"
+                } else {
+                    com.aicompanion.util.AppLogger.i("AppContainer", "ONNX模型已就绪,使用local模式")
+                }
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e("AppContainer", "ONNX模型检测失败,降级到tfidf: ${e.message}")
+                com.aicompanion.rag.RagConfig.embeddingMode = "tfidf"
+            }
+        }
     }
 
     fun rebuildApiClient() {
@@ -163,6 +163,12 @@ object AppContainer {
         PluginRegistry.register(sendStickerPlugin)
         _generateImagePlugin = GenerateImagePlugin(context)
         PluginRegistry.register(_generateImagePlugin!!)
+        // 记忆工具插件：AI 自动添加日历事件/里程碑/难忘时刻/时光胶囊
+        PluginRegistry.register(CalendarEventPlugin(context))
+        PluginRegistry.register(MilestonePlugin(context))
+        PluginRegistry.register(MemorableMomentPlugin(context))
+        PluginRegistry.register(TimeCapsulePlugin(context))
+        PluginRegistry.register(AlbumPlugin(context))
     }
 
     fun setSearchMemoryCallback(callback: suspend (String, Int) -> String) {

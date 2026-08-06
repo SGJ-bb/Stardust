@@ -95,7 +95,7 @@
         android:numColumns="4"
         android:horizontalSpacing="4dp"
         android:verticalSpacing="4dp"
-        android:padding="8dp"
+        android:padding="12dp"
         android:clipToPadding="false" />
 
 </LinearLayout>

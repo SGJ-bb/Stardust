@@ -63,7 +63,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="10sp"
-                android:textColor="#556677"
+                android:textColor="@color/text_muted"
                 android:layout_marginStart="6dp" />
         </LinearLayout>
 
@@ -77,14 +77,32 @@
             android:paddingTop="8dp"
             android:paddingBottom="8dp">
 
-            <TextView
-                android:id="@+id/tv_msg_text"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="14sp"
-                android:textColor="#e8e8e8"
-                android:lineSpacingExtra="2dp"
-                android:maxWidth="240dp" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_msg_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#e8e8e8"
+                    android:lineSpacingExtra="2dp"
+                    android:maxWidth="240dp" />
+
+                <ImageView
+                    android:id="@+id/iv_generated_image"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxWidth="200dp"
+                    android:maxHeight="200dp"
+                    android:adjustViewBounds="true"
+                    android:layout_marginTop="4dp"
+                    android:visibility="gone"
+                    android:contentDescription="生成的图片" />
+
+            </LinearLayout>
         </FrameLayout>
     </LinearLayout>
 

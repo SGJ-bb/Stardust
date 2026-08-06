@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 毛玻璃输入栏背景: 半透明卡片 + 顶部柔和高光 + 轻微内阴影感 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 底色: 半透明卡片 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#DDE0E0F0" />
+            <corners android:topLeftRadius="20dp" android:topRightRadius="20dp" />
+        </shape>
+    </item>
+    <!-- 顶部高光线 -->
+    <item android:top="0dp" android:left="16dp" android:right="16dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#44FFFFFF" />
+            <size android:height="0.5dp" />
+            <corners android:topLeftRadius="20dp" android:topRightRadius="20dp" />
+        </shape>
+    </item>
+</layer-list>

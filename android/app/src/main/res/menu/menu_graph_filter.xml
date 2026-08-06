@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/filter_all"
+            android:title="全部类型"
+            android:checked="true" />
+        <item
+            android:id="@+id/filter_diary"
+            android:title="只看日记" />
+        <item
+            android:id="@+id/filter_topic"
+            android:title="只看主题" />
+        <item
+            android:id="@+id/filter_person"
+            android:title="只看人物" />
+        <item
+            android:id="@+id/filter_location"
+            android:title="只看地点" />
+    </group>
+</menu>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    app:cardBackgroundColor="#161b22"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp">
+
+        <!-- 缩略图 -->
+        <ImageView
+            android:id="@+id/iv_pet_thumb"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:scaleType="fitCenter"
+            android:background="#21262d"
+            android:padding="2dp"
+            android:layout_marginEnd="12dp" />
+
+        <!-- 信息 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tv_pet_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="宠物名"
+                    android:textSize="14sp"
+                    android:textColor="#e5e7eb"
+                    android:textStyle="bold" />
+
+                <View
+                    android:id="@+id/view_active_badge"
+                    android:layout_width="6dp"
+                    android:layout_height="6dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_active_dot"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_pet_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="64x64px · 12fps"
+                android:textSize="11sp"
+                android:textColor="#6b7280"
+                android:layout_marginTop="2dp" />
+
+        </LinearLayout>
+
+        <!-- 操作按钮 -->
+        <ImageButton
+            android:id="@+id/btn_activate"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@android:drawable/ic_menu_edit"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="激活"
+            android:tint="#facc15" />
+
+        <ImageButton
+            android:id="@+id/btn_delete"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="删除"
+            android:tint="#ef4444"
+            android:layout_marginStart="4dp" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

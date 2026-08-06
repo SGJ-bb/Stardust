@@ -1,0 +1,124 @@
+<!--
+    anim_mood_rain.xml — 难过情动画（雨云+雨滴）
+    用途：当情绪为"难过"时显示的雨云动画
+    包含：云朵形状（多圆重叠）+ 3滴下落的雨滴
+    动画效果：云朵上下浮动 + 挤压变形 + 雨滴依次下落消失
+    尺寸：32dp x 36dp
+-->
+<animated-vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/avd_mood_rain_vector">
+
+    <!-- 云朵上下浮动 -->
+    <target android:name="cloud_group">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateY"
+                android:duration="2000"
+                android:valueFrom="0"
+                android:valueTo="3"
+                android:valueType="floatType"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 云朵挤压 scaleX -->
+    <target android:name="cloud_body">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="2000"
+                android:valueFrom="1"
+                android:valueTo="1.05"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 雨滴1 下落 + 淡出 -->
+    <target android:name="raindrop1">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateY"
+                android:duration="800"
+                android:valueFrom="0"
+                android:valueTo="15"
+                android:valueType="floatType"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="raindrop1">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="800"
+                android:valueFrom="255"
+                android:valueTo="0"
+                android:valueType="intType"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 雨滴2 下落 + 淡出 (错开300ms) -->
+    <target android:name="raindrop2">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateY"
+                android:duration="800"
+                android:valueFrom="0"
+                android:valueTo="15"
+                android:valueType="floatType"
+                android:startOffset="300"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="raindrop2">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="800"
+                android:valueFrom="255"
+                android:valueTo="0"
+                android:valueType="intType"
+                android:startOffset="300"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 雨滴3 下落 + 淡出 (错开600ms) -->
+    <target android:name="raindrop3">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateY"
+                android:duration="800"
+                android:valueFrom="0"
+                android:valueTo="15"
+                android:valueType="floatType"
+                android:startOffset="600"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="raindrop3">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="800"
+                android:valueFrom="255"
+                android:valueTo="0"
+                android:valueType="intType"
+                android:startOffset="600"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+</animated-vector>

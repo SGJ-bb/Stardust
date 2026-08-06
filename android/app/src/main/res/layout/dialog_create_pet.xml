@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 宠物名称 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="宠物名称 *"
+            android:textSize="13sp"
+            android:textColor="#9ca3af"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_pet_name"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:hint="例如：小星、Pixel猫"
+            android:textSize="14sp"
+            android:textColor="#e5e7eb"
+            android:textColorHint="#4b5563"
+            android:background="@drawable/bg_input_dark"
+            android:paddingHorizontal="12dp"
+            android:singleLine="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 基础提示词 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="基础描述（用于生成参考）"
+            android:textSize="13sp"
+            android:textColor="#9ca3af"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_base_prompt"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:hint="描述宠物的外观特征..."
+            android:textSize="13sp"
+            android:textColor="#e5e7eb"
+            android:textColorHint="#4b5563"
+            android:background="@drawable/bg_input_dark"
+            android:padding="12dp"
+            android:gravity="top"
+            android:inputType="textMultiLine"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 参考图片 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="参考图片（可选）"
+            android:textSize="13sp"
+            android:textColor="#9ca3af"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/iv_reference_preview"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:scaleType="fitCenter"
+                android:background="#21262d"
+                android:padding="4dp" />
+
+            <Button
+                android:id="@+id/btn_pick_image"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:text="选择图片"
+                android:textSize="12sp"
+                android:textColor="#667eea"
+                android:layout_marginStart="12dp"
+                app:strokeColor="#667eea"
+                app:cornerRadius="8dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

@@ -70,6 +70,15 @@ class PersonaManager(private val context: Context) {
     fun load() {
         personas.clear()
         if (!indexFile.exists()) {
+            // 索引文件不存在,尝试从SharedPreferences恢复角色数据
+            val recovered = recoverFromSharedPreferences()
+            if (recovered.isNotEmpty()) {
+                personas.addAll(recovered)
+                save()
+                AppLogger.i(TAG, "[Persona-Load] 从SharedPreferences恢复了${recovered.size}个角色")
+                return
+            }
+            // 恢复失败,创建默认角色
             personas.add(Persona(
                 id = "default",
                 name = "星尘",
@@ -83,28 +92,79 @@ class PersonaManager(private val context: Context) {
         try {
             val text = indexFile.readText()
             val json = JSONObject(text)
-            val arr = json.optJSONArray("personas") ?: return
+            val arr = json.optJSONArray("personas")
+            if (arr == null) {
+                // JSON格式不正确,尝试从SharedPreferences恢复
+                val recovered = recoverFromSharedPreferences()
+                if (recovered.isNotEmpty()) {
+                    personas.addAll(recovered)
+                    save()
+                    AppLogger.i(TAG, "[Persona-Load] 索引格式异常,从SharedPreferences恢复了${recovered.size}个角色")
+                    return
+                }
+                // 恢复失败,创建默认角色(不覆盖原文件)
+                personas.add(Persona(
+                    id = "default",
+                    name = "星尘",
+                    prompt = "你叫星尘，性格活泼、有点小傲娇，喜欢和主人聊天。",
+                    isDefault = true,
+                    createdAt = System.currentTimeMillis()
+                ))
+                AppLogger.w(TAG, "[Persona-Load] 索引格式异常且无法恢复,使用默认角色(未覆盖原文件)")
+                return
+            }
             for (i in 0 until arr.length()) {
                 personas.add(Persona.fromJson(arr.getJSONObject(i)))
             }
+            AppLogger.i(TAG, "[Persona-Load] 成功加载${personas.size}个角色")
+
+            // 关键修复：总是尝试从SharedPreferences合并恢复丢失的角色
+            // 不再限制 personas.size <= 1，因为索引文件可能包含部分角色（如只有默认角色），
+            // 但用户之前创建的角色数据仍存在于 SharedPreferences 中。
+            // 此逻辑会扫描 persona_data_*.xml，将 JSON 中缺失的角色合并回来。
+            try {
+                val recovered = recoverFromSharedPreferences()
+                if (recovered.isNotEmpty()) {
+                    val existingIds = personas.map { it.id }.toSet()
+                    val toAdd = recovered.filter { it.id !in existingIds }
+                    if (toAdd.isNotEmpty()) {
+                        personas.addAll(toAdd)
+                        save()
+                        AppLogger.i(TAG, "[Persona-Load] 从SharedPreferences合并恢复了${toAdd.size}个丢失的角色(现有${existingIds.size}个)")
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "[Persona-Load] 合并恢复角色失败: ${e.message}")
+            }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "load failed, attempting backup: ${e.message}")
+            AppLogger.e(TAG, "[Persona-Load] 加载失败,尝试备份: ${e.javaClass.simpleName}: ${e.message}")
             val backup = File(personaDir, "personas_index.bak")
             if (backup.exists()) {
                 try {
                     val text = backup.readText()
                     val json = JSONObject(text)
-                    val arr = json.optJSONArray("personas") ?: return
-                    for (i in 0 until arr.length()) {
-                        personas.add(Persona.fromJson(arr.getJSONObject(i)))
+                    val arr = json.optJSONArray("personas")
+                    if (arr != null) {
+                        for (i in 0 until arr.length()) {
+                            personas.add(Persona.fromJson(arr.getJSONObject(i)))
+                        }
+                        save()
+                        AppLogger.i(TAG, "[Persona-Load] 从备份恢复了${personas.size}个角色")
+                        return
                     }
-                    save()
-                    //AppLogger.d(TAG, "restored from backup")
-                    return
                 } catch (e2: Exception) {
-                    AppLogger.e(TAG, "backup restore also failed: ${e2.message}")
+                    AppLogger.e(TAG, "[Persona-Load] 备份恢复也失败: ${e2.javaClass.simpleName}: ${e2.message}")
                 }
             }
+            // 尝试从SharedPreferences恢复
+            val recovered = recoverFromSharedPreferences()
+            if (recovered.isNotEmpty()) {
+                personas.addAll(recovered)
+                save()
+                AppLogger.i(TAG, "[Persona-Load] 从SharedPreferences恢复了${recovered.size}个角色")
+                return
+            }
+            // 所有恢复方式都失败,创建默认角色
             personas.add(Persona(
                 id = "default",
                 name = "星尘",
@@ -113,7 +173,92 @@ class PersonaManager(private val context: Context) {
                 createdAt = System.currentTimeMillis()
             ))
             save()
+            AppLogger.w(TAG, "[Persona-Load] 所有恢复方式失败,创建默认角色")
         }
+    }
+
+    /**
+     * 从SharedPreferences恢复角色数据
+     *
+     * 扫描所有 persona_data_* SharedPreferences,
+     * 如果包含 persona_name 字段,则认为是一个有效的角色。
+     * 用于 personas_index.json 丢失或损坏时的数据恢复。
+     */
+    private fun recoverFromSharedPreferences(): List<Persona> {
+        val recovered = mutableListOf<Persona>()
+        try {
+            // 扫描 filesDir 下的 SharedPreferences 文件
+            val sharedPrefsDir = File(context.filesDir.parent, "shared_prefs")
+            if (!sharedPrefsDir.exists()) return emptyList()
+
+            val prefsFiles = sharedPrefsDir.listFiles { f ->
+                f.name.startsWith("persona_data_") && f.name.endsWith(".xml")
+            } ?: return emptyList()
+
+            for (file in prefsFiles) {
+                val personaId = file.name.removePrefix("persona_data_").removeSuffix(".xml")
+                val prefs = context.getSharedPreferences("persona_data_$personaId", Context.MODE_PRIVATE)
+                val name = prefs.getString("persona_name", null) ?: continue
+
+                // 从 SharedPreferences 恢复所有可恢复字段
+                val desc = prefs.getString("persona_desc", "") ?: ""
+                val personality = prefs.getString("persona_personality", "") ?: ""
+                val speechStyle = prefs.getString("persona_speech_style", "") ?: ""
+                val appearance = prefs.getString("persona_appearance", "") ?: ""
+                val catchphrases = prefs.getString("persona_catchphrases", "") ?: ""
+                val preferences = prefs.getString("persona_preferences", "") ?: ""
+                val worldSetting = prefs.getString("world_setting", "") ?: ""
+                val worldRelationship = prefs.getString("world_relationship", "") ?: ""
+                val worldRules = prefs.getString("world_rules", "") ?: ""
+                val nickname = prefs.getString("user_nickname", "") ?: ""
+                val freeMode = prefs.getString("free_mode", "") ?: ""
+                val avatarPath = prefs.getString("persona_avatar_path", "") ?: ""
+
+                // 重新构建 prompt（与 PersonaEditorActivity.savePersona 逻辑一致）
+                val prompt = buildString {
+                    append("你是「${name.ifBlank { "星尘" }}」。")
+                    if (desc.isNotBlank()) append("\n简介：$desc")
+                    if (appearance.isNotBlank()) append("\n外貌：$appearance")
+                    if (personality.isNotBlank()) append("\n性格：$personality")
+                    if (speechStyle.isNotBlank()) append("\n说话风格：$speechStyle")
+                    if (catchphrases.isNotBlank()) append("\n常用口头禅：$catchphrases")
+                    if (preferences.isNotBlank()) append("\n喜好：$preferences")
+                    if (worldSetting.isNotBlank()) append("\n世界观设定：$worldSetting")
+                    if (worldRelationship.isNotBlank()) append("\n你和用户的关系：$worldRelationship")
+                    if (worldRules.isNotBlank()) append("\n规则：$worldRules")
+                    if (nickname.isNotBlank()) append("\n你称呼用户为「$nickname」。")
+                    if (freeMode.isNotBlank()) append("\n\n自定义指令：\n$freeMode")
+                }
+
+                val persona = Persona(
+                    id = personaId,
+                    name = name,
+                    prompt = prompt,
+                    avatarPath = avatarPath,
+                    speechStyle = speechStyle,
+                    personality = personality,
+                    description = desc,
+                    isDefault = personaId == "default",
+                    createdAt = System.currentTimeMillis()
+                )
+                recovered.add(persona)
+                AppLogger.i(TAG, "[Persona-Recover] 恢复角色: id=$personaId name=$name avatar=${avatarPath.isNotEmpty()}")
+            }
+
+            // 确保默认角色存在
+            if (recovered.none { it.id == "default" }) {
+                recovered.add(Persona(
+                    id = "default",
+                    name = "星尘",
+                    prompt = "你叫星尘，性格活泼、有点小傲娇，喜欢和主人聊天。",
+                    isDefault = true,
+                    createdAt = System.currentTimeMillis()
+                ))
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "[Persona-Recover] 从SharedPreferences恢复失败: ${e.javaClass.simpleName}: ${e.message}")
+        }
+        return recovered
     }
 
     fun save() {
@@ -148,6 +293,14 @@ class PersonaManager(private val context: Context) {
     fun setActivePersona(id: String) {
         val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
         prefs.edit().putString(ACTIVE_KEY, id).apply()
+        // Auto-sync persona name to persona_data SP so UI can read it without PersonaManager
+        val persona = getPersona(id)
+        if (persona != null) {
+            val personaPrefs = context.getSharedPreferences("persona_data_$id", Context.MODE_PRIVATE)
+            if (personaPrefs.getString("persona_name", null).isNullOrBlank()) {
+                personaPrefs.edit().putString("persona_name", persona.name).apply()
+            }
+        }
         com.aicompanion.AppContainer.onPersonaChanged()
     }
 
@@ -184,8 +337,14 @@ class PersonaManager(private val context: Context) {
         context.getSharedPreferences("achievements_$id", Context.MODE_PRIVATE).edit().clear().apply()
         context.getSharedPreferences("favorites_$id", Context.MODE_PRIVATE).edit().clear().apply()
         context.getSharedPreferences("memorable_moments_$id", Context.MODE_PRIVATE).edit().clear().apply()
+        // 关键修复：清理 persona_data_$id，否则角色恢复逻辑会扫描 persona_data_*.xml 将已删除的角色恢复
+        context.getSharedPreferences("persona_data_$id", Context.MODE_PRIVATE).edit().clear().apply()
         val diaryDir = File(File(context.filesDir, "diaries"), id)
         diaryDir.deleteRecursively()
+        // 同步删除该角色的聊天历史JSON文件（修复：删除角色后重进不会恢复聊天记录）
+        try {
+            com.aicompanion.storage.ChatHistoryStorage(context).deleteScope("persona", id)
+        } catch (_: Exception) {}
         save()
         return true
     }

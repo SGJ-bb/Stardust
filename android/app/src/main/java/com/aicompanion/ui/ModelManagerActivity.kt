@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.util.Log
+import android.view.View
 import android.widget.*
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -45,6 +46,7 @@ class ModelManagerActivity : Activity() {
             initViews()
             loadModels()
             setupClickListeners()
+            applyTheme()
         } catch (e: Exception) {
             Log.e(TAG, "onCreate error", e)
             Toast.makeText(this, "模型管理加载失败", Toast.LENGTH_SHORT).show()
@@ -114,9 +116,28 @@ class ModelManagerActivity : Activity() {
 
         btnScan?.setOnClickListener {
             try {
+                val mm = modelManager ?: return@setOnClickListener
+                // 1. 扫描本地 Download/Live2D 目录（含文件拷贝与注册）
                 val found = scanModelsLocal()
-                if (found.isNotEmpty()) {
-                    Toast.makeText(this, "找到 ${found.size} 个模型", Toast.LENGTH_SHORT).show()
+                // 2. 调用 ModelManager.scanForModels() 扫描内置搜索目录，
+                //    将新发现的模型注册到列表中（避免重复注册）
+                val scanned = runCatching { mm.scanForModels() }.getOrDefault(emptyList())
+                val existing = mm.getAllModels()
+                var newFromScan = 0
+                scanned.forEach { model ->
+                    val alreadyRegistered = existing.any { it.id == model.id || it.modelPath == model.modelPath }
+                    if (!alreadyRegistered) {
+                        mm.addModel(model)
+                        newFromScan++
+                    }
+                }
+                val total = found.size + newFromScan
+                if (total > 0) {
+                    val msg = buildString {
+                        append("找到 $total 个模型")
+                        if (newFromScan > 0) append("（其中 scanForModels 新增 $newFromScan 个）")
+                    }
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
                     loadModels()
                 } else {
                     Toast.makeText(this, "未找到新模型\n请将模型文件夹放入 Download/Live2D/ 目录", Toast.LENGTH_LONG).show()
@@ -704,6 +725,18 @@ class ModelManagerActivity : Activity() {
         private const val TAG = "ModelManagerActivity"
         const val REQUEST_IMPORT_MODEL = 1001
         const val REQUEST_IMPORT_FOLDER = 1002
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
+        }
     }
 }
 

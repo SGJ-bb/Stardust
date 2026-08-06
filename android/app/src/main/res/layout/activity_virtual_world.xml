@@ -4,19 +4,19 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0f0c29">
+    android:background="@color/bg_base">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="#00ffffff"
-        android:elevation="0dp"
+        android:background="@drawable/bg_toolbar_glass"
+        android:elevation="4dp"
         app:title="🌍 虚拟世界"
-        app:titleTextColor="#e8e8f0"
+        app:titleTextColor="@color/text_primary"
         app:titleTextAppearance="@style/ToolbarTitleStyle"
         app:navigationIcon="@android:drawable/ic_menu_close_clear_cancel"
-        app:navigationIconTint="#c4b5fd" />
+        app:navigationIconTint="@color/brand_primary" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -37,11 +37,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="14dp"
-                app:cardBackgroundColor="#1a1a3e"
+                app:cardBackgroundColor="@color/surface_card"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="4dp"
+                app:rippleColor="#33FFFFFF"
                 app:strokeWidth="1dp"
-                app:strokeColor="#3a3a6e">
+                app:strokeColor="@color/stroke_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -62,7 +63,7 @@
                             android:text="⏱️ 虚拟时间"
                             android:textSize="16sp"
                             android:textStyle="bold"
-                            android:textColor="#9c7cff" />
+                            android:textColor="@color/brand_primary" />
 
                         <TextView
                             android:id="@+id/tv_simulation_status"
@@ -73,7 +74,7 @@
                             android:paddingEnd="10dp"
                             android:text="⏸ 已暂停"
                             android:textSize="11sp"
-                            android:textColor="#8899bb"
+                            android:textColor="@color/text_muted"
                             android:background="@drawable/bg_edit_moment" />
                     </LinearLayout>
 
@@ -90,8 +91,9 @@
                             android:layout_weight="1"
                             android:layout_marginEnd="6dp"
                             app:cardCornerRadius="14dp"
-                            app:cardElevation="0dp"
-                            app:cardBackgroundColor="#12122e">
+                            app:cardElevation="2dp"
+                            app:rippleColor="#33FFFFFF"
+                            app:cardBackgroundColor="@color/surface_dark">
 
                             <LinearLayout
                                 android:layout_width="match_parent"
@@ -115,7 +117,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="📅 虚拟日期"
                                     android:textSize="9sp"
-                                    android:textColor="#667788"
+                                    android:textColor="@color/text_muted"
                                     android:layout_marginTop="2dp" />
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -127,8 +129,9 @@
                             android:layout_marginStart="6dp"
                             android:layout_marginEnd="6dp"
                             app:cardCornerRadius="14dp"
-                            app:cardElevation="0dp"
-                            app:cardBackgroundColor="#12122e">
+                            app:cardElevation="2dp"
+                            app:rippleColor="#33FFFFFF"
+                            app:cardBackgroundColor="@color/surface_dark">
 
                             <LinearLayout
                                 android:layout_width="match_parent"
@@ -152,7 +155,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="🕐 虚拟时刻"
                                     android:textSize="9sp"
-                                    android:textColor="#667788"
+                                    android:textColor="@color/text_muted"
                                     android:layout_marginTop="2dp" />
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -163,8 +166,9 @@
                             android:layout_weight="1"
                             android:layout_marginStart="6dp"
                             app:cardCornerRadius="14dp"
-                            app:cardElevation="0dp"
-                            app:cardBackgroundColor="#12122e">
+                            app:cardElevation="2dp"
+                            app:rippleColor="#33FFFFFF"
+                            app:cardBackgroundColor="@color/surface_dark">
 
                             <LinearLayout
                                 android:layout_width="match_parent"
@@ -188,7 +192,7 @@
                                     android:layout_height="wrap_content"
                                     android:text="⚡ 时间倍率"
                                     android:textSize="9sp"
-                                    android:textColor="#667788"
+                                    android:textColor="@color/text_muted"
                                     android:layout_marginTop="2dp" />
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
@@ -209,7 +213,7 @@
                             android:layout_weight="1"
                             android:text="📍 起始之地"
                             android:textSize="12sp"
-                            android:textColor="#c4b5fd" />
+                            android:textColor="@color/text_secondary" />
 
                         <TextView
                             android:id="@+id/tv_weather"
@@ -254,7 +258,7 @@
                     app:strokeColor="#667eea"
                     app:strokeWidth="1.5dp"
                     app:backgroundTint="@android:color/transparent"
-                    android:textColor="#aabbdd"
+                    android:textColor="@color/text_secondary"
                     style="@style/Widget.Material3.Button.OutlinedButton" />
             </LinearLayout>
 
@@ -263,11 +267,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="14dp"
-                app:cardBackgroundColor="#1a1a3e"
+                app:cardBackgroundColor="@color/surface_card"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="4dp"
+                app:rippleColor="#33FFFFFF"
                 app:strokeWidth="1dp"
-                app:strokeColor="#3a3a6e">
+                app:strokeColor="@color/stroke_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -281,7 +286,7 @@
                         android:text="⚙️ 推演设置"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="#9c7cff"
+                        android:textColor="@color/brand_primary"
                         android:layout_marginBottom="14dp" />
 
                     <LinearLayout
@@ -297,14 +302,14 @@
                             android:layout_weight="1"
                             android:text="时间倍率"
                             android:textSize="14sp"
-                            android:textColor="#c8c8e0" />
+                            android:textColor="@color/text_secondary" />
 
                         <Spinner
                             android:id="@+id/spinner_time_ratio"
                             android:layout_width="130dp"
                             android:layout_height="38dp"
                             android:background="@drawable/bg_edit_moment"
-                            android:popupBackground="#1a1a3e" />
+                            android:popupBackground="@color/surface_card" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -320,14 +325,14 @@
                             android:layout_weight="1"
                             android:text="推演间隔"
                             android:textSize="14sp"
-                            android:textColor="#c8c8e0" />
+                            android:textColor="@color/text_secondary" />
 
                         <Spinner
                             android:id="@+id/spinner_tick_interval"
                             android:layout_width="130dp"
                             android:layout_height="38dp"
                             android:background="@drawable/bg_edit_moment"
-                            android:popupBackground="#1a1a3e" />
+                            android:popupBackground="@color/surface_card" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -343,14 +348,14 @@
                             android:layout_weight="1"
                             android:text="群聊推演"
                             android:textSize="14sp"
-                            android:textColor="#c8c8e0" />
+                            android:textColor="@color/text_secondary" />
 
                         <com.google.android.material.switchmaterial.SwitchMaterial
                             android:id="@+id/switch_group_sim"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             app:thumbTint="#667eea"
-                            app:trackTint="#334466" />
+                            app:trackTint="@color/text_muted" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -365,15 +370,73 @@
                             android:layout_weight="1"
                             android:text="剧情配图"
                             android:textSize="14sp"
-                            android:textColor="#c8c8e0" />
+                            android:textColor="@color/text_secondary" />
 
                         <com.google.android.material.switchmaterial.SwitchMaterial
                             android:id="@+id/switch_image_gen"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             app:thumbTint="#667eea"
-                            app:trackTint="#334466" />
+                            app:trackTint="@color/text_muted" />
                     </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 虚拟世界记忆池 -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_vw_memory"
+                style="@style/Stardust.Card.Standard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <!-- 标题行 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="🧠 世界记忆池"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+
+                        <TextView
+                            android:id="@+id/tv_vw_memory_stats"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 条记忆"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_muted" />
+                    </LinearLayout>
+
+                    <!-- 记忆内容（可滚动） -->
+                    <ScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:maxHeight="200dp"
+                        android:layout_marginTop="8dp">
+
+                        <TextView
+                            android:id="@+id/tv_vw_memory_content"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="暂无记忆，开始推演后将自动积累..."
+                            android:textSize="13sp"
+                            android:textColor="@color/text_primary"
+                            android:lineSpacingExtra="2dp" />
+                    </ScrollView>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -388,7 +451,7 @@
                 app:strokeColor="#9c7cff"
                 app:strokeWidth="1.5dp"
                 app:backgroundTint="@android:color/transparent"
-                android:textColor="#c4b5fd"
+                android:textColor="@color/text_secondary"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
 
             <com.google.android.material.button.MaterialButton
@@ -455,18 +518,19 @@
                 android:text="📖 剧情推演记录"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="#9c7cff"
+                android:textColor="@color/brand_primary"
                 android:layout_marginBottom="10dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="14dp"
-                app:cardBackgroundColor="#1a1a3e"
+                app:cardBackgroundColor="@color/surface_card"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="4dp"
+                app:rippleColor="#33FFFFFF"
                 app:strokeWidth="1dp"
-                app:strokeColor="#3a3a6e">
+                app:strokeColor="@color/stroke_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -478,8 +542,7 @@
                         android:id="@+id/rv_story"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:nestedScrollingEnabled="false"
-                        android:maxHeight="400dp" />
+                        android:nestedScrollingEnabled="false" />
 
                     <TextView
                         android:id="@+id/tv_story_empty"
@@ -487,7 +550,7 @@
                         android:layout_height="wrap_content"
                         android:text="还没有推演记录\n点击「开始推演」启动虚拟世界"
                         android:textSize="13sp"
-                        android:textColor="#667788"
+                        android:textColor="@color/text_muted"
                         android:gravity="center"
                         android:padding="28dp" />
                 </LinearLayout>

@@ -1,0 +1,346 @@
+/* ================================================================
+   STRADUST 12套主题配色方案
+   每个主题包含：亮色 + 暗色 两套变量
+   所有组件通过 var(--color-*) 变量跟随主题切换
+   ================================================================ */
+
+/* ===== 1. 樱粉 Sakura (默认) ===== */
+[data-theme="sakura"] {
+  --color-bg: #fef7f7;
+  --color-bg-secondary: #fdf2f2;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a1a2e;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a1a2e;
+  --color-primary: #ec4899;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #fce7f3;
+  --color-secondary-foreground: #9d174d;
+  --color-muted: #f5f5f5;
+  --color-muted-foreground: #737373;
+  --color-accent: #fce7f3;
+  --color-accent-foreground: #9d174d;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #f3e8ff;
+  --color-input: #fce7f3;
+  --color-ring: #ec4899;
+  --color-sidebar: #fef7f7;
+  --color-sidebar-foreground: #6b7280;
+  --color-sidebar-active: #ec4899;
+  /* 主题特有 */
+  --theme-glow: rgba(236,72,153,0.15);
+  --theme-glow-strong: rgba(236,72,153,0.35);
+  --theme-gradient: linear-gradient(135deg, #ec4899, #f472b6);
+  --theme-border-style: solid;
+}
+[data-theme="sakura"].dark {
+  --color-bg: #14080f; --color-bg-secondary: #1e1020; --color-card: #261424;
+  --color-card-foreground: #fad0ea; --color-popover: #261424; --color-popover-foreground: #fad0ea;
+  --color-primary: #ec4899; --color-primary-foreground: #fff;
+  --color-secondary: #361830; --color-secondary-foreground: #fbcfe8;
+  --color-muted: #361830; --color-muted-foreground: #c4a0b0;
+  --color-accent: #361830; --color-accent-foreground: #fbcfe8;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #462840; --color-input: #361830; --color-ring: #ec4899;
+  --color-sidebar: #14080f; --color-sidebar-foreground: #c4a0b0; --color-sidebar-active: #ec4899;
+  --theme-glow: rgba(236,72,153,0.20); --theme-glow-strong: rgba(236,72,153,0.45);
+  --theme-gradient: linear-gradient(135deg, #ec4899, #db2777);
+}
+
+/* ===== 2. 桃粉 Peach ===== */
+[data-theme="peach"] {
+  --color-bg: #fff7ed; --color-bg-secondary: #ffedd5; --color-card: #ffffff;
+  --color-card-foreground: #1c1917; --color-popover: #ffffff; --color-popover-foreground: #1c1917;
+  --color-primary: #f97316; --color-primary-foreground: #ffffff;
+  --color-secondary: #ffedd5; --color-secondary-foreground: #9a3412;
+  --color-muted: #f5f5f4; --color-muted-foreground: #78716c;
+  --color-accent: #ffedd5; --color-accent-foreground: #9a3412;
+  --color-destructive: #ef4444; --color-destructive-foreground: #fff;
+  --color-border: #fed7aa; --color-input: #ffedd5; --color-ring: #f97316;
+  --color-sidebar: #fff7ed; --color-sidebar-foreground: #78716c; --color-sidebar-active: #f97316;
+  --theme-glow: rgba(249,115,22,0.15); --theme-glow-strong: rgba(249,115,22,0.35);
+  --theme-gradient: linear-gradient(135deg, #f97316, #fb923c); --theme-border-style: solid;
+}
+[data-theme="peach"].dark {
+  --color-bg: #141008; --color-bg-secondary: #20180e; --color-card: #281e14;
+  --color-card-foreground: #fed8b0; --color-popover: #281e14; --color-popover-foreground: #fed8b0;
+  --color-primary: #f97316; --color-primary-foreground: #fff;
+  --color-secondary: #382818; --color-secondary-foreground: #fed7aa;
+  --color-muted: #382818; --color-muted-foreground: #c4a890;
+  --color-accent: #382818; --color-accent-foreground: #fed7aa;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #483828; --color-input: #382818; --color-ring: #f97316;
+  --color-sidebar: #141008; --color-sidebar-foreground: #c4a890; --color-sidebar-active: #f97316;
+  --theme-glow: rgba(249,115,22,0.20); --theme-glow-strong: rgba(249,115,22,0.45);
+  --theme-gradient: linear-gradient(135deg, #f97316, #ea580c);
+}
+
+/* ===== 3. 紫罗兰 Violet ===== */
+[data-theme="violet"] {
+  --color-bg: #faf5ff; --color-bg-secondary: #f3e8ff; --color-card: #ffffff;
+  --color-card-foreground: #1e1b4b; --color-popover: #ffffff; --color-popover-foreground: #1e1b4b;
+  --color-primary: #8b5cf6; --color-primary-foreground: #ffffff;
+  --color-secondary: #f3e8ff; --color-secondary-foreground: #5b21b6;
+  --color-muted: #f5f5f5; --color-muted-foreground: #737373;
+  --color-accent: #f3e8ff; --color-accent-foreground: #5b21b6;
+  --color-destructive: #ef4444; --color-destructive-foreground: #fff;
+  --color-border: #e9d5ff; --color-input: #f3e8ff; --color-ring: #8b5cf6;
+  --color-sidebar: #faf5ff; --color-sidebar-foreground: #737373; --color-sidebar-active: #8b5cf6;
+  --theme-glow: rgba(139,92,246,0.15); --theme-glow-strong: rgba(139,92,246,0.35);
+  --theme-gradient: linear-gradient(135deg, #8b5cf6, #a78bfa); --theme-border-style: solid;
+}
+[data-theme="violet"].dark {
+  --color-bg: #0d0818; --color-bg-secondary: #18102e; --color-card: #20143a;
+  --color-card-foreground: #ddd0f5; --color-popover: #20143a; --color-popover-foreground: #ddd0f5;
+  --color-primary: #8b5cf6; --color-primary-foreground: #fff;
+  --color-secondary: #2a184a; --color-secondary-foreground: #d8b4fe;
+  --color-muted: #2a184a; --color-muted-foreground: #a090c4;
+  --color-accent: #2a184a; --color-accent-foreground: #d8b4fe;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #3a285c; --color-input: #2a184a; --color-ring: #8b5cf6;
+  --color-sidebar: #0d0818; --color-sidebar-foreground: #a090c4; --color-sidebar-active: #8b5cf6;
+  --theme-glow: rgba(139,92,246,0.20); --theme-glow-strong: rgba(139,92,246,0.45);
+  --theme-gradient: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+/* ===== 4. 海蓝 Ocean ===== */
+[data-theme="ocean"] {
+  --color-bg: #eff6ff; --color-bg-secondary: #dbeafe; --color-card: #ffffff;
+  --color-card-foreground: #1e3a5f; --color-popover: #ffffff; --color-popover-foreground: #1e3a5f;
+  --color-primary: #3b82f6; --color-primary-foreground: #ffffff;
+  --color-secondary: #dbeafe; --color-secondary-foreground: #1e40af;
+  --color-muted: #f5f5f5; --color-muted-foreground: #6b7280;
+  --color-accent: #dbeafe; --color-accent-foreground: #1e40af;
+  --color-destructive: #ef4444; --color-destructive-foreground: #fff;
+  --color-border: #bfdbfe; --color-input: #dbeafe; --color-ring: #3b82f6;
+  --color-sidebar: #eff6ff; --color-sidebar-foreground: #6b7280; --color-sidebar-active: #3b82f6;
+  --theme-glow: rgba(59,130,246,0.15); --theme-glow-strong: rgba(59,130,246,0.35);
+  --theme-gradient: linear-gradient(135deg, #3b82f6, #60a5fa); --theme-border-style: solid;
+}
+[data-theme="ocean"].dark {
+  --color-bg: #08101a; --color-bg-secondary: #101a2e; --color-card: #14203a;
+  --color-card-foreground: #bcd8f5; --color-popover: #14203a; --color-popover-foreground: #bcd8f5;
+  --color-primary: #3b82f6; --color-primary-foreground: #fff;
+  --color-secondary: #182a4a; --color-secondary-foreground: #93c5fd;
+  --color-muted: #182a4a; --color-muted-foreground: #7090b0;
+  --color-accent: #182a4a; --color-accent-foreground: #93c5fd;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #283a5c; --color-input: #182a4a; --color-ring: #3b82f6;
+  --color-sidebar: #08101a; --color-sidebar-foreground: #7090b0; --color-sidebar-active: #3b82f6;
+  --theme-glow: rgba(59,130,246,0.20); --theme-glow-strong: rgba(59,130,246,0.45);
+  --theme-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+/* ===== 5. 翡翠 Emerald ===== */
+[data-theme="emerald"] {
+  --color-bg: #ecfdf5; --color-bg-secondary: #d1fae5; --color-card: #ffffff;
+  --color-card-foreground: #064e3b; --color-popover: #ffffff; --color-popover-foreground: #064e3b;
+  --color-primary: #10b981; --color-primary-foreground: #ffffff;
+  --color-secondary: #d1fae5; --color-secondary-foreground: #065f46;
+  --color-muted: #f5f5f5; --color-muted-foreground: #6b7280;
+  --color-accent: #d1fae5; --color-accent-foreground: #065f46;
+  --color-destructive: #ef4444; --color-destructive-foreground: #fff;
+  --color-border: #a7f3d0; --color-input: #d1fae5; --color-ring: #10b981;
+  --color-sidebar: #ecfdf5; --color-sidebar-foreground: #6b7280; --color-sidebar-active: #10b981;
+  --theme-glow: rgba(16,185,129,0.15); --theme-glow-strong: rgba(16,185,129,0.35);
+  --theme-gradient: linear-gradient(135deg, #10b981, #34d399); --theme-border-style: solid;
+}
+[data-theme="emerald"].dark {
+  --color-bg: #081410; --color-bg-secondary: #102a1e; --color-card: #143024;
+  --color-card-foreground: #b0f5e0; --color-popover: #143024; --color-popover-foreground: #b0f5e0;
+  --color-primary: #10b981; --color-primary-foreground: #fff;
+  --color-secondary: #183a2d; --color-secondary-foreground: #6ee7b7;
+  --color-muted: #183a2d; --color-muted-foreground: #70b4a0;
+  --color-accent: #183a2d; --color-accent-foreground: #6ee7b7;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #284d3d; --color-input: #183a2d; --color-ring: #10b981;
+  --color-sidebar: #081410; --color-sidebar-foreground: #70b4a0; --color-sidebar-active: #10b981;
+  --theme-glow: rgba(16,185,129,0.20); --theme-glow-strong: rgba(16,185,129,0.45);
+  --theme-gradient: linear-gradient(135deg, #10b981, #059669);
+}
+
+/* ===== 6. 日落 Sunset ===== */
+[data-theme="sunset"] {
+  --color-bg: #fffbeb; --color-bg-secondary: #fef3c7; --color-card: #ffffff;
+  --color-card-foreground: #78350f; --color-popover: #ffffff; --color-popover-foreground: #78350f;
+  --color-primary: #f59e0b; --color-primary-foreground: #78350f;
+  --color-secondary: #fef3c7; --color-secondary-foreground: #92400e;
+  --color-muted: #f5f5f4; --color-muted-foreground: #78716c;
+  --color-accent: #fef3c7; --color-accent-foreground: #92400e;
+  --color-destructive: #ef4444; --color-destructive-foreground: #fff;
+  --color-border: #fde68a; --color-input: #fef3c7; --color-ring: #f59e0b;
+  --color-sidebar: #fffbeb; --color-sidebar-foreground: #78716c; --color-sidebar-active: #f59e0b;
+  --theme-glow: rgba(245,158,11,0.15); --theme-glow-strong: rgba(245,158,11,0.35);
+  --theme-gradient: linear-gradient(135deg, #f59e0b, #fbbf24); --theme-border-style: solid;
+}
+[data-theme="sunset"].dark {
+  --color-bg: #141008; --color-bg-secondary: #201c10; --color-card: #282214;
+  --color-card-foreground: #f5e8c0; --color-popover: #282214; --color-popover-foreground: #f5e8c0;
+  --color-primary: #f59e0b; --color-primary-foreground: #141008;
+  --color-secondary: #383018; --color-secondary-foreground: #fde68a;
+  --color-muted: #383018; --color-muted-foreground: #b4a480;
+  --color-accent: #383018; --color-accent-foreground: #fde68a;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #484028; --color-input: #383018; --color-ring: #f59e0b;
+  --color-sidebar: #141008; --color-sidebar-foreground: #b4a480; --color-sidebar-active: #f59e0b;
+  --theme-glow: rgba(245,158,11,0.20); --theme-glow-strong: rgba(245,158,11,0.45);
+  --theme-gradient: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+/* ===== 7. 玫瑰金 RoseGold ===== */
+[data-theme="rosegold"] {
+  --color-bg: #fdf2f8; --color-bg-secondary: #fce7f3; --color-card: #ffffff;
+  --color-card-foreground: #831843; --color-popover: #ffffff; --color-popover-foreground: #831843;
+  --color-primary: #e11d48; --color-primary-foreground: #ffffff;
+  --color-secondary: #fce7f3; --color-secondary-foreground: #9d174d;
+  --color-muted: #f5f5f5; --color-muted-foreground: #737373;
+  --color-accent: #fce7f3; --color-accent-foreground: #9d174d;
+  --color-destructive: #ef4444; --color-destructive-foreground: #fff;
+  --color-border: #fbcfe8; --color-input: #fce7f3; --color-ring: #e11d48;
+  --color-sidebar: #fdf2f8; --color-sidebar-foreground: #737373; --color-sidebar-active: #e11d48;
+  --theme-glow: rgba(225,29,72,0.15); --theme-glow-strong: rgba(225,29,72,0.35);
+  --theme-gradient: linear-gradient(135deg, #e11d48, #fb7185); --theme-border-style: solid;
+}
+[data-theme="rosegold"].dark {
+  --color-bg: #140810; --color-bg-secondary: #201018; --color-card: #281420;
+  --color-card-foreground: #f5d0e8; --color-popover: #281420; --color-popover-foreground: #f5d0e8;
+  --color-primary: #e11d48; --color-primary-foreground: #fff;
+  --color-secondary: #381830; --color-secondary-foreground: #fbcfe8;
+  --color-muted: #381830; --color-muted-foreground: #b4a0b0;
+  --color-accent: #381830; --color-accent-foreground: #fbcfe8;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #482840; --color-input: #381818; --color-ring: #e11d48;
+  --color-sidebar: #140810; --color-sidebar-foreground: #b4a0b0; --color-sidebar-active: #e11d48;
+  --theme-glow: rgba(225,29,72,0.20); --theme-glow-strong: rgba(225,29,72,0.45);
+  --theme-gradient: linear-gradient(135deg, #e11d48, #be123c);
+}
+
+/* ===== 8. 薄荷 Mint ===== */
+[data-theme="mint"] {
+  --color-bg: #f0fdfa; --color-bg-secondary: #ccfbf1; --color-card: #ffffff;
+  --color-card-foreground: #134e4a; --color-popover: #ffffff; --color-popover-foreground: #134e4a;
+  --color-primary: #14b8a6; --color-primary-foreground: #ffffff;
+  --color-secondary: #ccfbf1; --color-secondary-foreground: #115e59;
+  --color-muted: #f5f5f5; --color-muted-foreground: #6b7280;
+  --color-accent: #ccfbf1; --color-accent-foreground: #115e59;
+  --color-destructive: #ef4444; --color-destructive-foreground: #fff;
+  --color-border: #99f6e4; --color-input: #ccfbf1; --color-ring: #14b8a6;
+  --color-sidebar: #f0fdfa; --color-sidebar-foreground: #6b7280; --color-sidebar-active: #14b8a6;
+  --theme-glow: rgba(20,184,166,0.15); --theme-glow-strong: rgba(20,184,166,0.35);
+  --theme-gradient: linear-gradient(135deg, #14b8a6, #2dd4bf); --theme-border-style: solid;
+}
+[data-theme="mint"].dark {
+  --color-bg: #081412; --color-bg-secondary: #102618; --color-card: #142824;
+  --color-card-foreground: #b0f5ee; --color-popover: #142824; --color-popover-foreground: #b0f5ee;
+  --color-primary: #14b8a6; --color-primary-foreground: #fff;
+  --color-secondary: #183830; --color-secondary-foreground: #5eead4;
+  --color-muted: #183830; --color-muted-foreground: #70aeaa;
+  --color-accent: #183830; --color-accent-foreground: #5eead4;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #284840; --color-input: #183830; --color-ring: #14b8a6;
+  --color-sidebar: #081412; --color-sidebar-foreground: #70aeaa; --color-sidebar-active: #14b8a6;
+  --theme-glow: rgba(20,184,166,0.20); --theme-glow-strong: rgba(20,184,166,0.45);
+  --theme-gradient: linear-gradient(135deg, #14b8a6, #0d9488);
+}
+
+/* ===== 9. 暗夜 Midnight (经典暗色) ===== */
+[data-theme="midnight"] {
+  --color-bg: #0c0c18; --color-bg-secondary: #16162e; --color-card: #1c1c32;
+  --color-card-foreground: #dce0f0; --color-popover: #1c1c32; --color-popover-foreground: #dce0f0;
+  --color-primary: #6366f1; --color-primary-foreground: #ffffff;
+  --color-secondary: #25254a; --color-secondary-foreground: #a5b4fc;
+  --color-muted: #25254a; --color-muted-foreground: #8896b8;
+  --color-accent: #25254a; --color-accent-foreground: #a5b4fc;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #33355c; --color-input: #25254a; --color-ring: #6366f1;
+  --color-sidebar: #0c0c18; --color-sidebar-foreground: #8896b8; --color-sidebar-active: #6366f1;
+  --theme-glow: rgba(99,102,241,0.18); --theme-glow-strong: rgba(99,102,241,0.42);
+  --theme-gradient: linear-gradient(135deg, #6366f1, #818cf8); --theme-border-style: solid;
+}
+[data-theme="midnight"].dark { /* 本身已是暗色 */ }
+
+/* ===== 10. 茶香 Tea (新 - 中式温润绿调) ===== */
+[data-theme="tea"] {
+  --color-bg: #faf8f3; --color-bg-secondary: #f2ede0; --color-card: #ffffff;
+  --color-card-foreground: #2d2a1e; --color-popover: #ffffff; --color-popover-foreground: #2d2a1e;
+  --color-primary: #6b8e5a; --color-primary-foreground: #ffffff;
+  --color-secondary: #e8e0cc; --color-secondary-foreground: #4a5a3a;
+  --color-muted: #f0ece0; --color-muted-foreground: #6b6655;
+  --color-accent: #e8e0cc; --color-accent-foreground: #4a5a3a;
+  --color-destructive: #dc2626; --color-destructive-foreground: #fff;
+  --color-border: #d4cbb0; --color-input: #e8e0cc; --color-ring: #6b8e5a;
+  --color-sidebar: #faf8f3; --color-sidebar-foreground: #6b6655; --color-sidebar-active: #6b8e5a;
+  --theme-glow: rgba(107,142,90,0.12); --theme-glow-strong: rgba(107,142,90,0.30);
+  --theme-gradient: linear-gradient(135deg, #6b8e5a, #8ba86a);
+  --theme-border-style: double; /* 中式双线边框 */
+  --theme-accent-gold: #b8956a; /* 金色点缀 */
+}
+[data-theme="tea"].dark {
+  --color-bg: #12100c; --color-bg-secondary: #1c1a14; --color-card: #222016;
+  --color-card-foreground: #e8e0cc; --color-popover: #222016; --color-popover-foreground: #e8e0cc;
+  --color-primary: #7da36a; --color-primary-foreground: #fff;
+  --color-secondary: #2e2c1e; --color-secondary-foreground: #b8c89a;
+  --color-muted: #2e2c1e; --color-muted-foreground: #999078;
+  --color-accent: #2e2c1e; --color-accent-foreground: #b8c89a;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #3e3c28; --color-input: #2e2c1e; --color-ring: #7da36a;
+  --color-sidebar: #12100c; --color-sidebar-foreground: #999078; --color-sidebar-active: #7da36a;
+  --theme-glow: rgba(125,163,106,0.18); --theme-glow-strong: rgba(125,163,106,0.40);
+  --theme-gradient: linear-gradient(135deg, #7da36a, #6b8e5a);
+  --theme-border-style: double;
+  --theme-accent-gold: #c4a66a;
+}
+
+/* ===== 11. 赛博朋克 Cyberpunk (新 - 霓虹暗色) ===== */
+[data-theme="cyberpunk"] {
+  --color-bg: #050510; --color-bg-secondary: #0a0a1e; --color-card: #0e0e24;
+  --color-card-foreground: #d0e0ff; --color-popover: #0e0e24; --color-popover-foreground: #d0e0ff;
+  --color-primary: #00f0ff; --color-primary-foreground: #000000;
+  --color-secondary: #151530; --color-secondary-foreground: #80d0ff;
+  --color-muted: #151530; --color-muted-foreground: #6080a0;
+  --color-accent: #151530; --color-accent-foreground: #80d0ff;
+  --color-destructive: #ff0055; --color-destructive-foreground: #fff;
+  --color-border: #202048; --color-input: #151530; --color-ring: #00f0ff;
+  --color-sidebar: #050510; --color-sidebar-foreground: #6080a0; --color-sidebar-active: #00f0ff;
+  --theme-glow: rgba(0,240,255,0.25); --theme-glow-strong: rgba(0,240,255,0.55);
+  --theme-gradient: linear-gradient(135deg, #00f0ff, #bf00ff);
+  --theme-border-style: ridge; /* 锐利棱角感 */
+  --theme-neon-magenta: #ff00aa; /* 霓虹品红 */
+  --theme-neon-green: #39ff14; /* 霓虹绿 */
+}
+[data-theme="cyberpunk"].dark { /* 本身已是暗色 */ }
+
+/* ===== 12. 中式美学 Chinese (新 - 朱砂金韵) ===== */
+[data-theme="chinese"] {
+  --color-bg: #faf6f0; --color-bg-secondary: #f2ebe0; --color-card: #ffffff;
+  --color-card-foreground: #2a1a10; --color-popover: #ffffff; --color-popover-foreground: #2a1a10;
+  --color-primary: #c53d43; --color-primary-foreground: #ffffff; /* 朱砂红 */
+  --color-secondary: #f0e4d8; --color-secondary-foreground: #8b4513;
+  --color-muted: #f0ece4; --color-muted-foreground: #7a6050;
+  --color-accent: #f0e4d8; --color-accent-foreground: #8b4513;
+  --color-destructive: #dc2626; --color-destructive-foreground: #fff;
+  --color-border: #d4c4ac; --color-input: #f0e4d8; --color-ring: #c53d43;
+  --color-sidebar: #faf6f0; --color-sidebar-foreground: #7a6050; --color-sidebar-active: #c53d43;
+  --theme-glow: rgba(197,61,67,0.12); --theme-glow-strong: rgba(197,61,67,0.30);
+  --theme-gradient: linear-gradient(135deg, #c53d43, #d4765a);
+  --theme-border-style: double; /* 中式双线边框 */
+  --theme-accent-gold: #c49a3a; /* 古铜金 */
+  --theme-accent-vermilion: #e34234; /* 正朱砂 */
+}
+[data-theme="chinese"].dark {
+  --color-bg: #100c08; --color-bg-secondary: #1a1410; --color-card: #241c14;
+  --color-card-foreground: #f0e4d0; --color-popover: #241c14; --color-popover-foreground: #f0e4d0;
+  --color-primary: #e0454a; --color-primary-foreground: #fff;
+  --color-secondary: #2e2418; --color-secondary-foreground: #d4a05a;
+  --color-muted: #2e2418; --color-muted-foreground: #a08070;
+  --color-accent: #2e2418; --color-accent-foreground: #d4a05a;
+  --color-destructive: #f87171; --color-destructive-foreground: #fff;
+  --color-border: #3e3428; --color-input: #2e2418; --color-ring: #e0454a;
+  --color-sidebar: #100c08; --color-sidebar-foreground: #a08070; --color-sidebar-active: #e0454a;
+  --theme-glow: rgba(224,69,74,0.18); --theme-glow-strong: rgba(224,69,74,0.42);
+  --theme-gradient: linear-gradient(135deg, #e0454a, #c53d43);
+  --theme-border-style: double;
+  --theme-accent-gold: #d4a84a;
+  --theme-accent-vermilion: #f05040;
+}

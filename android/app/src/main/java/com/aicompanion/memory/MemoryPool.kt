@@ -1,6 +1,7 @@
 package com.aicompanion.memory
 
 import android.content.Context
+import com.aicompanion.config.AppConfig
 import com.aicompanion.network.ApiClient
 import com.aicompanion.util.AppLogger
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,8 @@ data class MemoryEntry(
     val scene: String = "",
     val details: String = "",
     val relationships: String = "",
-    val isGlobal: Boolean = false
+    val isGlobal: Boolean = false,
+    val importance: Float = 1.0f  // 重要性评分 0.0-1.0，默认1.0
 ) {
     fun toStructuredText(): String {
         val parts = mutableListOf<String>()
@@ -50,6 +52,7 @@ data class MemoryEntry(
         put("details", details)
         put("relationships", relationships)
         put("isGlobal", isGlobal)
+        put("importance", importance)
     }
 
     companion object {
@@ -66,21 +69,44 @@ data class MemoryEntry(
             scene = obj.optString("scene", ""),
             details = obj.optString("details", ""),
             relationships = obj.optString("relationships", ""),
-            isGlobal = obj.optBoolean("isGlobal", false)
+            isGlobal = obj.optBoolean("isGlobal", false),
+            importance = obj.optDouble("importance", 1.0).toFloat()
         )
+    }
+}
+
+/**
+ * 记忆池配置类
+ * 支持根据模型大小动态调整记忆容量
+ */
+data class MemoryConfig(
+    val maxChars: Int = AppConfig.MEMORY_MAX_CHARS_DEFAULT,
+    val importanceThreshold: Float = AppConfig.MEMORY_IMPORTANCE_THRESHOLD
+) {
+    companion object {
+        fun forLargeModel() = MemoryConfig(maxChars = AppConfig.MEMORY_MAX_CHARS_LARGE_MODEL)
+        fun forSmallModel() = MemoryConfig(maxChars = AppConfig.MEMORY_MAX_CHARS_SMALL_MODEL)
+        fun fromUserPreference(prefs: android.content.SharedPreferences): MemoryConfig {
+            val modelSize = prefs.getString("model_size", "medium")
+            return when (modelSize) {
+                "large" -> forLargeModel()
+                "small" -> forSmallModel()
+                else -> MemoryConfig()
+            }
+        }
     }
 }
 
 class MemoryPool(
     private val context: Context,
     private val personaId: String = "default",
-    private val scope: String = "private"
+    private val scope: String = "private",
+    private val config: MemoryConfig = MemoryConfig()
 ) {
 
     companion object {
         private const val TAG = "MemoryPool"
         private const val CONSOLIDATE_INTERVAL = 10
-        private const val MAX_CHARS = 3000
     }
 
     private val entries = mutableListOf<MemoryEntry>()
@@ -101,12 +127,14 @@ class MemoryPool(
     fun getAll(): List<MemoryEntry> = entries.toList()
 
     fun addOrUpdate(entry: MemoryEntry) {
+        if (entry.content.isBlank()) return
         entries.removeAll { it.id == entry.id }
         entries.add(entry)
         recalcCharCount()
     }
 
     fun add(entry: MemoryEntry) {
+        if (entry.content.isBlank()) return
         entries.add(entry)
         recalcCharCount()
     }
@@ -123,6 +151,30 @@ class MemoryPool(
         return true
     }
 
+    /**
+     * 手动标记记忆重要性
+     * @param index 记忆索引
+     * @param importance 重要性评分 0.0-1.0
+     */
+    fun markImportance(index: Int, importance: Float) {
+        if (index in entries.indices) {
+            entries[index] = entries[index].copy(importance = importance.coerceIn(0f, 1f))
+            AppLogger.d(TAG, "Marked memory importance: ${entries[index].content.take(30)}... -> $importance")
+        }
+    }
+
+    /**
+     * 通过ID标记记忆重要性
+     * @param id 记忆ID
+     * @param importance 重要性评分 0.0-1.0
+     */
+    fun markImportanceById(id: String, importance: Float) {
+        val index = entries.indexOfFirst { it.id == id }
+        if (index >= 0) {
+            markImportance(index, importance)
+        }
+    }
+
     fun incrementTurn() {
         turnsSinceLastConsolidate++
         totalTurns++
@@ -133,13 +185,23 @@ class MemoryPool(
     fun getPoolBlock(): String {
         if (entries.isEmpty()) return ""
         val sb = StringBuilder()
-        sb.appendLine("[记忆池 - 剧情与关键信息]")
-        for (entry in entries) {
-            val structured = entry.toStructuredText()
-            if (structured != entry.content && entry.event.isNotBlank()) {
-                sb.appendLine("- $structured")
-            } else {
-                sb.appendLine("- ${entry.content}")
+        sb.appendLine("[记忆池]")
+
+        // 按scene分组输出，同一场景的记忆聚合展示
+        val grouped = entries.groupBy {
+            val s = it.scene.ifBlank { it.place.ifBlank { "其他" } }
+            s.take(20)
+        }
+
+        for ((sceneKey, groupEntries) in grouped) {
+            sb.appendLine("◆ $sceneKey")
+            for (entry in groupEntries) {
+                val structured = entry.toStructuredText()
+                if (structured != entry.content && entry.event.isNotBlank()) {
+                    sb.appendLine("  · $structured")
+                } else {
+                    sb.appendLine("  · ${entry.content}")
+                }
             }
         }
         return sb.toString().trimEnd()
@@ -148,13 +210,13 @@ class MemoryPool(
     fun getDetailBlock(): String {
         if (detailEntries.isEmpty()) return ""
         val sb = StringBuilder()
-        sb.appendLine("[细节记忆 - 事实与状态]")
+        sb.appendLine("[细节记忆]")
         for (entry in detailEntries) {
             val structured = entry.toStructuredText()
             if (structured != entry.content && entry.event.isNotBlank()) {
-                sb.appendLine("- $structured")
+                sb.appendLine("  · $structured")
             } else {
-                sb.appendLine("- ${entry.content}")
+                sb.appendLine("  · ${entry.content}")
             }
         }
         return sb.toString().trimEnd()
@@ -184,10 +246,13 @@ class MemoryPool(
 
     fun getPoolCharCount(): Int = totalCharCount
 
-    suspend fun consolidate(client: ApiClient): Boolean = withContext(Dispatchers.IO) {
+    /**
+ * 压缩记忆池。返回被归档的旧内容（用于写入日记作为长期记忆），无归档内容则返回空字符串
+ */
+suspend fun consolidate(client: ApiClient): String = withContext(Dispatchers.IO) {
         if (entries.isEmpty() && detailEntries.isEmpty()) {
             turnsSinceLastConsolidate = 0
-            return@withContext false
+            return@withContext ""
         }
 
         AppLogger.w(TAG, "consolidate: starting with ${entries.size} entries, ${detailEntries.size} details, $totalCharCount chars")
@@ -201,19 +266,19 @@ class MemoryPool(
         }
 
         val systemPrompt = buildString {
-            append("你是一个记忆总结助手。请将以下记忆池内容重新整理总结。\n")
-            append("要求：\n")
-            append("- 简短精炼，但必须保留所有重要细节和具体内容\n")
-            append("- 保留：具体事件、事实信息、用户观点与态度、场景描述、角色关系、用户喜好、对话中的关键细节\n")
-            append("- 场景描述要具体，事件经过要完整\n")
-            append("- 合并重复内容，删除过时信息\n")
-            append("- 将细节记忆中仍然重要的事实合并到总结记忆中\n")
-            append("- 不要丢失任何具体的事实、数据、观点或描述\n")
-            append("- 每条记忆必须包含结构化字段，按以下JSON格式输出：\n")
-            append("  {\"content\":\"总结内容\",\"eventTime\":\"时间\",\"place\":\"地点\",\"people\":\"人物\",\"event\":\"事件\",\"scene\":\"场景\",\"details\":\"细节\",\"relationships\":\"关系变化\"}\n")
-            append("- 字段可以为空字符串，但必须存在\n")
-            append("- 总字数不超过${MAX_CHARS}字\n")
-            append("- 只输出JSON数组，不要其他内容\n")
+            append("你是记忆整合助手。请将以下记忆重新按【场景】归类整理。\n\n")
+            append("【要求】\n")
+            append("- 将属于同一场景/主题的记忆合并为一条完整的场景概述\n")
+            append("- 合并后的每条记忆应包含该场景的所有关键信息：起因、经过、结果、涉及人物、重要细节\n")
+            append("- 删除已过时的信息（如已完成的事件、已过期的计划）\n")
+            append("- 保留所有跨场景共享的重要信息（用户喜好、习惯、关系变化等）\n")
+            append("- 最终输出应像「故事章节目录」，每个场景一段话，而非流水账\n\n")
+            append("【格式要求】\n")
+            append("- 只输出JSON数组\n")
+            append("- 每条记忆必须包含结构化字段:\n")
+            append("  {\"content\":\"场景概述\",\"eventTime\":\"时间\",\"place\":\"地点\",\"people\":\"人物\",\"event\":\"完整事件\",\"scene\":\"场景分类\",\"details\":\"关键细节\",\"relationships\":\"关系变化\"}\n")
+            append("- 总字数不超过${config.maxChars}字\n")
+            append("- 字段可为空字符串但必须存在\n")
         }
 
         try {
@@ -221,6 +286,15 @@ class MemoryPool(
             if (response != null && response.text.isNotBlank()) {
                 val newEntries = parseConsolidatedStructuredResult(response.text)
                 if (newEntries.isNotEmpty()) {
+                    // 收集将被替换的旧内容作为归档（写入日记）
+                    val archivedContent = buildString {
+                        appendLine("[记忆归档·${java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date())}]")
+                        for (entry in entries) {
+                            val structured = entry.toStructuredText()
+                            appendLine(if (structured != entry.content && entry.event.isNotBlank()) "- $structured" else "- ${entry.content}")
+                        }
+                    }
+
                     entries.clear()
                     entries.addAll(newEntries)
                     detailEntries.clear()
@@ -228,19 +302,52 @@ class MemoryPool(
                     saveToStorage()
                     AppLogger.w(TAG, "consolidate: done, ${entries.size} entries, $totalCharCount chars")
                     turnsSinceLastConsolidate = 0
-                    return@withContext true
+                    return@withContext archivedContent
                 }
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "consolidate failed: ${e.message}")
+            AppLogger.e(TAG, "[Memory-Pool] 记忆池整合失败: ${e.javaClass.simpleName}: ${e.message} | entries=${entries.size}")
         }
 
-        if (totalCharCount > MAX_CHARS) {
-            trimToLimit()
+        if (totalCharCount > config.maxChars) {
+            val archivedContent = buildString {
+                appendLine("[记忆归档·${java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date())}]")
+                while (totalCharCount > config.maxChars) {
+                    if (entries.size == 1) {
+                        // 只有一条记忆且超限：强制截断内容
+                        val entry = entries[0]
+                        if (entry.content.length > config.maxChars) {
+                            val truncatedContent = entry.content.take(config.maxChars)
+                            entries[0] = try {
+                                entry.copy(content = truncatedContent)
+                            } catch (e: Exception) {
+                                // 解析失败，保留原始数据避免丢失
+                                AppLogger.e(TAG, "截断后解析失败，保留原始数据: ${e.message}")
+                                entry  // 不修改，保持原样
+                            }
+                            recalcCharCount()
+                            AppLogger.w(TAG, "单条记忆超限，截断至${config.maxChars}字符")
+                        }
+                        break
+                    }
+                    // 智能裁剪：优先删除低重要性记忆
+                    val leastImportant = entries.minByOrNull { it.importance }
+                    val removed = if (leastImportant != null && leastImportant.importance < config.importanceThreshold) {
+                        entries.remove(leastImportant)
+                        leastImportant
+                    } else {
+                        entries.removeAt(0)
+                    }
+                    appendLine("- ${removed.content}")
+                    recalcCharCount()
+                }
+            }
             saveToStorage()
+            turnsSinceLastConsolidate = 0
+            return@withContext archivedContent
         }
         turnsSinceLastConsolidate = 0
-        return@withContext false
+        return@withContext ""   // 无归档内容
     }
 
     private fun parseConsolidatedStructuredResult(text: String): List<MemoryEntry> {
@@ -323,10 +430,43 @@ class MemoryPool(
         return results
     }
 
+    /**
+     * 智能裁剪记忆池
+     * 优先删除重要性低的记忆，若所有记忆重要性都较高则降级删除最旧的
+     * 特殊处理：只有一条记忆且超限时强制截断内容
+     */
     private fun trimToLimit() {
-        while (totalCharCount > MAX_CHARS && entries.size > 1) {
-            entries.removeAt(0)
-            recalcCharCount()
+        while (totalCharCount > config.maxChars) {
+            if (entries.size == 1) {
+                // 只有一条记忆且超限：强制截断内容
+                val entry = entries[0]
+                if (entry.content.length > config.maxChars) {
+                    val truncatedContent = entry.content.take(config.maxChars)
+                    entries[0] = try {
+                        entry.copy(content = truncatedContent)
+                    } catch (e: Exception) {
+                        // 解析失败，保留原始数据避免丢失
+                        AppLogger.e(TAG, "截断后解析失败，保留原始数据: ${e.message}")
+                        entry  // 不修改，保持原样
+                    }
+                    recalcCharCount()
+                    AppLogger.w(TAG, "单条记忆超限，截断至${config.maxChars}字符")
+                }
+                break
+            }
+
+            // 找到重要性最低的记忆
+            val leastImportant = entries.minByOrNull { it.importance }
+            if (leastImportant != null && leastImportant.importance < config.importanceThreshold) {
+                entries.remove(leastImportant)
+                recalcCharCount()
+                AppLogger.d(TAG, "Removed low importance memory: ${leastImportant.content.take(30)}...")
+            } else {
+                // 降级：删除最旧的
+                val removed = entries.removeAt(0)
+                recalcCharCount()
+                AppLogger.d(TAG, "Removed oldest memory (all important): ${removed.content.take(30)}...")
+            }
         }
     }
 
@@ -343,31 +483,32 @@ class MemoryPool(
 
         val nick = userNickname.ifBlank { "用户" }
         val systemPrompt = buildString {
-            append("你是记忆总结助手。分析对话，提取值得记住的信息。\n")
-            append("要求：\n")
-            append("- 每条记忆必须包含结构化字段\n")
-            append("- 必须记录对话中提到的所有具体内容：事实、数据、观点、描述、事件、决定、承诺等\n")
-            append("- 不要过滤掉对话的具体内容，用户说的具体话、具体描述、具体信息都要记\n")
-            append("- 只跳过纯寒暄（如「你好」「嗯」「好的」这类无实质内容的回应）\n")
-            append("- 关注：对话中涉及的具体事件、事实信息、用户观点与态度、场景描述、角色关系、用户喜好\n")
-            append("- 场景描述要具体（如：在森林里遇到受伤的小鹿而不是在某个地方遇到了什么）\n")
-            append("- 事件经过要完整（起因、经过、结果）\n")
-            append("- 用户表达的观点、感受、偏好都要记录，即使看起来不重要\n")
+            append("你是记忆整理助手。你的任务是将对话内容按【场景】和【事件】进行归纳总结。\n\n")
+            append("【核心原则】\n")
+            append("- 不要逐句记录对话！要将对话内容抽象为「场景→发生了什么」的结构化记忆\n")
+            append("- 将同一场景下发生的多轮对话合并为一条完整的场景记忆\n")
+            append("- 每条记忆应该像小说的章节摘要，而不是对话记录\n\n")
+
+            append("【输出格式】只输出JSON数组，不要Markdown包裹\n")
+            append("每条JSON格式：\n")
+            append("{\"action\":\"add\",\"content\":\"场景摘要(一句话概括这个场景发生了什么)\",\"eventTime\":\"时间\",\"place\":\"地点/场景名\",\"people\":\"涉及人物\",\"event\":\"具体事件经过(起因→经过→结果)\",\"scene\":\"场景类型(如:日常闲聊/情感交流/计划讨论/分享经历/游戏娱乐/学习工作等)\",\"details\":\"关键细节(具体数字、名称、承诺、决定等)\",\"relationships\":\"关系变化(如有)\"}\n\n")
+
+            append("【action类型】\n")
+            append("- add: 新增场景/事件记忆\n")
+            append("- update: 更新已有记忆(需加old_content_fragment字段)\n")
+            append("- delete: 删除过时记忆(需加old_content_fragment字段)\n")
+            append("- detail: 重要事实细节(单独保存，防止遗忘)\n\n")
+
+            append("【重要规则】\n")
+            append("- 场景描述要具体：「在咖啡馆聊了项目进度」而不是「聊了一些事情」\n")
+            append("- 事件要有完整脉络：「用户提到最近压力大→AI安慰并建议休息→用户表示会试试」而不是零散的三句话\n")
+            append("- 同一话题的多轮对话合并为一条：如果用户和AI连续5轮都在讨论旅行计划，只输出1条记忆概括整个讨论\n")
+            append("- 只跳过纯寒暄（如「你好」「嗯」「好的」）\n")
+            append("- 用户的具体偏好、承诺、决定、数据必须记入details字段\n")
+            append("- 跨场景有价值的信息(喜好、习惯、重要事实)加 \"global\":true\n")
+            append("- detail类型的记忆用于保存容易遗忘的具体细节\n")
+            append("- 结构化字段可以为空字符串但必须存在\n")
             append("- 提到$nick 时用「$nick」称呼\n")
-            append("- 只输出JSON数组，不需要更新时输出[]\n")
-            append("- 不要用Markdown代码块包裹\n")
-            append("\n每条记忆的JSON格式：\n")
-            append("{\"action\":\"add\",\"content\":\"简短总结\",\"eventTime\":\"事件发生的时间\",\"place\":\"地点\",\"people\":\"涉及的人物\",\"event\":\"发生了什么事\",\"scene\":\"场景描述\",\"details\":\"重要细节\",\"relationships\":\"关系变化\"}\n")
-            append("action可选: add(新增), update(更新旧记忆), delete(删除过时记忆)\n")
-            append("update需要额外字段: old_content_fragment(旧记忆片段)\n")
-            append("delete需要额外字段: old_content_fragment(要删除的记忆片段)\n")
-            append("结构化字段可以为空字符串，但必须存在\n")
-            append("\n额外规则：对话中任何具体的、事实性的内容（如具体描述、数据、物品、位置、状态、颜色、数量、时间点、承诺、决定等容易遗忘的细节），请额外输出一条action为\"detail\"的记忆：\n")
-            append("{\"action\":\"detail\",\"content\":\"具体细节描述\",\"details\":\"细节内容\",\"place\":\"位置\",\"event\":\"相关事件\"}\n")
-            append("detail类型的记忆会单独保存，确保不会遗忘。宁可多记也不要遗漏。\n")
-            append("\n重要：对于跨场景有价值的信息（如用户的喜好、习惯、事实信息、重要决定、关系变化等），请在记忆的JSON中添加 \"global\":true 字段。场景特定的事件（如'在群里讨论了游戏'）不需要标记global。示例：\n")
-            append("{\"action\":\"add\",\"content\":\"用户喜欢吃苹果\",\"category\":\"喜好\",\"global\":true,...}\n")
-            append("{\"action\":\"add\",\"content\":\"群里聊了3小时游戏\",\"category\":\"事件\",\"global\":false,...}\n")
         }
 
         val userContent = buildString {
@@ -527,7 +668,7 @@ class MemoryPool(
                 .putInt("turns_since_consolidate", turnsSinceLastConsolidate)
                 .putInt("total_turns", totalTurns)
                 .apply()
-        } catch (e: Exception) { AppLogger.e(TAG, "记忆保存失败！数据可能丢失: ${e.message}", e) }
+        } catch (e: Exception) { AppLogger.e(TAG, "[Memory-Pool] 记忆保存失败,数据可能丢失: ${e.javaClass.simpleName}: ${e.message}", e) }
     }
 
     fun loadFromStorage() {
@@ -552,7 +693,7 @@ class MemoryPool(
             }
             recalcCharCount()
         } catch (e: Exception) {
-            AppLogger.e(TAG, "记忆加载失败，已清空: ${e.message}", e); entries.clear()
+            AppLogger.e(TAG, "[Memory-Pool] 记忆加载失败,已清空: ${e.javaClass.simpleName}: ${e.message}", e); entries.clear()
         }
     }
 

@@ -1,0 +1,49 @@
+<!--
+    avd_wave_breath_vector.xml — 波浪呼吸矢量图（anim_wave_breath 的 drawable 源）
+    包含：2层正弦波浪路径（前层+后层），一前一后
+    viewport: 240x40 (宽而扁)
+    前层：brand_primary 15%透明度 (#26667eea)
+    后层：brand_primary 10%透明度 (#1a667eea)
+    波长设计为120dp，绘制2个完整周期以便无缝循环滚动
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp"
+    android:height="40dp"
+    android:viewportWidth="240"
+    android:viewportHeight="40">
+
+    <!-- ===== 后层波浪（较淡，在下方/后方） ===== -->
+    <!-- 正弦波：振幅6, 波长60, 绘制4个周期(240) -->
+    <path
+        android:name="wave_back"
+        android:pathData="
+            M0,25
+            Q15,13 30,25
+            T60,25
+            T90,25
+            T120,25
+            T150,25
+            T180,25
+            T210,25
+            T240,25
+            L240,40 L0,40 Z"
+        android:fillColor="#1a667eea"/>
+
+    <!-- ===== 前层波浪（较亮，在上方/前方） ===== -->
+    <!-- 正弦波：振幅8, 波长60, 相位偏移，绘制4个周期 -->
+    <path
+        android:name="wave_front"
+        android:pathData="
+            M0,20
+            Q15,8 30,20
+            T60,20
+            T90,20
+            T120,20
+            T150,20
+            T180,20
+            T210,20
+            T240,20
+            L240,40 L0,40 Z"
+        android:fillColor="#26667eea"/>
+
+</vector>

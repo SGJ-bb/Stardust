@@ -1,0 +1,43 @@
+<!-- 轨道环绕加载动画 - Vector定义：3个同心圆环 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- 外圈 - 品牌主色，顺时针旋转 -->
+    <group android:name="orbit_outer">
+        <path
+            android:name="outer_ring"
+            android:pathData="M24,4 A20,20 0 1,1 23.9,4"
+            android:strokeWidth="2"
+            android:strokeColor="@color/brand_primary"
+            android:fillColor="@android:color/transparent"
+            android:strokeLineCap="round" />
+    </group>
+
+    <!-- 中圈 - 次品牌色，逆时针旋转 -->
+    <group android:name="orbit_middle">
+        <path
+            android:name="middle_ring"
+            android:pathData="M24,10 A14,14 0 1,1 23.92,10"
+            android:strokeWidth="2"
+            android:strokeColor="@color/brand_secondary"
+            android:fillColor="@android:color/transparent"
+            android:strokeLineCap="round" />
+    </group>
+
+    <!-- 内圈 - 青色强调，脉冲效果 -->
+    <group android:name="orbit_inner"
+        android:pivotX="24"
+        android:pivotY="24">
+        <path
+            android:name="inner_ring"
+            android:pathData="M24,16 A8,8 0 1,1 23.96,16"
+            android:strokeWidth="2.5"
+            android:strokeColor="@color/accent_cyan"
+            android:fillColor="@android:color/transparent"
+            android:strokeLineCap="round" />
+    </group>
+
+</vector>

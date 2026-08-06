@@ -36,13 +36,8 @@
 
         <activity
             android:name=".ui.HomeActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Companion">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:theme="@style/Theme.Companion" />
 
         <activity
             android:name=".ui.SplashActivity"
@@ -50,27 +45,27 @@
 
         <activity
             android:name=".ui.MainActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustPan" />
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".ui.WebTestActivity"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
-            android:name=".ui.SettingsActivity"
-            android:label="设置"
-            android:parentActivityName=".ui.MainActivity" />
-
-        <activity
             android:name=".ui.MemoryActivity"
             android:label="记忆管理"
-            android:parentActivityName=".ui.SettingsActivity" />
+            android:parentActivityName=".ui.MainActivity" />
 
         <activity
             android:name=".ui.ModelManagerActivity"
             android:label="Live2D模型管理"
-            android:parentActivityName=".ui.SettingsActivity" />
+            android:parentActivityName=".ui.MainActivity" />
 
         <activity
             android:name=".ui.ModelSettingsActivity"
@@ -122,17 +117,13 @@
             android:parentActivityName=".ui.MainActivity" />
 
         <activity
-            android:name=".ui.PersonaEditorActivity"
-            android:label="角色设定"
-            android:parentActivityName=".ui.SettingsActivity" />
-
-        <activity
             android:name=".ui.ModelAdjustActivity"
             android:label="调整模型"
-            android:parentActivityName=".ui.SettingsActivity" />
+            android:parentActivityName=".ui.MainActivity" />
 
         <activity android:name="com.aicompanion.sticker.StickerActivity" android:theme="@style/Theme.Companion" />
         <activity android:name="com.aicompanion.moments.MomentsActivity" android:theme="@style/Theme.Companion" />
+        <activity android:name="com.aicompanion.graph.DiaryGraphActivity" android:theme="@style/Theme.Companion" android:label="日记关系图谱" />
 
         <activity
             android:name="com.aicompanion.wakeup.WakeUpActivity"
@@ -162,12 +153,16 @@
         <activity
             android:name="com.aicompanion.ui.VirtualWorldActivity"
             android:label="虚拟世界"
-            android:parentActivityName=".ui.SettingsActivity"
+            android:parentActivityName=".ui.MainActivity"
             android:theme="@style/Theme.Companion" />
 
         <activity
             android:name="com.aicompanion.ilink.WechatBindActivity"
             android:label="微信连接"
+            android:theme="@style/Theme.Companion" />
+        <activity
+            android:name="com.aicompanion.ilink.WechatChatActivity"
+            android:label="微信聊天记录"
             android:theme="@style/Theme.Companion" />
         <activity
             android:name="com.aicompanion.album.MemorialAlbumActivity"
@@ -180,6 +175,18 @@
         <activity
             android:name="com.aicompanion.ui.TimeCapsuleActivity"
             android:label="时光胶囊"
+            android:theme="@style/Theme.Companion" />
+
+        <activity
+            android:name="com.aicompanion.pixelpet.PetCreatorActivity"
+            android:label="像素宠物管理"
+            android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.Companion" />
+
+        <activity
+            android:name="com.aicompanion.pixelpet.ActionListActivity"
+            android:label="动作列表"
+            android:parentActivityName="com.aicompanion.pixelpet.PetCreatorActivity"
             android:theme="@style/Theme.Companion" />
 
         <service

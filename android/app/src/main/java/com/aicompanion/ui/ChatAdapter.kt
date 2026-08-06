@@ -16,15 +16,29 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.DiffUtil
 import com.aicompanion.R
 import com.aicompanion.util.AppLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
-class ChatAdapter(private val messages: MutableList<ChatMessage>) :
+class ChatAdapter(messages: List<ChatMessage>) :
     RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+
+    // 内部维护可变列表副本，支持 DiffUtil 更新
+    private val messages: MutableList<ChatMessage> = messages.toMutableList()
 
     var aiAvatarOverride: String? = null
     var personaName: String = "星尘"
+    var currentPersonaId: String = ""
+
+    // DiffUtil 后台计算专用协程作用域
+    private val diffScope = CoroutineScope(Dispatchers.Default)
+    private var diffJob: Job? = null
 
     companion object {
         private const val VIEW_TYPE_USER = 1
@@ -111,11 +125,15 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
     private var userGradientColors: List<Int> = listOf(bubbleUserColor)
     private val density: Float = android.content.res.Resources.getSystem().displayMetrics.density
 
-    private var cachedUserAvatarPath: String? = null
-    private var cachedAiAvatarPath: String? = null
+    internal var cachedUserAvatarPath: String? = null
+    internal var cachedAiAvatarPath: String? = null
     private var avatarPathCached = false
 
-    fun cacheAvatarPaths(userPath: String?, aiPath: String?) {
+    fun cacheAvatarPaths(userPath: String?, aiPath: String?, personaId: String = "") {
+        currentPersonaId = personaId.ifBlank { currentPersonaId }
+        // 清除旧路径的缓存，确保新头像能正确加载
+        cachedUserAvatarPath?.let { avatarCache.remove(it) }
+        cachedAiAvatarPath?.let { avatarCache.remove(it) }
         cachedUserAvatarPath = userPath
         cachedAiAvatarPath = aiPath
         avatarPathCached = true
@@ -229,6 +247,7 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         }
     }
 
+    var onNavigateToProfile: (() -> Unit)? = null
     var onFeedback: ((Int, Boolean) -> Unit)? = null
     var onDeleteMessage: ((Int) -> Unit)? = null
     var onQuoteMessage: ((Int) -> Unit)? = null
@@ -248,6 +267,36 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
                 val removePos = messages.size
                 showTyping = false
                 notifyItemRemoved(removePos)
+            }
+        }
+    }
+
+    /**
+     * 使用 DiffUtil 更新消息列表（后台线程计算，避免主线程阻塞）
+     *
+     * 相比直接 notifyDataSetChanged()，优势：
+     * - 只更新变化的项，性能更好
+     * - 自动计算插入/删除/移动动画，用户体验更流畅
+     * - 支持部分更新 payload，避免不必要的重新绑定
+     * - DiffUtil 计算在后台线程执行，不阻塞 UI
+     *
+     * @param newList 新的消息列表
+     */
+    fun submitList(newList: List<ChatMessage>) {
+        // 取消正在进行的旧计算，避免竞态
+        diffJob?.cancel()
+
+        val oldList = messages.toList()
+
+        diffJob = diffScope.launch {
+            // 在后台线程计算 Diff
+            val diffResult = DiffUtil.calculateDiff(ChatDiffCallback(oldList, newList))
+
+            // 切回主线程更新数据
+            withContext(Dispatchers.Main) {
+                messages.clear()
+                messages.addAll(newList)
+                diffResult.dispatchUpdatesTo(this@ChatAdapter)
             }
         }
     }
@@ -344,8 +393,11 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         val path = if (avatarPathCached) {
             if (isUser) cachedUserAvatarPath else cachedAiAvatarPath
         } else {
-            val prefs = ivAvatar.context.getSharedPreferences("avatar_data", 0)
-            prefs.getString(if (isUser) "user_avatar" else "ai_avatar", "")
+            if (isUser) {
+                com.aicompanion.util.AvatarManager.getUserAvatarPath(ivAvatar.context, currentPersonaId)
+            } else {
+                aiAvatarOverride ?: com.aicompanion.util.AvatarManager.getAiAvatarPath(ivAvatar.context, currentPersonaId)
+            }
         }
         if (!path.isNullOrEmpty()) {
             loadAvatarBitmap(path)?.let { bmp ->
@@ -613,6 +665,14 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
         private var lastBoundReaction: String? = null
 
         init {
+            ivAvatar.setOnClickListener {
+                com.aicompanion.anim.AnimeUtils.pulse(it)
+                onNavigateToProfile?.invoke()
+            }
+            frameLayout.setOnClickListener {
+                com.aicompanion.anim.AnimeUtils.pulse(it)
+                onNavigateToProfile?.invoke()
+            }
             bubble.setOnLongClickListener {
                 if (currentPosition >= 0 && currentPosition < messages.size) {
                     showPopupMenu(bubble, currentPosition, messages[currentPosition])
@@ -623,6 +683,8 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
 
         fun bind(message: ChatMessage, position: Int) {
             currentPosition = position
+            // 每次绑定时刷新头像，解决更换头像后聊天列表不更新的问题
+            applyAvatarToViewHolder(ivAvatar, frameLayout, true)
 
             val imagePath = message.generatedImagePath ?: message.stickerPath
             if (!imagePath.isNullOrEmpty()) {
@@ -701,6 +763,16 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
             voiceBtn.isClickable = true
             voiceBtn.isFocusable = true
 
+            // AI头像点击 -> 跳转角色档案页
+            ivAvatar.setOnClickListener {
+                com.aicompanion.anim.AnimeUtils.pulse(it)
+                onNavigateToProfile?.invoke()
+            }
+            aiFrameLayout.setOnClickListener {
+                com.aicompanion.anim.AnimeUtils.pulse(it)
+                onNavigateToProfile?.invoke()
+            }
+
             bubble.setOnLongClickListener {
                 if (currentPosition >= 0 && currentPosition < messages.size) {
                     showPopupMenu(bubble, currentPosition, messages[currentPosition])
@@ -720,6 +792,8 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
 
         fun bind(message: ChatMessage, position: Int) {
             currentPosition = position
+            // 每次绑定时刷新头像，解决更换头像后聊天列表不更新的问题
+            applyAvatarToViewHolder(ivAvatar, aiFrameLayout, false)
 
             val imagePath = message.generatedImagePath ?: message.stickerPath
             if (!imagePath.isNullOrEmpty()) {

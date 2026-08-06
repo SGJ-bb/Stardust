@@ -17,9 +17,15 @@ import com.aicompanion.settings.SettingsManager
 import com.aicompanion.settings.DiaryTriggerMode
 import com.aicompanion.diary.DiaryManager
 import com.aicompanion.ui.MainActivity
+import com.aicompanion.storage.ChatHistoryStorage
+import com.aicompanion.storage.StoredMessage
 import com.aicompanion.util.AppLogger
 import kotlinx.coroutines.*
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
 
 class IlinkPollingService : Service() {
 
@@ -58,6 +64,7 @@ class IlinkPollingService : Service() {
     private lateinit var authManager: IlinkAuthManager
     private lateinit var settingsManager: SettingsManager
     private lateinit var personaManager: PersonaManager
+    private lateinit var chatHistoryStorage: ChatHistoryStorage
     private var contextManager: ContextManager? = null
 
     private var updatesBuf = ""
@@ -71,6 +78,7 @@ class IlinkPollingService : Service() {
         authManager = IlinkAuthManager(this)
         settingsManager = SettingsManager(this)
         personaManager = PersonaManager(this)
+        chatHistoryStorage = ChatHistoryStorage(this)
         createNotificationChannel()
     }
 
@@ -167,6 +175,14 @@ class IlinkPollingService : Service() {
         if (msg.messageType != 1) return
 
         var userText = msg.textContent.trim()
+        var imageUrls = listOf<String>()
+
+        // 提取图片URL
+        for (item in msg.itemList) {
+            if (item.type == 2 && item.imageUrl.isNotBlank()) {
+                imageUrls = imageUrls + item.imageUrl
+            }
+        }
 
         if (userText.isBlank()) {
             for (item in msg.itemList) {
@@ -181,18 +197,40 @@ class IlinkPollingService : Service() {
             }
         }
 
-        if (userText.isBlank()) {
+        // 图片消息无文字时，用[图片]占位
+        if (userText.isBlank() && imageUrls.isNotEmpty()) {
+            userText = "[图片]"
+        }
+
+        if (userText.isBlank() && imageUrls.isEmpty()) {
             AppLogger.w(TAG, "Skip: all text fields are empty, from=${msg.fromUserId}")
             return
         }
 
-        handleTextMessage(msg.fromUserId, msg.contextToken, userText)
+        handleTextMessage(msg.fromUserId, msg.contextToken, userText, imageUrls)
     }
 
-    private suspend fun handleTextMessage(fromUserId: String, contextToken: String, userText: String) {
+    private suspend fun handleTextMessage(fromUserId: String, contextToken: String, userText: String, imageUrls: List<String> = emptyList()) {
         withContext(Dispatchers.Main) {
             updateNotification("回复中: ${userText.take(20)}...")
         }
+
+        // 保存用户消息到微信聊天记录
+        val activePersona = personaManager.getActivePersona()
+        val wechatScopeId = activePersona.id
+        val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val now = System.currentTimeMillis()
+        val userMsg = StoredMessage(
+            id = UUID.randomUUID().toString(),
+            text = userText,
+            time = timeFmt.format(Date(now)),
+            isUser = true,
+            timestamp = now,
+            senderName = "微信用户",
+            senderPersonaId = wechatScopeId,
+            imageUrls = imageUrls
+        )
+        chatHistoryStorage.addMessage("wechat", wechatScopeId, userMsg)
 
         sendTypingIndicator(contextToken)
 
@@ -213,6 +251,19 @@ class IlinkPollingService : Service() {
             contextToken,
             reply
         )
+
+        // 保存AI回复到微信聊天记录
+        val replyTime = System.currentTimeMillis()
+        val aiMsg = StoredMessage(
+            id = UUID.randomUUID().toString(),
+            text = if (sent) reply else "$reply [发送失败]",
+            time = timeFmt.format(Date(replyTime)),
+            isUser = false,
+            timestamp = replyTime,
+            senderName = activePersona.name,
+            senderPersonaId = wechatScopeId
+        )
+        chatHistoryStorage.addMessage("wechat", wechatScopeId, aiMsg)
 
         if (sent && emojiList.isNotEmpty()) {
             serviceScope.launch(Dispatchers.IO) {

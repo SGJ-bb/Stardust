@@ -36,6 +36,37 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+// ============================================
+// 文件级颜色常量 - 避免硬编码颜色值
+// ============================================
+private val COLOR_BG_BASE = 0xFF080818.toInt()                    // 主背景色（深蓝黑）
+private val COLOR_BG_GRADIENT_START = 0xFF0F0F2E.toInt()           // 渐变背景起始色
+private val COLOR_BG_GRADIENT_MID = 0xFF080818.toInt()             // 渐变背景中间色
+private val COLOR_BG_GRADIENT_END = 0xFF050510.toInt()             // 渐变背景结束色
+private val COLOR_AMBIENT_GLOW_START = 0x1A7C4DFF.toInt()          // 环境光渐变起始（半透明紫色）
+private val COLOR_AMBIENT_GLOW_END = 0x00000000.toInt()            // 环境光渐变结束（透明）
+private val COLOR_TRANSPARENT = 0x00000000.toInt()                // 完全透明色
+private val COLOR_PULSE_RING_BASE = 0x0D81D4FA.toInt()             // 脉冲环基础色（半透明青蓝）
+private val COLOR_PULSE_RING_INCREMENT = 0x0581D4FA.toInt()        // 脉冲环颜色增量
+private val COLOR_AVATAR_BG = 0xFF1A1A3E.toInt()                   // 头像背景色
+private val COLOR_AVATAR_STROKE = 0xFF7C4DFF.toInt()               // 头像描边色（紫色）
+private val COLOR_NAME_TEXT = 0xFFFFFFFF.toInt()                   // 名称文字颜色（白色）
+private val COLOR_STATUS_DOT = 0xFF4CAF50.toInt()                  // 状态点颜色（绿色）
+private val COLOR_STATUS_TEXT = 0xFF81D4FA.toInt()                 // 状态文字颜色（浅蓝）
+private val COLOR_DURATION_TEXT = 0xFF666688.toInt()               // 时长文字颜色
+private val COLOR_TRANSCRIPT_TEXT = 0xFFCCCCDD.toInt()             // 转录文字颜色
+private val COLOR_TRANSCRIPT_BG = 0x0DFFFFFF.toInt()               // 转录背景色（半透明白）
+private val COLOR_BUTTON_BG = 0xFF2A2A4A.toInt()                   // 控制按钮背景色
+private val COLOR_BUTTON_LABEL = 0xFF8888AA.toInt()                 // 控制按钮标签颜色
+private val COLOR_HANGUP_BG = 0xFFD32F2F.toInt()                   // 挂断按钮背景色（红色）
+private val COLOR_HANGUP_LABEL = 0xFFCCCCCC.toInt()               // 挂断按钮标签颜色
+private val COLOR_MUTED_BG = 0xFFE53935.toInt()                    // 静音激活状态背景色
+// VoiceWaveformView 颜色常量
+private val COLOR_WAVE_LISTENING_BASE = intArrayOf(0x64, 0xFF, 0xDA)  // 聆听模式波形 RGB
+private val COLOR_WAVE_AI_SPEAKING_BASE = intArrayOf(0x7C, 0x4D, 0xFF) // AI说话模式波形 RGB
+private val COLOR_WAVE_MUTED = Color.argb(0x40, 0x88, 0x88, 0x88)       // 静音模式波形
+private val COLOR_WAVE_IDLE = Color.argb(0x30, 0x55, 0x55, 0x77)       // 默认模式波形
+
 class PhoneCallActivity : AppCompatActivity() {
 
     companion object {
@@ -115,16 +146,19 @@ class PhoneCallActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-        )
+        // 保持屏幕常亮（所有版本）
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // 锁屏显示 - 使用新 API（API 27+），旧版使用废弃 Flag
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
         }
 
         personaId = intent.getStringExtra(EXTRA_PERSONA_ID) ?: ""
@@ -144,7 +178,8 @@ class PhoneCallActivity : AppCompatActivity() {
             if (scopeId.isBlank()) scopeId = personaId
         }
 
-        if (personaName == "星尘" && personaId.isNotBlank()) {
+        // 名称太短或是默认值时，从 PersonaManager 获取真实名称
+        if (personaName.isBlank() || personaName == "星尘" || personaName.length <= 1) {
             try {
                 val persona = personaManager.getPersona(personaId)
                 if (persona != null) personaName = persona.name
@@ -234,13 +269,13 @@ class PhoneCallActivity : AppCompatActivity() {
     private fun buildUI() {
         val density = resources.displayMetrics.density
         val rootLayout = FrameLayout(this).apply {
-            setBackgroundColor(0xFF080818.toInt())
+            setBackgroundColor(COLOR_BG_BASE)
         }
 
         val bgGradient = View(this).apply {
             val drawable = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                intArrayOf(0xFF0F0F2E.toInt(), 0xFF080818.toInt(), 0xFF050510.toInt())
+                intArrayOf(COLOR_BG_GRADIENT_START, COLOR_BG_GRADIENT_MID, COLOR_BG_GRADIENT_END)
             )
             background = drawable
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
@@ -256,7 +291,7 @@ class PhoneCallActivity : AppCompatActivity() {
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                colors = intArrayOf(0x1A7C4DFF.toInt(), 0x00000000)
+                colors = intArrayOf(COLOR_AMBIENT_GLOW_START, COLOR_AMBIENT_GLOW_END)
                 gradientType = GradientDrawable.RADIAL_GRADIENT
                 setGradientRadius(150 * density)
             }
@@ -288,8 +323,8 @@ class PhoneCallActivity : AppCompatActivity() {
                 }
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(0x00000000)
-                    setStroke((1.5 * density).toInt(), (0x0D81D4FA + i * 0x0581D4FA).toInt())
+                    setColor(COLOR_TRANSPARENT)
+                    setStroke((1.5 * density).toInt(), (COLOR_PULSE_RING_BASE + i * COLOR_PULSE_RING_INCREMENT))
                 }
                 alpha = 0f
             }
@@ -305,8 +340,8 @@ class PhoneCallActivity : AppCompatActivity() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             val cardBg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(0xFF1A1A3E.toInt())
-                setStroke((2 * density).toInt(), 0xFF7C4DFF.toInt())
+                setColor(COLOR_AVATAR_BG)
+                setStroke((2 * density).toInt(), COLOR_AVATAR_STROKE)
             }
             background = cardBg
             setImageResource(R.drawable.ic_avatar_default_ai)
@@ -325,7 +360,7 @@ class PhoneCallActivity : AppCompatActivity() {
 
         tvName = TextView(this).apply {
             text = personaName
-            setTextColor(0xFFFFFFFF.toInt())
+            setTextColor(COLOR_NAME_TEXT)
             textSize = 26f
             setTypeface(null, Typeface.BOLD)
             gravity = android.view.Gravity.CENTER
@@ -350,14 +385,14 @@ class PhoneCallActivity : AppCompatActivity() {
                 }
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(0xFF4CAF50.toInt())
+                    setColor(COLOR_STATUS_DOT)
                 }
             }
             addView(dot)
 
             tvStatus = TextView(this@PhoneCallActivity).apply {
                 text = "正在接听..."
-                setTextColor(0xFF81D4FA.toInt())
+                setTextColor(COLOR_STATUS_TEXT)
                 textSize = 13f
                 gravity = android.view.Gravity.CENTER
             }
@@ -367,7 +402,7 @@ class PhoneCallActivity : AppCompatActivity() {
 
         tvDuration = TextView(this).apply {
             text = "00:00"
-            setTextColor(0xFF666688.toInt())
+            setTextColor(COLOR_DURATION_TEXT)
             textSize = 12f
             gravity = android.view.Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -377,7 +412,7 @@ class PhoneCallActivity : AppCompatActivity() {
         contentLayout.addView(tvDuration)
 
         tvTranscript = TextView(this).apply {
-            setTextColor(0xFFCCCCDD.toInt())
+            setTextColor(COLOR_TRANSCRIPT_TEXT)
             textSize = 15f
             gravity = android.view.Gravity.CENTER
             maxLines = 4
@@ -389,7 +424,7 @@ class PhoneCallActivity : AppCompatActivity() {
                 bottomMargin = (16 * density).toInt()
             }
             background = GradientDrawable().apply {
-                setColor(0x0DFFFFFF.toInt())
+                setColor(COLOR_TRANSCRIPT_BG)
                 setCornerRadius(16 * density)
             }
         }
@@ -403,7 +438,7 @@ class PhoneCallActivity : AppCompatActivity() {
             }
         }
 
-        btnMute = createControlButton("🎤", "静音", 0xFF2A2A4A.toInt()) { toggleMute() }
+        btnMute = createControlButton("🎤", "静音", COLOR_BUTTON_BG) { toggleMute() }
         controlsLayout.addView(btnMute)
 
         val spacer1 = View(this).apply {
@@ -419,7 +454,7 @@ class PhoneCallActivity : AppCompatActivity() {
         }
         controlsLayout.addView(spacer2)
 
-        btnSpeaker = createControlButton("🔊", "扬声器", 0xFF2A2A4A.toInt()) { toggleSpeaker() }
+        btnSpeaker = createControlButton("🔊", "扬声器", COLOR_BUTTON_BG) { toggleSpeaker() }
         controlsLayout.addView(btnSpeaker)
 
         contentLayout.addView(controlsLayout)
@@ -444,7 +479,7 @@ class PhoneCallActivity : AppCompatActivity() {
 
             val labelTv = TextView(this@PhoneCallActivity).apply {
                 text = label
-                setTextColor(0xFF8888AA.toInt())
+                setTextColor(COLOR_BUTTON_LABEL)
                 textSize = 9f
                 gravity = android.view.Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -482,7 +517,7 @@ class PhoneCallActivity : AppCompatActivity() {
 
             val labelTv = TextView(this@PhoneCallActivity).apply {
                 text = "挂断"
-                setTextColor(0xFFCCCCCC.toInt())
+                setTextColor(COLOR_HANGUP_LABEL)
                 textSize = 10f
                 gravity = android.view.Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -494,7 +529,7 @@ class PhoneCallActivity : AppCompatActivity() {
             addView(labelTv)
 
             background = GradientDrawable().apply {
-                setColor(0xFFD32F2F.toInt())
+                setColor(COLOR_HANGUP_BG)
                 setCornerRadius(18 * density)
             }
             elevation = 6 * density
@@ -509,27 +544,54 @@ class PhoneCallActivity : AppCompatActivity() {
     }
 
     private fun loadAvatar() {
-        try {
-            val persona = personaManager.getPersona(personaId)
-            if (persona != null && persona.avatarPath.isNotBlank()) {
-                val file = java.io.File(persona.avatarPath)
-                if (file.exists()) {
-                    val bmp = BitmapFactory.decodeFile(persona.avatarPath)
-                    if (bmp != null) { ivAvatar?.setImageBitmap(bmp); return }
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val persona = personaManager.getPersona(personaId)
+                if (persona != null && persona.avatarPath.isNotBlank()) {
+                    val file = java.io.File(persona.avatarPath)
+                    if (file.exists()) {
+                        val bmp = decodeSampledBitmap(persona.avatarPath, 256, 256)
+                        if (bmp != null) {
+                            withContext(Dispatchers.Main) { ivAvatar?.setImageBitmap(bmp) }
+                            return@launch
+                        }
+                    }
                 }
-            }
-            val prefs = getSharedPreferences("persona_data_$personaId", MODE_PRIVATE)
-            val path = prefs.getString("persona_avatar_path", "")
-            if (!path.isNullOrBlank()) {
-                val file = java.io.File(path)
-                if (file.exists()) {
-                    val bmp = BitmapFactory.decodeFile(path)
-                    if (bmp != null) ivAvatar?.setImageBitmap(bmp)
+                val prefs = getSharedPreferences("persona_data_$personaId", MODE_PRIVATE)
+                val path = prefs.getString("persona_avatar_path", "")
+                if (!path.isNullOrBlank()) {
+                    val file = java.io.File(path)
+                    if (file.exists()) {
+                        val bmp = decodeSampledBitmap(path, 256, 256)
+                        if (bmp != null) {
+                            withContext(Dispatchers.Main) { ivAvatar?.setImageBitmap(bmp) }
+                        }
+                    }
                 }
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "loadAvatar: ${e.message}")
             }
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "loadAvatar: ${e.message}")
         }
+    }
+
+    private fun decodeSampledBitmap(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, opts)
+        opts.inSampleSize = calculateSampleSize(opts.outWidth, opts.outHeight, reqWidth, reqHeight)
+        opts.inJustDecodeBounds = false
+        return BitmapFactory.decodeFile(path, opts)
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, reqWidth: Int, reqHeight: Int): Int {
+        var inSampleSize = 1
+        if (width > reqWidth || height > reqHeight) {
+            val halfW = width / 2
+            val halfH = height / 2
+            while (halfW / inSampleSize >= reqWidth && halfH / inSampleSize >= reqHeight) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 
     @Suppress("DEPRECATION")
@@ -627,6 +689,7 @@ class PhoneCallActivity : AppCompatActivity() {
         tvStatus?.text = "通话中"
 
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        @Suppress("DEPRECATION")
         audioManager.isSpeakerphoneOn = isSpeakerOn
         requestAudioFocus()
 
@@ -969,7 +1032,7 @@ class PhoneCallActivity : AppCompatActivity() {
             iconTv.text = "🔇"
             labelTv.text = "已静音"
             btnLayout.background = GradientDrawable().apply {
-                setColor(0xFFE53935.toInt())
+                setColor(COLOR_MUTED_BG)
                 setCornerRadius(14 * density)
             }
             if (isListening) {
@@ -981,7 +1044,7 @@ class PhoneCallActivity : AppCompatActivity() {
             iconTv.text = "🎤"
             labelTv.text = "静音"
             btnLayout.background = GradientDrawable().apply {
-                setColor(0xFF2A2A4A.toInt())
+                setColor(COLOR_BUTTON_BG)
                 setCornerRadius(14 * density)
             }
             if (isCallActive && !isAiSpeaking) startListeningCycle()
@@ -990,6 +1053,7 @@ class PhoneCallActivity : AppCompatActivity() {
 
     private fun toggleSpeaker() {
         isSpeakerOn = !isSpeakerOn
+        @Suppress("DEPRECATION")
         audioManager.isSpeakerphoneOn = isSpeakerOn
         val btnLayout = btnSpeaker as? LinearLayout ?: return
         val iconTv = btnLayout.getChildAt(0) as? TextView ?: return
@@ -1018,6 +1082,7 @@ class PhoneCallActivity : AppCompatActivity() {
         ttsManager.stopPlayback()
 
         try {
+            @Suppress("DEPRECATION")
             audioManager.isSpeakerphoneOn = false
             audioManager.mode = AudioManager.MODE_NORMAL
         } catch (_: Exception) {}
@@ -1056,6 +1121,7 @@ class PhoneCallActivity : AppCompatActivity() {
         ttsManager.cleanup()
         stopPulseAnimation()
         try {
+            @Suppress("DEPRECATION")
             audioManager.isSpeakerphoneOn = false
             audioManager.mode = AudioManager.MODE_NORMAL
         } catch (_: Exception) {}
@@ -1063,6 +1129,7 @@ class PhoneCallActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
         hangUp()
     }
@@ -1140,14 +1207,14 @@ class PhoneCallActivity : AppCompatActivity() {
                 val color = when (mode) {
                     MODE_LISTENING -> {
                         val alpha = (0.4f + 0.6f * (amplitude / (h * 0.4f))).coerceIn(0f, 1f)
-                        Color.argb((alpha * 255).toInt(), 0x64, 0xFF, 0xDA)
+                        Color.argb((alpha * 255).toInt(), COLOR_WAVE_LISTENING_BASE[0], COLOR_WAVE_LISTENING_BASE[1], COLOR_WAVE_LISTENING_BASE[2])
                     }
                     MODE_AI_SPEAKING -> {
                         val alpha = (0.4f + 0.6f * (amplitude / (h * 0.4f))).coerceIn(0f, 1f)
-                        Color.argb((alpha * 255).toInt(), 0x7C, 0x4D, 0xFF)
+                        Color.argb((alpha * 255).toInt(), COLOR_WAVE_AI_SPEAKING_BASE[0], COLOR_WAVE_AI_SPEAKING_BASE[1], COLOR_WAVE_AI_SPEAKING_BASE[2])
                     }
-                    MODE_MUTED -> Color.argb(0x40, 0x88, 0x88, 0x88)
-                    else -> Color.argb(0x30, 0x55, 0x55, 0x77)
+                    MODE_MUTED -> COLOR_WAVE_MUTED
+                    else -> COLOR_WAVE_IDLE
                 }
 
                 paint.color = color

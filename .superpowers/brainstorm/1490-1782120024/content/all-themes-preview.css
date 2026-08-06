@@ -1,0 +1,69 @@
+/* 全主题预览样式 */
+.theme-grid { display:grid; grid-template-columns:1fr; gap:16px; padding:8px 0 }
+
+.theme-card {
+  border-radius:16px; overflow:hidden;
+  box-shadow:0 2px 12px rgba(0,0,0,0.08);
+  transition:transform 0.2s,box-shadow 0.2s;
+}
+.theme-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.14) }
+
+.theme-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 18px; font-weight:700; font-size:15px;
+}
+.theme-name { display:flex;align-items:center;gap:10px }
+.theme-dot { width:12px;height:12px;border-radius:50%;flex-shrink:0 }
+.theme-badge { font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600 }
+
+/* 双模式并排 */
+.modes-row { display:flex }
+.mode-panel { flex:1; padding:16px }
+.mode-label {
+  font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:1px;margin-bottom:12px;display:flex;align-items:center;gap:6px
+}
+
+/* 色板 */
+.color-swatches { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:14px }
+.swatch {
+  border-radius:8px; height:40px; display:flex;align-items:flex-end;
+  padding:4px 6px; font-size:9px;font-weight:600;overflow:hidden
+}
+.swatch span { text-overflow:ellipsis;white-space:nowrap;overflow:hidden }
+
+/* 模拟 UI 组件 */
+.mock-ui { border-radius:12px; padding:14px; margin-bottom:10px }
+.mock-toolbar {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-radius:10px;margin-bottom:10px
+}
+.mock-avatar { width:28px;height:28px;border-radius:50%;flex-shrink:0 }
+.mock-chat-row { display:flex; gap:8px; margin-bottom:8px }
+.mock-bubble {
+  max-width:70%;padding:10px 14px;border-radius:16px;
+  font-size:12px;line-height:1.4
+}
+.mock-bubble.user { border-bottom-right-radius:4px }
+.mock-bubble.ai { border-bottom-left-radius:4px }
+.mock-input-bar {
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;border-radius:22px;margin-top:8px
+}
+.mock-input-flex { flex:1;height:8px;border-radius:4px }
+.mock-btn { width:30px;height:30px;border-radius:50%;flex-shrink:0 }
+
+/* 卡片模拟 */
+.mock-cards { display:flex;gap:8px;margin-top:10px }
+.mock-card { flex:1;border-radius:10px;padding:10px }
+.mock-card-line { height:6px;border-radius:3px;margin-bottom:6px }
+.mock-card-line:last-child{margin-bottom:0;width:60% }
+
+.info-bar {
+  display:flex;gap:10px;justify-content:center;
+  padding:16px;flex-wrap:wrap
+}
+.badge {
+  font-size:12px;padding:5px 14px;border-radius:20px;font-weight:600
+}
+.badge.info { background:#667eea15;color:#667eea }

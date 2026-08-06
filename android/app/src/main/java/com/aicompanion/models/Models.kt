@@ -84,7 +84,7 @@ data class CharacterCard(
             systemPrompt = "你是「星尘」，一只异色瞳黑猫AI桌宠。性格傲娇毒舌但内心关心主人。说话风格简短自然，偶尔带点小傲娇。用中文回复。",
             tags = listOf("猫", "傲娇", "默认"),
             creator = "AI Companion",
-            isActive = true
+            isActive = false
         )
     }
 }

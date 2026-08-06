@@ -16,16 +16,15 @@ data class TimeCapsule(
     val fromSelf: Boolean = true
 )
 
-class TimeCapsuleManager(private val context: Context) {
+class TimeCapsuleManager(private val context: Context, private val personaId: String = "default") {
     companion object {
         private const val TAG = "TimeCapsuleManager"
-        private const val PREFS_NAME = "time_capsules"
         private const val KEY_CAPSULES = "capsule_list"
         private const val KEY_LAST_CHECK = "last_check_date"
     }
 
     private val prefs: SharedPreferences by lazy {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences("time_capsules_$personaId", Context.MODE_PRIVATE)
     }
 
     @Synchronized

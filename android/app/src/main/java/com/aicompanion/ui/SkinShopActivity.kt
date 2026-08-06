@@ -19,6 +19,10 @@ data class SkinItem(val id: String, val name: String, val assetPath: String?)
 
 class SkinShopActivity : AppCompatActivity() {
 
+    companion object {
+        private const val TAG = "SkinShopActivity"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_skin_shop)
@@ -54,6 +58,19 @@ class SkinShopActivity : AppCompatActivity() {
 
         val defaultTab = intent.getIntExtra("tab", 0).coerceIn(0, 2)
         viewPager.currentItem = defaultTab
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
+        }
     }
 
     private inner class SkinPagerAdapter(val activity: SkinShopActivity) : RecyclerView.Adapter<SkinPagerAdapter.PagerViewHolder>() {

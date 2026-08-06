@@ -4,18 +4,18 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0a0a1a">
+    android:background="@color/bg_base">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="#1a1a30"
+        android:background="@drawable/bg_toolbar_glass"
         android:elevation="4dp"
         app:navigationIcon="@android:drawable/ic_menu_revert"
-        app:navigationIconTint="#aabbdd"
+        app:navigationIconTint="@color/text_secondary"
         app:title="Live2D模型管理"
-        app:titleTextColor="#ffffff"
+        app:titleTextColor="@color/text_primary"
         app:titleTextAppearance="@style/ToolbarTitleStyle" />
 
     <ScrollView
@@ -33,11 +33,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="#1a1a30"
+                app:cardBackgroundColor="@color/surface_card"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
+                app:rippleColor="#33FFFFFF"
                 app:strokeWidth="1dp"
-                app:strokeColor="#2a2a4a">
+                app:strokeColor="@color/stroke_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -51,7 +52,7 @@
                         android:text="当前模型"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="#c4b5fd" />
+                        android:textColor="@color/brand_primary" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -82,7 +83,7 @@
                                 android:text="PurpleBird"
                                 android:textSize="16sp"
                                 android:textStyle="bold"
-                                android:textColor="#e0e0f0" />
+                                android:textColor="@color/text_primary" />
 
                             <TextView
                                 android:id="@+id/tv_current_model_desc"
@@ -90,7 +91,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="紫鸟，默认模型"
                                 android:textSize="12sp"
-                                android:textColor="#8899aa"
+                                android:textColor="@color/text_secondary"
                                 android:layout_marginTop="4dp" />
 
                             <TextView
@@ -110,11 +111,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="#151530"
+                app:cardBackgroundColor="@color/surface_card"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
+                app:rippleColor="#33FFFFFF"
                 app:strokeWidth="1dp"
-                app:strokeColor="#252545">
+                app:strokeColor="@color/stroke_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -128,14 +130,14 @@
                         android:text="如何导入模型？"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:textColor="#8899dd" />
+                        android:textColor="@color/text_primary" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="支持格式：\n1. model3.json（Cubism 3/4，推荐）\n2. model.json（Cubism 2）\n\n导入方式：\n方式A：点击「导入模型」选择单个.json文件\n方式B：将模型文件夹放入手机「Download/Live2D」目录后点击「扫描模型」\n\n模型文件夹需要包含：.model3.json + .moc3/.moc + 纹理图片(png) + physics3.json(可选)"
                         android:textSize="12sp"
-                        android:textColor="#6688aa"
+                        android:textColor="@color/text_muted"
                         android:lineSpacingExtra="2dp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -169,7 +171,7 @@
                     app:strokeColor="#667eea"
                     app:strokeWidth="2dp"
                     app:backgroundTint="@android:color/transparent"
-                    android:textColor="#8899cc"
+                    android:textColor="@color/text_secondary"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
             </LinearLayout>
         </LinearLayout>
@@ -181,7 +183,7 @@
         android:text="我的模型库"
         android:textSize="15sp"
         android:textStyle="bold"
-        android:textColor="#c4b5fd"
+        android:textColor="@color/brand_primary"
         android:padding="16dp"
         android:paddingBottom="8dp" />
 
@@ -190,7 +192,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:padding="8dp"
+        android:padding="16dp"
         android:clipToPadding="false" />
 
     <TextView
@@ -200,7 +202,7 @@
         android:layout_weight="1"
         android:gravity="center"
         android:text="暂无其他模型\n点击导入添加新皮套"
-        android:textColor="#556688"
+        android:textColor="@color/text_muted"
         android:textSize="14sp"
         android:lineSpacingExtra="4dp"
         android:visibility="gone" />

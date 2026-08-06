@@ -4,9 +4,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    app:cardBackgroundColor="#1a1a2e"
+    app:cardBackgroundColor="@color/surface_card"
     app:cardCornerRadius="12dp"
-    app:cardElevation="0dp"
+    app:cardElevation="2dp"
+    app:rippleColor="#33FFFFFF"
     android:layout_marginBottom="8dp">
 
     <LinearLayout
@@ -26,7 +27,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="10sp"
-                android:textColor="#ffffff"
+                android:textColor="@color/text_primary"
                 android:paddingStart="6dp"
                 android:paddingEnd="6dp"
                 android:paddingTop="2dp"
@@ -38,7 +39,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textColor="#ffffff"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_marginStart="8dp" />
@@ -47,7 +48,7 @@
                 android:id="@+id/tvModelSize"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#888888"
+                android:textColor="@color/text_muted"
                 android:textSize="12sp" />
 
         </LinearLayout>
@@ -56,7 +57,7 @@
             android:id="@+id/tvModelDesc"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#aaaaaa"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp"
             android:layout_marginTop="4dp" />
 
@@ -64,7 +65,7 @@
             android:id="@+id/tvModelCapabilities"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#666666"
+            android:textColor="@color/text_muted"
             android:textSize="11sp"
             android:layout_marginTop="2dp" />
 
