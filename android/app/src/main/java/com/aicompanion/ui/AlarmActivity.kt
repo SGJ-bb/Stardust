@@ -30,13 +30,7 @@ class AlarmActivity : Activity() {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            )
-        }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContentView(R.layout.activity_alarm)
 

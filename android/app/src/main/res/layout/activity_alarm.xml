@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#111122">
+    android:background="@color/bg_base">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:text="闹钟"
             android:textSize="32sp"
-            android:textColor="#ffffff"
+            android:textColor="@color/text_primary"
             android:textStyle="bold"
             android:layout_marginBottom="8dp" />
 
@@ -45,7 +45,7 @@
             android:layout_height="56dp"
             android:text="关闭闹钟"
             android:textSize="18sp"
-            android:textColor="#ffffff"
+            android:textColor="@color/text_primary"
             android:backgroundTint="#3355aa"
             android:insetTop="0dp"
             android:insetBottom="0dp" />

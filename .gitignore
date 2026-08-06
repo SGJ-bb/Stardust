@@ -82,6 +82,16 @@ stradust-pc/data/
 # Temp files
 *.png
 !stradust-ios/src-tauri/icons/*.png
+!stradust-pc/public/*.png
+!stradust-pc/src-tauri/icons/*.png
 taste-skill-main/
 *.zip
 build_log.txt
+
+# ML model binaries (too large for git, use git-lfs or download script)
+*.onnx
+*.bin
+!stradust-pc/node_modules/**/*.bin
+models/
+android/app/src/main/assets/models/bge-*/
+stradust-pc/data/

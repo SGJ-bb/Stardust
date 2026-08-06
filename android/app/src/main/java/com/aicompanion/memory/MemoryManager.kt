@@ -36,7 +36,7 @@ class MemoryManager(private val context: Context, private val personaId: String 
                 ))
             }
             localMemories = list.sortedByDescending { it.timestamp }.toMutableList()
-        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MemoryManager", "loadLocalCache: ${e.message}") }
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MemoryManager", "[Memory-Cache] 加载本地缓存失败: ${e.javaClass.simpleName}: ${e.message}") }
     }
 
     private fun saveLocalCache() {
@@ -52,7 +52,7 @@ class MemoryManager(private val context: Context, private val personaId: String 
                 arr.put(obj)
             }
             localPrefs.edit().putString("memories_json", arr.toString()).apply()
-        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MemoryManager", "saveLocalCache: ${e.message}") }
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MemoryManager", "[Memory-Cache] 保存本地缓存失败: ${e.javaClass.simpleName}: ${e.message}") }
     }
 
     fun getLocalMemories(): List<MemoryFact> = localMemories.toList()
@@ -109,7 +109,7 @@ class MemoryManager(private val context: Context, private val personaId: String 
             saveLocalCache()
             cloud
         } catch (e: Exception) {
-            AppLogger.e("MemoryManager", "loadMemories failed: ${e.message}")
+            AppLogger.e("MemoryManager", "[Memory-Load] loadMemories加载记忆失败: ${e.javaClass.simpleName}: ${e.message}")
             localMemories.take(limit)
         }
     }

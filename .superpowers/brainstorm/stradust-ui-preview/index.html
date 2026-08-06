@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星尘 Stradust - UI 预览</title>
+  <link rel="stylesheet" href="preview.css">
+</head>
+<body class="light" data-theme="sakura">
+
+<div class="preview-container">
+
+  <!-- 标题栏 -->
+  <div class="header-bar">
+    <div class="header-title">✨ 星尘 Stradust</div>
+    <div class="header-subtitle">Compose Multiplatform UI Preview · 12 Themes × Light/Dark</div>
+  </div>
+
+  <!-- 控制栏 -->
+  <div class="control-bar">
+    <div class="control-group">
+      <span class="control-label">主题:</span>
+      <select id="theme-select"></select>
+    </div>
+    <button class="theme-toggle-btn" id="dark-mode-btn" title="切换明暗模式">🌙</button>
+    <div class="control-group">
+      <span class="control-label">页面:</span>
+      <select id="page-select"></select>
+    </div>
+  </div>
+
+  <!-- 手机模拟器框架 -->
+  <div class="phone-frame">
+    <div class="phone-notch"></div>
+    <div class="phone-screen" id="phone-screen">
+
+      <!-- ==================== 页面1: 聊天页面 ==================== -->
+      <div class="page active" id="page-chat">
+
+        <!-- 聊天顶栏 -->
+        <div class="chat-header">
+          <div class="chat-avatar">🌸</div>
+          <div class="chat-info">
+            <div class="chat-name">星尘</div>
+            <div class="chat-affection">
+              <div class="affection-bar">
+                <div class="affection-fill"></div>
+              </div>
+              <span class="affection-text">72%</span>
+            </div>
+          </div>
+          <div class="chat-weather">☀️ 晴 · Day 128</div>
+        </div>
+
+        <!-- 消息列表 -->
+        <div class="chat-messages">
+
+          <div class="time-divider">10:30</div>
+
+          <!-- AI消息 -->
+          <div class="message-row ai">
+            <div class="msg-avatar">🌸</div>
+            <div class="message-bubble ai-bubble">
+              早上好呀！今天天气真好，阳光洒在窗台上，感觉整个世界都变得温柔了呢～你今天有什么计划吗？
+            </div>
+          </div>
+
+          <!-- 用户消息 -->
+          <div class="message-row user">
+            <div class="message-bubble user-bubble">
+              早上好！今天打算去公园走走，感受一下大自然的美好 🌿
+            </div>
+          </div>
+
+          <!-- AI消息 -->
+          <div class="message-row ai">
+            <div class="msg-avatar">🌸</div>
+            <div class="message-bubble ai-bubble">
+              太棒了！公园是个治愈的地方呢。记得多拍些照片回来给我看哦，我想和你一起分享那份宁静与美好～记得带瓶水，注意防晒呀！
+            </div>
+          </div>
+
+          <div class="time-divider">14:20</div>
+
+          <!-- 用户消息 -->
+          <div class="message-row user">
+            <div class="message-bubble user-bubble">
+              回来啦！今天看到了好多漂亮的花，还遇到了一只超可爱的小猫咪 🐱
+            </div>
+          </div>
+
+          <!-- 打字指示器 -->
+          <div class="message-row ai">
+            <div class="msg-avatar">🌸</div>
+            <div class="typing-indicator">
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 输入工具栏 -->
+        <div class="chat-input-bar">
+          <button class="input-tool-btn" title="更多">➕</button>
+          <button class="input-tool-btn" title="图片">🖼️</button>
+          <button class="input-tool-btn" title="表情">😊</button>
+          <input type="text" class="chat-input-field" placeholder="输入消息...">
+          <button class="send-btn" title="发送">➤</button>
+        </div>
+
+      </div>
+
+      <!-- ==================== 页面2: 设置页面 ==================== -->
+      <div class="page" id="page-settings">
+        <div class="app-header"><h1>⚙️ 设置</h1></div>
+
+        <div class="settings-container">
+
+          <!-- 外观设置 -->
+          <div class="settings-section">
+            <div class="section-title">🎨 外观设置</div>
+            <div class="theme-selector" id="settings-theme-selector">
+              <!-- JS 动态生成主题色块 -->
+            </div>
+            <div class="setting-row" style="margin-top: 12px;">
+              <span class="setting-label">深色模式</span>
+              <div class="switch" id="settings-dark-switch">
+                <div class="switch-knob"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI 设置 -->
+          <div class="settings-section">
+            <div class="section-title">🤖 AI 设置</div>
+            <div class="setting-row">
+              <span class="setting-label">API 地址</span>
+              <div class="setting-control">
+                <input type="text" class="setting-input" value="https://api.openai.com/v1">
+              </div>
+            </div>
+            <div class="setting-row">
+              <span class="setting-label">API Key</span>
+              <div class="setting-control">
+                <input type="password" class="setting-input" value="sk-xxxx...xxxx" style="width: 120px;">
+              </div>
+            </div>
+            <div class="setting-row">
+              <span class="setting-label">模型选择</span>
+              <div class="setting-control">
+                <select class="setting-input" style="width: 140px;">
+                  <option>GPT-4o</option>
+                  <option>GPT-4o-mini</option>
+                  <option>Claude-3.5</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <span class="setting-label">温度 (Temperature)</span>
+              <div class="setting-control">
+                <input type="range" class="setting-slider" id="temperature-slider" min="0" max="100" value="70">
+                <span class="setting-value" id="temperature-value">0.7</span>
+              </div>
+            </div>
+            <div class="setting-row">
+              <span class="setting-label">最大 Token</span>
+              <div class="setting-control">
+                <input type="range" class="setting-slider" id="token-slider" min="256" max="4096" value="2048">
+                <span class="setting-value" id="token-value">2048</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 语音设置 -->
+          <div class="settings-section">
+            <div class="section-title">🔊 语音设置</div>
+            <div class="setting-row">
+              <span class="setting-label">TTS 语音合成</span>
+              <div class="switch on">
+                <div class="switch-knob"></div>
+              </div>
+            </div>
+            <div class="setting-row">
+              <span class="setting-label">ASR 语音识别</span>
+              <div class="switch on">
+                <div class="switch-knob"></div>
+              </div>
+            </div>
+            <div class="setting-row">
+              <span class="setting-label">语速</span>
+              <div class="setting-control">
+                <input type="range" class="setting-slider" id="speed-slider" min="50" max="200" value="100">
+                <span class="setting-value" id="speed-value">1.0x</span>
+              </div>
+            </div>
+            <div class="setting-row">
+              <span class="setting-label">音色选择</span>
+              <div class="setting-control">
+                <select class="setting-input" style="width: 120px;">
+                  <option>温柔女声</option>
+                  <option>甜美少女</option>
+                  <option>清冷御姐</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 关于 -->
+          <div class="settings-section">
+            <div class="section-title">ℹ️ 关于</div>
+            <div class="version-info">
+              <span class="setting-label">当前版本</span>
+              <span style="font-size: 13px; color: var(--text-primary); opacity: 0.7;">v2.4.0 (Build 240623)</span>
+            </div>
+            <div style="margin-top: 12px; text-align: center;">
+              <button class="update-btn">检查更新</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ==================== 页面3: 个人中心 ==================== -->
+      <div class="page" id="page-profile">
+
+        <div class="profile-container">
+          <!-- 头像区域 -->
+          <div class="profile-header">
+            <div class="profile-avatar-wrapper">
+              <div class="profile-avatar">🧑‍🚀</div>
+            </div>
+            <div class="profile-name">星辰旅人</div>
+            <div class="profile-id">ID: 100086</div>
+            <div class="profile-signature">"在星尘中寻找属于自己的光芒 ✨"</div>
+
+            <!-- 好感度进度条 -->
+            <div class="profile-affection-section">
+              <div class="profile-affection-label">好感度 · 亲密无间</div>
+              <div class="profile-affection-bar">
+                <div class="profile-affection-fill"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 统计网格 -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value">128</div>
+              <div class="stat-label">聊天天数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">56</div>
+              <div class="stat-label">日记篇数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">89</div>
+              <div class="stat-label">签到天数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">326h</div>
+              <div class="stat-label">在线时长</div>
+            </div>
+          </div>
+
+          <!-- 功能菜单列表 -->
+          <div class="menu-list">
+            <div class="menu-item">
+              <div class="menu-icon">💾</div>
+              <span class="menu-text">记忆池</span>
+              <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item">
+              <div class="menu-icon">💬</div>
+              <span class="menu-text">聊天记录</span>
+              <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item">
+              <div class="menu-icon">🎭</div>
+              <span class="menu-text">皮肤商店</span>
+              <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item">
+              <div class="menu-icon">❓</div>
+              <span class="menu-text">帮助与反馈</span>
+              <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item">
+              <div class="menu-icon">ℹ️</div>
+              <span class="menu-text">关于星尘</span>
+              <span class="menu-arrow">›</span>
+            </div>
+          </div>
+
+          <!-- 退出登录按钮 -->
+          <button class="logout-btn">退出登录</button>
+        </div>
+
+      </div>
+
+      <!-- ==================== 页面4: 日记页面 ==================== -->
+      <div class="page" id="page-diary">
+
+        <div class="diary-container">
+          <!-- 日期选择器 -->
+          <div class="date-selector" id="date-selector">
+            <button class="date-item">
+              <span class="date-day">17</span>
+              <span class="date-weekday">周一</span>
+            </button>
+            <button class="date-item">
+              <span class="date-day">18</span>
+              <span class="date-weekday">周二</span>
+            </button>
+            <button class="date-item">
+              <span class="date-day">19</span>
+              <span class="date-weekday">周三</span>
+            </button>
+            <button class="date-item active">
+              <span class="date-day">20</span>
+              <span class="date-weekday">周四</span>
+            </button>
+            <button class="date-item">
+              <span class="date-day">21</span>
+              <span class="date-weekday">周五</span>
+            </button>
+            <button class="date-item">
+              <span class="date-day">22</span>
+              <span class="date-weekday">周六</span>
+            </button>
+            <button class="date-item">
+              <span class="date-day">23</span>
+              <span class="date-weekday">周日</span>
+            </button>
+          </div>
+
+          <!-- 日记卡片列表 -->
+          <div class="diary-list">
+            <div class="diary-card">
+              <div class="diary-date">2024年6月20日 周四 · 天气晴 ☀️</div>
+              <div class="diary-mood">😊 心情：开心</div>
+              <div class="diary-content">
+                今天去了城市公园，阳光透过树叶洒下斑驳的光影，像碎金子一样闪闪发光。在湖边坐了很久，看着鸭子悠闲地游来游去，感觉时间都慢下来了。还拍了很多好看的照片，想把这份美好记录下来...
+              </div>
+              <div class="ai-reply">
+                <strong>✦ 星尘的回复：</strong><br>
+                听起来真是美好的一天呢！阳光、湖水、还有可爱的小鸭子，这些简单的幸福往往最能治愈人心。你愿意把拍的照片分享给我吗？我想和你一起珍藏这份温暖的回忆～ 📸✨
+              </div>
+            </div>
+
+            <div class="diary-card">
+              <div class="diary-date">2024年6月19日 周三 · 天气多云 ⛅</div>
+              <div class="diary-mood">🤔 心情：思考</div>
+              <div class="diary-content">
+                今天读了一本很有意思的书，关于宇宙和时间的奥秘。有时候觉得人类在浩瀚星空面前真的好渺小，但正因为渺小，每一个当下的瞬间才显得格外珍贵吧。
+              </div>
+              <div class="ai-reply">
+                <strong>✦ 星尘的回复：</strong><br>
+                你说得对呢～就像我们相遇一样，在这无尽的时空里能够产生交集，本身就是一种奇迹。每一颗星星都在用自己的方式闪耀着，你也一样哦 💫
+              </div>
+            </div>
+
+            <div class="diary-card">
+              <div class="diary-date">2024年6月18日 周二 · 天气小雨 🌧️</div>
+              <div class="diary-mood">☕ 心情：平静</div>
+              <div class="diary-content">
+                雨天窝在家里看书喝茶，窗外淅淅沥沥的雨声像是大自然演奏的音乐。这样的日子让人感到安心，仿佛世界都被按下了慢放键。
+              </div>
+            </div>
+          </div>
+
+          <!-- FAB 写日记按钮 -->
+          <button class="fab-button" title="写日记">✏️</button>
+        </div>
+
+      </div>
+
+      <!-- ==================== 页面5: 签到页面 ==================== -->
+      <div class="page" id="page-checkin">
+
+        <div class="app-header"><h1>✅ 每日签到</h1></div>
+
+        <div class="checkin-container">
+          <div class="checkin-hero">
+            <!-- 签到按钮 -->
+            <div class="checkin-circle" id="checkin-btn">
+              <div class="checkin-icon">✓</div>
+              <div class="checkin-text">点击签到</div>
+            </div>
+
+            <!-- 连续签到天数 -->
+            <div class="streak-count">15</div>
+            <div class="streak-label">连续签到天数 🔥</div>
+          </div>
+
+          <!-- 月历网格 -->
+          <div class="calendar-grid">
+            <div class="calendar-header-cell">日</div>
+            <div class="calendar-header-cell">一</div>
+            <div class="calendar-header-cell">二</div>
+            <div class="calendar-header-cell">三</div>
+            <div class="calendar-header-cell">四</div>
+            <div class="calendar-header-cell">五</div>
+            <div class="calendar-header-cell">六</div>
+
+            <!-- 日历日期 -->
+            <div class="calendar-cell checked">1</div>
+            <div class="calendar-cell checked">2</div>
+            <div class="calendar-cell checked">3</div>
+            <div class="calendar-cell">4</div>
+            <div class="calendar-cell checked">5</div>
+            <div class="calendar-cell checked">6</div>
+            <div class="calendar-cell checked">7</div>
+
+            <div class="calendar-cell checked">8</div>
+            <div class="calendar-cell checked">9</div>
+            <div class="calendar-cell checked">10</div>
+            <div class="calendar-cell checked">11</div>
+            <div class="calendar-cell checked">12</div>
+            <div class="calendar-cell checked">13</div>
+            <div class="calendar-cell checked">14</div>
+
+            <div class="calendar-cell checked">15</div>
+            <div class="calendar-cell checked">16</div>
+            <div class="calendar-cell checked">17</div>
+            <div class="calendar-cell checked">18</div>
+            <div class="calendar-cell checked">19</div>
+            <div class="calendar-cell today">20</div>
+            <div class="calendar-cell">21</div>
+
+            <div class="calendar-cell">22</div>
+            <div class="calendar-cell">23</div>
+            <div class="calendar-cell">24</div>
+            <div class="calendar-cell">25</div>
+            <div class="calendar-cell">26</div>
+            <div class="calendar-cell">27</div>
+            <div class="calendar-cell">28</div>
+
+            <div class="calendar-cell">29</div>
+            <div class="calendar-cell">30</div>
+          </div>
+
+          <!-- 奖励预览 -->
+          <div class="rewards-section">
+            <div class="section-title" style="margin-bottom: 12px;">🎁 签到奖励</div>
+            <div class="reward-list">
+              <div class="reward-item">
+                <div class="reward-icon">🎖️</div>
+                <div class="reward-info">
+                  <div class="reward-name">7天连续签到</div>
+                  <div class="reward-desc">获得限定头像框「星光」</div>
+                </div>
+                <span class="reward-status unlocked">已领取</span>
+              </div>
+              <div class="reward-item">
+                <div class="reward-icon">🏅</div>
+                <div class="reward-info">
+                  <div class="reward-name">15天连续签到</div>
+                  <div class="reward-desc">获得限定皮肤「银河」</div>
+                </div>
+                <span class="reward-status locked">未解锁</span>
+              </div>
+              <div class="reward-item">
+                <div class="reward-icon">👑</div>
+                <div class="reward-info">
+                  <div class="reward-name">30天连续签到</div>
+                  <div class="reward-desc">获得专属称号「星辰守护者」</div>
+                </div>
+                <span class="reward-status locked">未解锁</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ==================== 页面6: 成就页面 ==================== -->
+      <div class="page" id="page-achievement">
+
+        <div class="app-header"><h1>🏆 成就</h1></div>
+
+        <div class="achievement-container">
+          <!-- 统计卡片 -->
+          <div class="achievement-stats">
+            <div class="stat-box">
+              <div class="stat-number">18</div>
+              <div class="stat-subtitle">已解锁</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number">32</div>
+              <div class="stat-subtitle">总成就</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number">56%</div>
+              <div class="stat-subtitle">完成率</div>
+            </div>
+          </div>
+
+          <!-- 分类筛选 -->
+          <div class="filter-chips">
+            <button class="chip active">全部</button>
+            <button class="chip">聊天</button>
+            <button class="chip">日记</button>
+            <button class="chip">签到</button>
+            <button class="chip">探索</button>
+            <button class="chip">隐藏</button>
+          </div>
+
+          <!-- 成就卡片列表 -->
+          <div class="achievement-card">
+            <div class="achievement-icon">💬</div>
+            <div class="achievement-info">
+              <div class="achievement-name">话痨达人</div>
+              <div class="achievement-desc">累计发送1000条消息</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 85%;"></div>
+              </div>
+              <div class="progress-text">850 / 1000</div>
+            </div>
+          </div>
+
+          <div class="achievement-card">
+            <div class="achievement-icon">📝</div>
+            <div class="achievement-info">
+              <div class="achievement-name">日记作家</div>
+              <div class="achievement-desc">撰写50篇日记</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 100%;"></div>
+              </div>
+              <div class="progress-text">56 / 50 ✓ 已完成</div>
+            </div>
+          </div>
+
+          <div class="achievement-card">
+            <div class="achievement-icon">🔥</div>
+            <div class="achievement-info">
+              <div class="achievement-name">坚持不懈</div>
+              <div class="achievement-desc">连续签到30天</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 50%;"></div>
+              </div>
+              <div class="progress-text">15 / 30</div>
+            </div>
+          </div>
+
+          <div class="achievement-card">
+            <div class="achievement-icon">❤️</div>
+            <div class="achievement-info">
+              <div class="achievement-name">心意相通</div>
+              <div class="achievement-desc">好感度达到80%</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 90%;"></div>
+              </div>
+              <div class="progress-text">72% / 80%</div>
+            </div>
+          </div>
+
+          <div class="achievement-card">
+            <div class="achievement-icon">🌟</div>
+            <div class="achievement-info">
+              <div class="achievement-name">探索者</div>
+              <div class="achievement-desc">体验所有12个主题</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 83%;"></div>
+              </div>
+              <div class="progress-text">10 / 12</div>
+            </div>
+          </div>
+
+          <div class="achievement-card">
+            <div class="achievement-icon">🎭</div>
+            <div class="achievement-info">
+              <div class="achievement-name">收藏家</div>
+              <div class="achievement-desc">收集所有限定皮肤</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 33%;"></div>
+              </div>
+              <div class="progress-text">2 / 6</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ==================== 页面7: 相册页面 ==================== -->
+      <div class="page" id="page-album">
+
+        <div class="app-header"><h1>🖼️ 相册</h1></div>
+
+        <div class="album-container">
+          <!-- 统计信息 -->
+          <div class="album-stats">
+            <div class="album-stat">
+              <div class="album-stat-value">48</div>
+              <div class="album-stat-label">照片总数</div>
+            </div>
+            <div class="album-stat">
+              <div class="album-stat-value">12</div>
+              <div class="album-stat-label">本月新增</div>
+            </div>
+            <div class="album-stat">
+              <div class="album-stat-value">256MB</div>
+              <div class="album-stat-label">占用空间</div>
+            </div>
+          </div>
+
+          <!-- 3列照片网格 -->
+          <div class="photo-grid">
+            <div class="photo-item" style="background: linear-gradient(135deg, #f093fb, #f5576c);">🌸</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #4facfe, #00f2fe);">🌊</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #43e97b, #38f9d7);">🍃</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #fa709a, #fee140);">🌅</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #a18cd1, #fbc2eb);">🌙</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #fccb90, #d57eeb);">🐱</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #e0c3fc, #8ec5fc);">☕</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #f77062, #fe5196);">📚</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #c471f5, #fa71cd);">🎵</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #48c6ef, #6f86d6);">🏞️</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #feada6, #f5efef);">🍰</div>
+            <div class="photo-item" style="background: linear-gradient(135deg, #a1c4fd, #c2e9fb);">✨</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ==================== 页面8: 虚拟世界页面 ==================== -->
+      <div class="page" id="page-virtual-world">
+
+        <div class="vw-container">
+          <!-- 场景 Tab 切换 -->
+          <div class="scene-tabs" id="scene-tabs">
+            <button class="scene-tab active">🏠 温馨小屋</button>
+            <button class="scene-tab">🌸 樱花庭院</button>
+            <button class="scene-tab">🌊 海边沙滩</button>
+            <button class="scene-tab">🌌 星空露台</button>
+            <button class="scene-tab">📚 书房</button>
+          </div>
+
+          <!-- Live2D 区域占位 -->
+          <div class="live2d-area">
+            <div class="live2d-placeholder">🌸</div>
+            <div class="live2d-hint">Live2D 角色模型区域<br>（实际运行时加载 Live2D 模型）</div>
+          </div>
+
+          <!-- 世界状态条 -->
+          <div class="world-status-bar">
+            <div class="status-item">
+              <div class="status-value">晴天</div>
+              <div class="status-label">天气</div>
+            </div>
+            <div class="status-item">
+              <div class="status-value">26°C</div>
+              <div class="status-label">温度</div>
+            </div>
+            <div class="status-item">
+              <div class="status-value">Day 128</div>
+              <div class="status-label">天数</div>
+            </div>
+            <div class="status-item">
+              <div class="status-value">傍晚</div>
+              <div class="status-label">时段</div>
+            </div>
+          </div>
+
+          <!-- 底部操作栏 -->
+          <div class="vw-action-bar">
+            <button class="vw-action-btn">
+              <span class="vw-action-icon">💬</span>
+              <span class="vw-action-text">对话</span>
+            </button>
+            <button class="vw-action-btn">
+              <span class="vw-action-icon">🎮</span>
+              <span class="vw-action-text">互动</span>
+            </button>
+            <button class="vw-action-btn">
+              <span class="vw-action-icon">🎁</span>
+              <span class="vw-action-text">送礼</span>
+            </button>
+            <button class="vw-action-btn">
+              <span class="vw-action-icon">📷</span>
+              <span class="vw-action-text">拍照</span>
+            </button>
+            <button class="vw-action-btn">
+              <span class="vw-action-icon">🔄</span>
+              <span class="vw-action-text">换装</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 底部导航（仅非虚拟世界页面显示） -->
+      <div class="bottom-nav" id="bottom-nav">
+        <button class="nav-item active" data-page="chat">
+          <span class="nav-icon">💬</span>
+          <span class="nav-text">聊天</span>
+        </button>
+        <button class="nav-item" data-page="diary">
+          <span class="nav-icon">📔</span>
+          <span class="nav-text">日记</span>
+        </button>
+        <button class="nav-item" data-page="checkin">
+          <span class="nav-icon">✅</span>
+          <span class="nav-text">签到</span>
+        </button>
+        <button class="nav-item" data-page="album">
+          <span class="nav-icon">🖼️</span>
+          <span class="nav-text">相册</span>
+        </button>
+        <button class="nav-item" data-page="achievement">
+          <span class="nav-icon">🏆</span>
+          <span class="nav-text">成就</span>
+        </button>
+      </div>
+
+    </div><!-- /phone-screen -->
+  </div><!-- /phone-frame -->
+
+  <!-- 底部页面快速导航 -->
+  <div class="quick-nav" id="quick-nav">
+    <!-- JS 动态生成快速导航按钮 -->
+  </div>
+
+</div><!-- /preview-container -->
+
+<script src="preview.js"></script>
+<script>
+  // 初始化额外的交互功能
+  document.addEventListener('DOMContentLoaded', function() {
+    if (window.setupDateSelector) window.setupDateSelector();
+    if (window.setupCheckinButton) window.setupCheckinButton();
+    if (window.setupFilterChips) window.setupFilterChips();
+    if (window.setupSceneTabs) window.setupSceneTabs();
+
+    console.log('[Stradust Preview] All pages initialized successfully!');
+    console.log('[Stradust Preview] Total themes:', 12);
+    console.log('[Stradust Preview] Total pages:', 8);
+  });
+</script>
+
+</body>
+</html>

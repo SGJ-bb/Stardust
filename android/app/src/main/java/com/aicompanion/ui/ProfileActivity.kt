@@ -31,6 +31,7 @@ import java.io.FileOutputStream
 class ProfileActivity : AppCompatActivity() {
 
     companion object {
+        private const val TAG = "ProfileActivity"
         private const val REQUEST_AI_AVATAR = 200
         private const val REQUEST_USER_AVATAR = 201
     }
@@ -81,6 +82,19 @@ class ProfileActivity : AppCompatActivity() {
         initViews()
         loadData()
         animateEntrance()
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
+        }
     }
 
     private fun animateEntrance() {
@@ -145,13 +159,9 @@ class ProfileActivity : AppCompatActivity() {
         }
 
         findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_edit_persona)?.setOnClickListener {
-            try {
-                val intent = Intent(this, PersonaEditorActivity::class.java)
-                intent.putExtra("persona_id", personaId)
-                startActivity(intent)
-            } catch (e: Exception) {
-                Toast.makeText(this, "无法打开人格设定: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+            // 角色编辑已迁移到 Compose 版 CharacterCardScreen，从 MainActivity 进入
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
         }
     }
 
@@ -233,15 +243,14 @@ class ProfileActivity : AppCompatActivity() {
     private fun loadAvatars() {
         val persona = personaManager.getPersona(personaId)
         val aiPath = persona?.avatarPath?.ifBlank {
-            getSharedPreferences("avatar_data", MODE_PRIVATE).getString("ai_avatar", "") ?: ""
+            com.aicompanion.util.AvatarManager.getAiAvatarPath(this, personaId)
         } ?: ""
 
         if (aiPath.isNotEmpty() && File(aiPath).exists()) {
             ivAiAvatar.setImageBitmap(BitmapFactory.decodeFile(aiPath))
         }
 
-        val userPath = getSharedPreferences("avatar_data", MODE_PRIVATE)
-            .getString("user_avatar", "") ?: ""
+        val userPath = com.aicompanion.util.AvatarManager.getUserAvatarPath(this, personaId)
         if (userPath.isNotEmpty() && File(userPath).exists()) {
             ivUserAvatar.setImageBitmap(BitmapFactory.decodeFile(userPath))
         }
@@ -259,7 +268,7 @@ class ProfileActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != Activity.RESULT_OK || data?.data == null) return
 
-        val uri = data.data!!
+        val uri = data.data ?: return
         try {
             if (requestCode == REQUEST_AI_AVATAR) {
                 val dir = File(filesDir, "personas/avatars")
@@ -271,14 +280,14 @@ class ProfileActivity : AppCompatActivity() {
                 personaManager.updatePersona(personaId) {
                     it.copy(avatarPath = file.absolutePath)
                 }
+                com.aicompanion.util.AvatarManager.saveAiAvatarPath(this, personaId, file.absolutePath)
                 ivAiAvatar.setImageBitmap(BitmapFactory.decodeFile(file.absolutePath))
             } else {
                 val file = File(filesDir, "user_avatar_${System.currentTimeMillis()}.jpg")
                 contentResolver.openInputStream(uri)?.use { input ->
                     FileOutputStream(file).use { output -> input.copyTo(output) }
                 }
-                getSharedPreferences("avatar_data", MODE_PRIVATE).edit()
-                    .putString("user_avatar", file.absolutePath).apply()
+                com.aicompanion.util.AvatarManager.saveUserAvatarPath(this, personaId, file.absolutePath)
                 ivUserAvatar.setImageBitmap(BitmapFactory.decodeFile(file.absolutePath))
             }
         } catch (e: Exception) {

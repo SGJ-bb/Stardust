@@ -106,7 +106,7 @@ class TtsManager(private val context: Context) {
         val client = com.aicompanion.network.ApiClient.sharedClient
         client.newCall(jsonRequest).execute().use { jsonResp ->
 
-        if (jsonResp.code == 422) {
+        if (jsonResp.code == 422 && formatType != com.aicompanion.network.ProviderAdapter.FORMAT_MIMO) {
             jsonResp.body?.close()
             AppLogger.w(TAG, "TTS请求422错误，可能是参数格式不匹配。常见原因: 1)voice名称不正确 2)模型不支持该voice 3)API格式不compatible")
             AppLogger.w(TAG, "TTS JSON格式422，尝试替换voice字段名")
@@ -141,11 +141,11 @@ class TtsManager(private val context: Context) {
             return@withContext TtsResult(null, null, false, "HTTP ${jsonResp.code}: $errBody")
         }
 
-        return@withContext parseResponse(jsonResp)
+        return@withContext parseResponse(jsonResp, formatType)
         }
     }
 
-    private fun parseResponse(response: okhttp3.Response): TtsResult {
+    private fun parseResponse(response: okhttp3.Response, formatType: String = "openai"): TtsResult {
         if (!response.isSuccessful) {
             val errBody = response.body?.string()?.take(300) ?: "无响应体"
             return TtsResult(null, null, false, "HTTP ${response.code}: $errBody")
@@ -169,6 +169,21 @@ class TtsManager(private val context: Context) {
 
         val bodyStr = body.string()
         try {
+            // MiMoTTS 特殊解析：choices[0].message.audio.data (Base64)
+            if (formatType == com.aicompanion.network.ProviderAdapter.FORMAT_MIMO) {
+                val mimoB64 = com.aicompanion.network.ProviderAdapter.parseMimoResponse(bodyStr)
+                if (!mimoB64.isNullOrBlank()) {
+                    val audioBytes = android.util.Base64.decode(mimoB64, android.util.Base64.DEFAULT)
+                    val audioDir = File(context.filesDir, "tts_audio")
+                    if (!audioDir.exists()) audioDir.mkdirs()
+                    val audioFile = File(audioDir, "${System.currentTimeMillis()}_mimo.mp3")
+                    java.io.FileOutputStream(audioFile).use { it.write(audioBytes) }
+                    return TtsResult(audioFile.absolutePath, null, true)
+                }
+                AppLogger.w(TAG, "MiMoTTS 响应中未找到音频数据")
+                return TtsResult(null, null, false, "MiMoTTS 响应中未找到音频数据")
+            }
+
             val json = JSONObject(bodyStr)
 
             val audioUrl = json.optString("url", "")

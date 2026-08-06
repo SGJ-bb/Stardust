@@ -1,0 +1,582 @@
+@import "tailwindcss";
+
+/* ================================================================
+   STRADUST UI SYSTEM v4 — Impeccable + Anime.js
+   Rules from pbakaus/impeccable + juliangarnier/anime
+   ================================================================
+   ANTI-SLOP RULES:
+   - No glassmorphism as default → solid surfaces with purposeful depth
+   - No gradient text → single solid color, emphasis via weight/size
+   - No side-stripe borders → full border or background tint
+   - No identical card grids → varied compositions per section
+   - No tiny uppercase tracked eyebrows → natural section labels
+   - Card radius cap at 16px
+   - Body line length 65-75ch
+   - Typography scale ratio ≥1.25
+   - Max 3 font families
+   - Motion: exponential ease-out (quart/quint/expo)
+   - Contrast: body ≥4.5:1
+   ================================================================ */
+
+@import "./themes.css";
+@import "./animations.css";
+
+/* ==================== DESIGN TOKENS ==================== */
+:root {
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 64px;
+  --titlebar-height: 44px;
+  /* Radius — impeccable: cards top out at 12-16px */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px; /* card ceiling */
+  --radius-full: 9999px; /* tags/buttons only */
+  /* Typography */
+  --font-display: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  /* Z-index semantic scale */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal-backdrop: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+  /* Spacing rhythm (8px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  font-family: var(--font-body);
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ==================== TYPOGRAPHY SYSTEM ==================== */
+/* Scale ratio ≥1.25 between steps */
+h1, .text-h1 { font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; text-wrap: balance; }
+h2, .text-h2 { font-size: clamp(1.35rem, 3vw, 1.75rem); font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; text-wrap: balance; }
+h3, .text-h3 { font-size: clamp(1.1rem, 2vw, 1.35rem); font-weight: 600; line-height: 1.3; }
+.text-body-lg { font-size: 1rem; line-height: 1.65; max-width: 70ch; }
+.text-body { font-size: 0.9375rem; line-height: 1.65; max-width: 70ch; }
+.text-body-sm { font-size: 0.875rem; line-height: 1.55; }
+.text-caption { font-size: 0.8125rem; line-height: 1.45; color: var(--color-muted-foreground); }
+.text-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+
+/* ==================== BACKGROUND SYSTEM ==================== */
+.app-bg {
+  position: fixed; inset: 0; z-index: -2;
+  background-image: url('/bg.png');
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+}
+.app-bg::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(
+    160deg,
+    rgba(10, 6, 20, 0.85) 0%,
+    rgba(20, 10, 40, 0.78) 40%,
+    rgba(12, 6, 28, 0.82) 100%
+  );
+}
+:root[data-theme-mode="light"] .app-bg::after {
+  background: linear-gradient(
+    160deg,
+    rgba(255,255,255,0.65) 0%,
+    rgba(255,240,250,0.55) 40%,
+    rgba(255,255,255,0.60) 100%
+  );
+}
+
+/* ==================== SURFACE SYSTEM (solid, not glass by default) ==================== */
+
+/* Panel — sidebar, toolbar, titlebar: solid surface with subtle depth */
+.surface-panel {
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+}
+/* Dark mode: slightly elevated surface */
+:root:not([data-theme-mode="light"]) .surface-panel {
+  background: color-mix(in srgb, var(--color-bg) 95%, var(--color-primary));
+  border-color: color-mix(in srgb, var(--color-border) 30%, transparent);
+}
+
+/* Card — content blocks: solid with one depth cue only (border OR shadow, never both) */
+.surface-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: transform 0.2s var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+              box-shadow 0.2s var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+              border-color 0.15s ease;
+}
+.surface-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+/* Cyberpunk theme: neon glow on hover */
+[data-theme="cyberpunk"] .surface-card:hover {
+  box-shadow: 0 0 20px var(--theme-glow), 0 4px 16px rgba(0,0,0,0.3);
+  border-color: var(--color-primary);
+}
+/* Chinese/Tea: double-line border as deliberate motif */
+[data-theme="chinese"] .surface-card,
+[data-theme="tea"] .surface-card {
+  border-style: double;
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--theme-accent-gold, var(--color-primary)) 18%, transparent);
+}
+
+/* Elevated — modals, popovers */
+.surface-elevated {
+  background: var(--color-popover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+}
+
+/* Inset — inputs, embedded areas */
+.surface-inset {
+  background: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/* Legacy aliases (keep for components still transitioning) */
+.glass-panel { @extend .surface-panel; }
+.glass-card { @extend .surface-card; }
+
+/* Purposeful glass — use sparingly, only when it serves a real need */
+.glass-purposeful {
+  background: color-mix(in srgb, var(--color-card) 60%, transparent);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid color-mix(in srgb, var(--color-border) 20%, transparent);
+}
+
+/* ==================== AMBIENT (subtle, never distracting) ==================== */
+.ambient-bg {
+  position: fixed; inset: 0; z-index: -1;
+  overflow: hidden; pointer-events: none;
+}
+.ambient-orb {
+  position: absolute; border-radius: 50%;
+  filter: blur(140px);
+  opacity: 0.05; /* barely visible — ambient, not decorative */
+  animation: orbFloat 30s ease-in-out infinite alternate;
+}
+.ambient-orb:nth-child(1) {
+  width: 500px; height: 500px;
+  background: var(--color-primary); top: -10%; right: 5%;
+}
+.ambient-orb:nth-child(2) {
+  width: 350px; height: 350px;
+  background: color-mix(in srgb, var(--color-primary) 40%, #06b6d4);
+  bottom: 10%; left: 20%; animation-delay: -10s;
+}
+@keyframes orbFloat {
+  0% { transform: translate(0,0) scale(1); }
+  100% { transform: translate(40px,-30px) scale(1.04); }
+}
+
+/* ==================== SIDEBAR ==================== */
+.sidebar-surface {
+  background: var(--color-sidebar);
+  border-right: 1px solid var(--color-border);
+}
+:root:not([data-theme-mode="light"]) .sidebar-surface {
+  background: color-mix(in srgb, var(--color-sidebar) 92%, black);
+  border-right-color: color-mix(in srgb, var(--color-border) 25%, transparent);
+}
+
+.sidebar-item {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  margin: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500;
+  color: var(--color-sidebar-foreground);
+  transition: all 0.15s var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.sidebar-item:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-card-foreground);
+}
+/* Active state: full background tint, NO side stripe (impeccable ban) */
+.sidebar-item.active {
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+/* Section label: natural case, no uppercase tracking (impeccable ban) */
+.sidebar-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  padding: var(--space-4) var(--space-5) var(--space-1);
+  opacity: 0.6;
+  letter-spacing: normal; /* no wide tracking */
+  text-transform: none; /* no uppercase */
+}
+.sidebar-section-divider {
+  height: 1px;
+  margin: var(--space-2) var(--space-5);
+  background: var(--color-border);
+  opacity: 0.5;
+}
+
+/* ==================== CHAT BUBBLES ==================== */
+.bubble-user {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  /* One depth cue: shadow only, no extra border */
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 20%, transparent);
+  position: relative;
+}
+.bubble-user::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.10) 0%, transparent 50%);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.bubble-assistant {
+  background: var(--color-secondary);
+  color: var(--color-secondary-foreground);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
+  /* Solid surface, minimal border */
+  border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
+}
+.bubble-system {
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  padding: var(--space-1) var(--space-4);
+}
+
+/* ==================== INPUT ==================== */
+.input-field {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+/* ==================== TITLEBAR ==================== */
+.titlebar-surface {
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  user-select: none;
+  -webkit-user-select: none;
+}
+:root:not([data-theme-mode="light"]) .titlebar-surface {
+  background: color-mix(in srgb, var(--color-card) 90%, black);
+}
+
+/* 标题栏按钮区域 — 禁止拖拽（防止点击按钮时触发窗口拖拽） */
+.titlebar-no-drag {
+  -webkit-app-region: no-drag !important;
+}
+
+/* ==================== CHAT INPUT AREA ==================== */
+.chat-input-surface {
+  background: var(--color-card);
+  border-top: 1px solid var(--color-border);
+}
+:root:not([data-theme-mode="light"]) .chat-input-surface {
+  background: color-mix(in srgb, var(--color-card) 92%, black);
+  border-top-color: color-mix(in srgb, var(--color-border) 25%, transparent);
+}
+
+/* ==================== PERSONA CARD ==================== */
+.persona-card {
+  position: relative;
+  border-radius: var(--radius-lg); /* 16px ceiling */
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1)),
+              box-shadow 0.25s var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+}
+.persona-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--color-primary) 10%, rgba(0,0,0,0.15));
+  border-color: var(--color-primary);
+}
+/* Gradient border on hover — purposeful, not default */
+.persona-card::before {
+  content: ""; position: absolute; inset: 0;
+  border-radius: var(--radius-lg);
+  padding: 1.5px;
+  background: var(--theme-gradient, linear-gradient(135deg, var(--color-primary), var(--color-ring)));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.persona-card:hover::before { opacity: 1; }
+
+/* ==================== MOTION SYSTEM (anime.js-inspired) ==================== */
+
+/* Reveal: exponential ease-out, matches anime.js defaults */
+.reveal-up {
+  animation: revealUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.reveal-scale {
+  animation: revealScale 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.reveal-fade {
+  animation: revealFade 0.35s ease-out both;
+}
+
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes revealScale {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes revealFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Stagger children via CSS nth-child (complements anime.js stagger()) */
+.stagger-list > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-list > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-list > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-list > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-list > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-list > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-list > *:nth-child(n+7) { animation-delay: 300ms; }
+
+/* Reduced motion: crossfade instead of spatial transitions */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-up,
+  .reveal-scale,
+  .reveal-fade,
+  .stagger-list > * {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Page transition */
+.page-content {
+  animation: pageIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== INTERACTIVE ELEMENTS ==================== */
+
+/* Button primary */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  font-weight: 600; font-size: 13px;
+  border: none; border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-out-quart),
+              box-shadow 0.15s var(--ease-out-quart),
+              background-color 0.15s ease;
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+.btn-primary:active { transform: translateY(0); }
+
+/* Button ghost */
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font-weight: 500; font-size: 13px;
+  border: none; border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.btn-ghost:hover {
+  background: color-mix(in srgb, var(--color-muted) 80%, transparent);
+  color: var(--color-card-foreground);
+}
+
+/* Chip / Tag */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  font-size: 11px; font-weight: 600;
+  border-radius: var(--radius-full);
+  background: var(--color-secondary);
+  color: var(--color-secondary-foreground);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-out-quart);
+}
+.chip.active {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  border-color: var(--color-primary);
+}
+.chip:hover:not(.active) {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
+}
+
+/* Suggested reply */
+.suggested-reply {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3.5);
+  font-size: 13px;
+  background: var(--color-secondary);
+  color: var(--color-secondary-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: all 0.2s var(--ease-out-quart);
+}
+.suggested-reply:hover {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-secondary));
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+/* ==================== TYPING INDICATOR ==================== */
+.typing-indicator { display: inline-flex; gap: 5px; padding: var(--space-3) var(--space-4); }
+.typing-indicator span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--color-primary);
+  animation: typingDot 1.2s infinite;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typingDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* ==================== EMPTY STATE ==================== */
+.empty-state-icon { animation: emptyFloat 3.5s ease-in-out infinite; }
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* ==================== SCROLLBAR ==================== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-muted-foreground) 20%, transparent);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-muted-foreground) 35%, transparent);
+}
+
+/* ==================== SELECTION & FOCUS ==================== */
+::selection {
+  background: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ==================== THEME-SPECIFIC ACCENTS ==================== */
+/* These are applied ON TOP of the base system, only when theme calls for it */
+
+/* Cyberpunk: purposeful neon effects (not default) */
+[data-theme="cyberpunk"] .surface-elevated {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4),
+              0 0 1px var(--color-primary),
+              0 0 20px color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+[data-theme="cyberpunk"] .sidebar-item.active {
+  text-shadow: 0 0 12px var(--theme-glow);
+}
+[data-theme="cyberpunk"] .btn-primary {
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+[data-theme="cyberpunk"] .btn-primary:hover {
+  box-shadow: 0 0 20px var(--theme-glow), 0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* Chinese / Tea: double-line borders as cultural motif (deliberate) */
+[data-theme="chinese"] .surface-card,
+[data-theme="tea"] .surface-card {
+  position: relative;
+}
+[data-theme="chinese"] .surface-card::after,
+[data-theme="tea"] .surface-card::after {
+  content: "";
+  position: absolute; inset: -3px;
+  border: 1px solid color-mix(in srgb, var(--theme-accent-gold, var(--color-primary)) 8%, transparent);
+  border-radius: calc(var(--radius-lg) + 3px);
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.25s ease;
+}
+[data-theme="chinese"] .surface-card:hover::after,
+[data-theme="tea"] .surface-card:hover::after { opacity: 1; }
+
+/* Tea warmth overlay (subtle, on specific containers) */
+.tea-warmth::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(
+    ellipse at 25% 15%,
+    color-mix(in srgb, var(--theme-accent-gold, #c49a3a) 5%, transparent) 0%,
+    transparent 70%
+  );
+  pointer-events: none; border-radius: inherit;
+}
+
+/* ==================== DARK MODE DEFAULTS ==================== */
+:root:not([data-theme-mode="light"]) {
+  color-scheme: dark;
+}
+
+/* ==================== OVERLAY PET MODE (桌宠透明窗口) ====================
+ * 当 URL 为 /overlay-pet 时，整个页面背景透明
+ * Tauri 2 transparent window + Windows DWM 需要所有层都透明
+ */
+html:has(#root[data-route="overlay-pet"]),
+html:has(#root[data-route="overlay-pet"]) body,
+html:has(#root[data-route="overlay-pet"]) #root {
+  background: transparent !important;
+  background-color: transparent !important;
+}

@@ -1,0 +1,37 @@
+<!-- 成功勾选动画 - 操作成功时弹出+淡入效果 -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/avd_success_check_vector">
+    <target android:name="check_group">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <set>
+                <!-- 整体弹出缩放 -->
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.5"
+                    android:valueTo="1.0"
+                    android:duration="400"
+                    android:interpolator="@android:anim/overshoot_interpolator" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.5"
+                    android:valueTo="1.0"
+                    android:duration="400"
+                    android:interpolator="@android:anim/overshoot_interpolator" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <target android:name="check_path">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <!-- 对勾路径淡入效果 -->
+            <objectAnimator
+                android:propertyName="alpha"
+                android:valueFrom="0"
+                android:valueTo="255"
+                android:duration="500"
+                android:interpolator="@android:anim/decelerate_interpolator"
+                android:startOffset="200"
+                android:fillAfter="true" />
+        </aapt:attr>
+    </target>
+</animated-vector>

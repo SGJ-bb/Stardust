@@ -54,7 +54,8 @@ data class GroupMessage(
     val time: String,
     val timestamp: Long = System.currentTimeMillis(),
     val isUser: Boolean = false,
-    val emotion: String = "neutral"
+    val emotion: String = "neutral",
+    val imagePath: String = ""
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -65,6 +66,7 @@ data class GroupMessage(
         put("timestamp", timestamp)
         put("isUser", isUser)
         put("emotion", emotion)
+        put("imagePath", imagePath)
     }
 
     companion object {
@@ -76,7 +78,8 @@ data class GroupMessage(
             time = obj.optString("time", ""),
             timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
             isUser = obj.optBoolean("isUser", false),
-            emotion = obj.optString("emotion", "neutral")
+            emotion = obj.optString("emotion", "neutral"),
+            imagePath = obj.optString("imagePath", "")
         )
     }
 }

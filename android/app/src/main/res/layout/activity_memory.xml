@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0d1117">
+    android:background="@color/bg_base">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -12,23 +12,24 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:padding="12dp"
-        android:background="#161b22">
+        android:background="@drawable/bg_toolbar_glass"
+        android:elevation="4dp">
 
-        <ImageButton
+    <ImageButton
             android:id="@+id/btn_memory_back"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:src="@android:drawable/ic_menu_revert"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="返回"
-            app:tint="#8899cc" />
+            app:tint="@color/text_secondary" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="记忆管理"
-            android:textColor="#e6edf3"
+            android:textColor="@color/text_primary"
             android:textSize="18sp"
             android:textStyle="bold"
             android:gravity="center" />
@@ -40,7 +41,7 @@
             android:src="@android:drawable/ic_menu_search"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="搜索"
-            app:tint="#8899cc" />
+            app:tint="@color/text_secondary" />
     </LinearLayout>
 
     <LinearLayout
@@ -50,7 +51,7 @@
         android:orientation="horizontal"
         android:padding="8dp"
         android:paddingHorizontal="12dp"
-        android:background="#161b22"
+        android:background="@drawable/bg_toolbar_glass"
         android:visibility="gone">
 
         <EditText
@@ -59,8 +60,8 @@
             android:layout_height="40dp"
             android:layout_weight="1"
             android:hint="搜索记忆关键词..."
-            android:textColorHint="#667788"
-            android:textColor="#c9d1d9"
+            android:textColorHint="@color/text_muted"
+            android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_model_path"
             android:paddingHorizontal="12dp"
@@ -104,7 +105,7 @@
             android:orientation="horizontal"
             android:padding="12dp"
             android:gravity="center_vertical"
-            android:background="#1c2128"
+            android:background="@color/surface_card"
             android:visibility="gone">
 
             <TextView
@@ -112,7 +113,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textColor="#8b949e"
+                android:textColor="@color/text_muted"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -121,10 +122,10 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginTop="0dp"
-            android:divider="#1c2128"
+            android:divider="@color/stroke_subtle"
             android:dividerHeight="1dp"
-            android:padding="0dp"
-            android:background="#0d1117"
+            android:padding="16dp"
+            android:background="@color/bg_base"
             android:clipToPadding="false" />
 
         <TextView
@@ -133,7 +134,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:text="还没有记忆呢\n多和我说说话就会产生记忆啦~"
-            android:textColor="#667788"
+            android:textColor="@color/text_muted"
             android:textSize="14sp"
             android:visibility="gone"
             android:lineSpacingExtra="6dp" />

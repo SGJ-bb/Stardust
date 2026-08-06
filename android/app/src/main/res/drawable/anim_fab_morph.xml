@@ -1,0 +1,170 @@
+<!--
+    anim_fab_morph.xml — FAB 按钮形态变换动画
+    用途：用于首页 FAB 按钮（添加角色）的吸引注意动画
+    包含：+号图标 + 展开横条 + 光晕扩散层
+    动画序列 (总时长 2500ms 循环):
+      0-400ms:   圆形→圆角展开 (+号横线向两侧延伸)
+      400-1600ms:保持展开态
+      1600-2100ms:收回圆形
+      2100-2500ms:暂停
+    同时包含 shadow/glow 扩散效果
+    尺寸：24dp x 24dp（图标部分）
+-->
+<animated-vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/avd_fab_morph_vector">
+
+    <!-- ===== +号竖线：展开时消失 ===== -->
+    <target android:name="plus_vertical">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="400"
+                android:valueFrom="1"
+                android:valueTo="0"
+                android:startOffset="0"
+                android:repeatCount="infinite"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+    <target android:name="plus_vertical">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="200"
+                android:valueFrom="255"
+                android:valueTo="0"
+                android:valueType="intType"
+                android:startOffset="300"
+                android:repeatCount="infinite"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+    <!-- 竖线收回阶段恢复 -->
+    <target android:name="plus_vertical">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="200"
+                android:valueFrom="0"
+                android:valueTo="255"
+                android:valueType="intType"
+                android:startOffset="1900"
+                android:repeatCount="infinite"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+    <target android:name="plus_vertical">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="500"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:startOffset="1900"
+                android:repeatCount="infinite"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+
+    <!-- ===== +号横线：展开时向两侧延伸 ===== -->
+    <target android:name="plus_horizontal">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="400"
+                android:valueFrom="1"
+                android:valueTo="2.5"
+                android:startOffset="0"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+    <!-- 横线收回 -->
+    <target android:name="plus_horizontal">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="500"
+                android:valueFrom="2.5"
+                android:valueTo="1"
+                android:startOffset="1600"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+
+    <!-- ===== 展开后的横条（替代+号的横向长条） ===== -->
+    <target android:name="expand_bar">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="300"
+                android:valueFrom="0"
+                android:valueTo="255"
+                android:valueType="intType"
+                android:startOffset="200"
+                android:repeatCount="infinite"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+    <target android:name="expand_bar">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="300"
+                android:valueFrom="255"
+                android:valueTo="0"
+                android:valueType="intType"
+                android:startOffset="1800"
+                android:repeatCount="infinite"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+
+    <!-- ===== 光晕扩散层（第二层圆放大+淡出） ===== -->
+    <target android:name="glow_ring">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="600"
+                android:valueFrom="1"
+                android:valueTo="1.8"
+                android:startOffset="100"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+    <target android:name="glow_ring">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="600"
+                android:valueFrom="1"
+                android:valueTo="1.8"
+                android:startOffset="100"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+    <target android:name="glow_ring">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="600"
+                android:valueFrom="120"
+                android:valueTo="0"
+                android:valueType="intType"
+                android:startOffset="100"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"
+                android:fillAfter="true"/>
+        </aapt:attr>
+    </target>
+
+</animated-vector>

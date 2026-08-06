@@ -52,8 +52,9 @@ class CheckInManager(context: Context) {
 
         addRecord(CheckInRecord(today, currentStreakInternal))
 
-        val bonus = calculateBonus(currentStreakInternal)
-        return CheckInResult.Success(today, currentStreakInternal, bonus, totalCheckInsInternal)
+        // 连续签到15天触发AI发动态
+        val shouldTriggerAiMoment = currentStreakInternal > 0 && currentStreakInternal % 15 == 0
+        return CheckInResult.Success(today, currentStreakInternal, shouldTriggerAiMoment, totalCheckInsInternal)
     }
 
     fun isCheckedInToday(): Boolean = lastCheckInDate == dateFormat.format(Date())
@@ -79,20 +80,11 @@ class CheckInManager(context: Context) {
         prefs.edit().putString("checkin_history", arr.toString()).apply()
     }
 
-    private fun calculateBonus(streak: Int): Int = when {
-        streak <= 1 -> 0
-        streak == 2 -> 1
-        streak == 3 -> 2
-        streak % 7 == 0 -> 5
-        streak % 5 == 0 -> 3
-        else -> 0
-    }
-
     sealed class CheckInResult {
         data class Success(
             val date: String,
             val streak: Int,
-            val bonusAffection: Int,
+            val shouldTriggerAiMoment: Boolean,
             val totalCheckIns: Int
         ) : CheckInResult()
 

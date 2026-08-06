@@ -11,7 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.aicompanion.R
 import com.aicompanion.memory.MemoryManager
 import com.aicompanion.models.MemoryFact
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -109,14 +109,56 @@ class MemoryActivity : AppCompatActivity() {
                 .setTitle("确认清空")
                 .setMessage("确定要清空所有记忆吗？此操作不可撤销。\n本地缓存的记忆和云端记忆都将被删除。")
                 .setPositiveButton("确认清空") { _, _ ->
-                    CoroutineScope(Dispatchers.IO).launch {
+                    lifecycleScope.launch(Dispatchers.IO) {
                         memoryManager.deleteAllMemories(userId)
-                        runOnUiThread { loadMemories() }
+                        if (!isFinishing && !isDestroyed) {
+                            runOnUiThread { loadMemories() }
+                        }
                     }
                 }
                 .setNegativeButton("取消", null)
                 .show()
         }
+
+        // 今日记忆卡片入口：调用 MemoryManager.generateDailyCard（suspend）生成并展示
+        val btnDailyCard = Button(this).apply {
+            text = "今日记忆卡片"
+            setTextColor(0xFF6C5CE7.toInt())
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF1A2233.toInt())
+                cornerRadius = 24f
+                setStroke(2, 0xFF6C5CE7.toInt())
+            }
+            setOnClickListener {
+                // 异步调用 generateDailyCard 生成今日记忆卡片
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val card = try {
+                        memoryManager.generateDailyCard(userId)
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (!isFinishing && !isDestroyed) {
+                        runOnUiThread {
+                            if (card == null) {
+                                Toast.makeText(this@MemoryActivity, "生成失败，请稍后重试", Toast.LENGTH_SHORT).show()
+                            } else {
+                                // 弹窗展示今日记忆卡片
+                                android.app.AlertDialog.Builder(this@MemoryActivity)
+                                    .setTitle(card.title)
+                                    .setMessage(card.content)
+                                    .setPositiveButton("好的", null)
+                                    .show()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // 将按钮添加到头部布局
+        layoutHeader.addView(btnDailyCard, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { setMargins(0, 16, 0, 0) })
     }
 
     private fun loadMemories() {
@@ -175,9 +217,11 @@ class MemoryActivity : AppCompatActivity() {
                     .setTitle("删除这条记忆")
                     .setMessage("\"${memory.fact}\"")
                     .setPositiveButton("删除") { _, _ ->
-                        CoroutineScope(Dispatchers.IO).launch {
+                        lifecycleScope.launch(Dispatchers.IO) {
                             memoryManager.deleteMemoryBlocking(userId, memory.id)
-                            runOnUiThread { loadMemories() }
+                            if (!isFinishing && !isDestroyed) {
+                                runOnUiThread { loadMemories() }
+                            }
                         }
                     }
                     .setNegativeButton("取消", null)

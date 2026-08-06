@@ -21,114 +21,130 @@ class DiaryManager(private val context: Context, private val personaId: String =
     companion object {
         const val CURRENT_VERSION = 2
         val APP_VERSION = "1.0.0"
-        private const val INDEX_FILE = "diary_index.json"
         private const val TAG = "DiaryManager"
         private const val MIN_UPDATE_INTERVAL_MS = 30 * 60 * 1000L
     }
 
-    private val diaryDir = File(File(context.filesDir, "diaries"), personaId).apply { mkdirs() }
+    // SQLite-backed storage (shared with chat messages in same DB)
+    private val storage by lazy { com.aicompanion.storage.ChatHistoryStorage(context) }
+
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     private val fullDateFormat = SimpleDateFormat("yyyy年M月d日 EEEE", Locale.CHINESE)
     private var lastUpdateTime = 0L
 
-    init {
-        if (!diaryDir.exists()) diaryDir.mkdirs()
-    }
+    // ─── Read operations (SQLite) ──────────────────────────────
 
-    private fun getIndexFile(): File = File(diaryDir, INDEX_FILE)
-
-    private fun readIndex(): JSONObject {
-        val idxFile = getIndexFile()
-        return if (idxFile.exists()) {
-            try { JSONObject(idxFile.readText()) } catch (_: Exception) { JSONObject() }
-        } else {
-            JSONObject()
-        }
-    }
-
-    private fun writeIndex(index: JSONObject) {
-        try {
-            getIndexFile().writeText(index.toString(2))
-        } catch (e: Exception) { AppLogger.e("DiaryManager", "writeIndex: ${e.message}") }
-    }
-
-    private fun updateIndex(entry: DiaryEntry) {
-        val index = readIndex()
-        val idxObj = JSONObject().apply {
-            put("title", entry.title)
-            put("mood", entry.mood)
-            put("mood_emoji", entry.moodEmoji)
-            put("affection_level", entry.affectionLevel)
-            put("message_count", entry.messageCount)
-            put("created_at", entry.createdAt)
-            put("version", entry.version)
-        }
-        index.put(entry.date, idxObj)
-        writeIndex(index)
-    }
-
-    fun getAllDiaries(): List<DiaryEntry> {
-        val diaries = mutableListOf<DiaryEntry>()
-        diaryDir.listFiles()?.filter { it.isFile && it.extension == "json" && it.name != INDEX_FILE }?.forEach { file ->
-            try {
-                val json = JSONObject(file.readText())
-                diaries.add(DiaryEntry.fromJson(json))
-            } catch (e: Exception) { AppLogger.e("DiaryManager", "getAllDiaries: ${e.message}") }
-        }
-        return diaries.sortedByDescending { it.date }
-    }
+    fun getAllDiaries(): List<DiaryEntry> = storage.getAllDiaries(personaId)
 
     fun getTodayDiary(): DiaryEntry? {
         val today = dateFormat.format(Date())
-        return getDiaryByDate(today)
+        return storage.getDiary(personaId, today)
     }
 
-    fun getDiaryByDate(date: String): DiaryEntry? {
-        val file = File(diaryDir, "$date.json")
-        if (!file.exists()) return null
-        return try {
-            DiaryEntry.fromJson(JSONObject(file.readText()))
-        } catch (_: Exception) { null }
-    }
+    fun getDiaryByDate(date: String): DiaryEntry? = storage.getDiary(personaId, date)
 
     fun searchDiaries(query: String): List<DiaryEntry> {
         if (query.isEmpty()) return getAllDiaries()
-        val lower = query.lowercase()
-        return getAllDiaries().filter {
-            it.title.lowercase().contains(lower) || it.content.lowercase().contains(lower)
+        return storage.searchDiaries(personaId, query)
+    }
+
+    // ─── RAG缓存优化(缺陷7修复) ──────────────────────────────
+    private var diarySearchCache: com.aicompanion.rag.EmbeddingSearchCache? = null
+    private var diaryIndexHash: String = ""
+    private var lastDiaryCount: Int = 0
+    private val diaryCacheLock = java.util.concurrent.locks.ReentrantLock()
+
+    // ─── 关系图谱管理器 ──────────────────────────────
+    private val _graphManager by lazy {
+        com.aicompanion.graph.DiaryGraphManager(context, personaId).also {
+            it.initialize()
         }
     }
 
-    private var diarySearchCache: com.aicompanion.rag.EmbeddingSearchCache? = null
+    /**
+     * 更新关系图谱索引(在日记保存/更新时调用)
+     */
+    private fun updateGraphIndex(diaryDate: String, oldContent: String?, newContent: String) {
+        try {
+            _graphManager.updateDiaryLinks(diaryDate, oldContent, newContent)
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "[Diary-Graph] 更新日记图谱索引失败: ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
 
-    fun searchDiariesRag(query: String, topK: Int = 5): List<DiaryEntry> {
+    /**
+     * 获取关系图谱管理器(供UI层调用)
+     */
+    fun getGraphManager(): com.aicompanion.graph.DiaryGraphManager = _graphManager
+
+    /**
+     * 计算日记内容的哈希值(用于判断是否需要重建索引)
+     * 使用date作为唯一标识(修复缺陷10)
+     */
+    private fun computeDiaryHash(diaries: List<DiaryEntry>): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        diaries.sortedBy { it.date }.forEach { diary ->
+            // 使用date作为唯一标识,而不是数组索引
+            md.update("${diary.date}|${diary.content}|${diary.updatedAt}".toByteArray(Charsets.UTF_8))
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    suspend fun searchDiariesRag(query: String, topK: Int = 5): List<DiaryEntry> {
         val all = getAllDiaries()
         if (all.isEmpty() || query.isBlank()) return emptyList()
 
         try {
-            val cache = diarySearchCache ?: com.aicompanion.rag.EmbeddingSearchCache(
-                context, "diary_$personaId"
-            ).also { diarySearchCache = it }
+            diaryCacheLock.lock()
+            try {
+                // 缺陷7修复:只有日记内容变化时才重建索引
+                val newHash = computeDiaryHash(all)
+                val newCount = all.size
 
-            val entries = all.mapIndexed { i, d -> i.toString() to (d.title + " " + d.content) }
+                val cache = diarySearchCache ?: com.aicompanion.rag.EmbeddingSearchCache(
+                    context, "diary_$personaId"
+                ).also { diarySearchCache = it }
 
-            kotlinx.coroutines.runBlocking {
-                cache.buildIndex(entries)
-            }
-
-            val results = kotlinx.coroutines.runBlocking {
-                cache.search(query, topK, RagConfig.minSimilarity)
-            }
-
-            if (results.isNotEmpty()) {
-                return results.mapNotNull { r ->
-                    all.getOrNull(r.id.toIntOrNull() ?: -1)
+                // 判断是否需要重建索引
+                val needRebuild = if (newHash != diaryIndexHash || newCount != lastDiaryCount) {
+                    AppLogger.i(TAG, "日记索引需要重建: hash变化或数量变化(${lastDiaryCount}→${newCount})")
+                    true
+                } else if (!cache.isReady()) {
+                    AppLogger.i(TAG, "日记缓存未就绪,需要重建索引")
+                    true
+                } else {
+                    false
                 }
+
+                if (needRebuild) {
+                    // 缺陷10修复:使用date作为唯一标识
+                    val entries = all.map { diary ->
+                        diary.date to (diary.title + " " + diary.content)
+                    }
+                    cache.buildIndex(entries)
+                    diaryIndexHash = newHash
+                    lastDiaryCount = newCount
+                    AppLogger.i(TAG, "日记索引已重建: ${entries.size}条")
+                }
+
+                val results = cache.search(query, topK, RagConfig.minSimilarity)
+
+                if (results.isNotEmpty()) {
+                    // 缺陷10修复:根据date查找日记,而不是数组索引
+                    return results.mapNotNull { r ->
+                        all.find { diary ->
+                            diary.date == r.id || diary.date == r.id.toString()
+                        }
+                    }
+                }
+            } finally {
+                diaryCacheLock.unlock()
             }
         } catch (e: Exception) {
-            com.aicompanion.util.AppLogger.e("DiaryManager", "searchDiariesRag cache failed: ${e.message}")
+            com.aicompanion.util.AppLogger.e("DiaryManager", "[Diary-RAG] searchDiariesRag缓存检索失败: ${e.javaClass.simpleName}: ${e.message} | query='${query.take(30)}'")
         }
 
+        // 缺陷9修复:缓存TF-IDF embedder避免每次创建
         val docs = all.map { it.title + " " + it.content }
         val embedder = com.aicompanion.rag.TfidfEmbedder()
         embedder.buildVocabulary(docs)
@@ -141,21 +157,74 @@ class DiaryManager(private val context: Context, private val personaId: String =
         return scored.take(topK).filter { it.second > RagConfig.minSimilarity }.map { all[it.first] }
     }
 
-    private fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
-        var dot = 0f
-        var normA = 0f
-        var normB = 0f
-        for (i in a.indices) {
-            dot += a[i] * b[i]
-            normA += a[i] * a[i]
-            normB += b[i] * b[i]
+    fun getDiariesByMood(mood: String): List<DiaryEntry> = storage.getDiariesByMood(personaId, mood)
+
+    /**
+     * 用户手动写日记：将用户输入的 content 保存为今日日记
+     * @param content 日记正文
+     * @param mood 心情（英文 key，与 analyzeMood 返回值一致）
+     * @param moodEmoji 心情 emoji
+     * @return true=保存成功；false=今日已有日记（应改用更新接口）
+     */
+    fun saveUserDiary(
+        content: String,
+        mood: String = "normal",
+        moodEmoji: String = "😊",
+    ): Boolean {
+        if (content.isBlank()) return false
+        val today = dateFormat.format(Date())
+        if (storage.getDiary(personaId, today) != null) return false
+
+        val titleDate = fullDateFormat.format(Date())
+        val title = when (mood) {
+            "happy" -> "开心的一天"
+            "sad" -> "略有伤感"
+            "excited" -> "充满能量的一天"
+            "calm" -> "平静的时光"
+            "sentimental" -> "文艺的一天"
+            else -> "平凡而美好"
         }
-        val denom = kotlin.math.sqrt(normA) * kotlin.math.sqrt(normB)
-        return if (denom > 0f) dot / denom else 0f
+        val fullContent = "【$titleDate】\n情绪：$moodEmoji\n\n$content"
+        val entry = DiaryEntry(
+            date = today,
+            title = title,
+            content = fullContent,
+            mood = mood,
+            moodEmoji = moodEmoji,
+            tags = listOf("user_written"),
+        )
+        val ok = storage.insertDiary(personaId, entry)
+        if (ok) {
+            lastUpdateTime = System.currentTimeMillis()
+            // 更新关系图谱索引
+            updateGraphIndex(today, null, fullContent)
+        }
+        return ok
     }
 
-    fun getDiariesByMood(mood: String): List<DiaryEntry> {
-        return getAllDiaries().filter { it.mood == mood }
+    /**
+     * 根据 UI 层 DiaryEntry.id（即 createdAt.hashCode()）更新日记内容
+     * @param id UI 层 DiaryEntry.id
+     * @param content 新的正文内容
+     * @return true=更新成功；false=未找到对应日记
+     */
+    fun updateDiaryContentById(id: Long, content: String): Boolean {
+        if (content.isBlank()) return false
+        // 遍历所有日记，匹配 createdAt.hashCode().toLong() == id
+        val all = storage.getAllDiaries(personaId)
+        val target = all.firstOrNull { it.createdAt.hashCode().toLong() == id } ?: return false
+        val oldContent = target.content
+        val updated = target.copy(
+            content = content,
+            updatedAt = System.currentTimeMillis(),
+        )
+        val ok = storage.updateDiary(personaId, updated)
+        if (ok) {
+            lastUpdateTime = System.currentTimeMillis()
+            // 更新关系图谱索引(增量更新)
+            updateGraphIndex(target.date, oldContent, content)
+        }
+        return ok
     }
 
     fun canUpdateDiary(): Boolean {
@@ -171,13 +240,15 @@ class DiaryManager(private val context: Context, private val personaId: String =
 
     fun getTodayDiaryAppendCount(): Int {
         val today = dateFormat.format(Date())
-        val existing = getDiaryByDate(today) ?: return 0
+        val existing = storage.getDiary(personaId, today) ?: return 0
         return existing.content.split(Regex("""---\s*\d{1,2}:\d{2}\s*追加\s*---""")).size - 1
     }
 
+    // ─── Write operations (SQLite) ─────────────────────────────
+
     fun generateDailyDiary(chatTexts: List<String>, affectionLevel: Int) {
         val today = dateFormat.format(Date())
-        if (getDiaryByDate(today) != null) return
+        if (storage.getDiary(personaId, today) != null) return
 
         val combined = chatTexts.takeLast(20).joinToString(" | ")
         val mood = analyzeMood(combined)
@@ -227,15 +298,13 @@ class DiaryManager(private val context: Context, private val personaId: String =
             customFields = JSONObject()
         )
 
-        val file = File(diaryDir, "$today.json")
-        file.writeText(entry.toJson().toString(2))
-        updateIndex(entry)
+        storage.insertDiary(personaId, entry)
         lastUpdateTime = System.currentTimeMillis()
     }
 
     fun saveLlmDiary(llmContent: String, chatTexts: List<String>, affectionLevel: Int) {
         val today = dateFormat.format(Date())
-        if (getDiaryByDate(today) != null) return
+        if (storage.getDiary(personaId, today) != null) return
 
         val combined = chatTexts.takeLast(20).joinToString(" | ")
         val mood = analyzeMood(combined)
@@ -282,9 +351,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
             customFields = org.json.JSONObject()
         )
 
-        val file = File(diaryDir, "$today.json")
-        file.writeText(entry.toJson().toString(2))
-        updateIndex(entry)
+        storage.insertDiary(personaId, entry)
         lastUpdateTime = System.currentTimeMillis()
     }
 
@@ -292,7 +359,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
         if (!canUpdateDiary()) return
 
         val today = dateFormat.format(Date())
-        val existing = getDiaryByDate(today)
+        val existing = storage.getDiary(personaId, today)
 
         if (existing != null) {
             val summary = summarizeChatTexts(chatTexts)
@@ -326,9 +393,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
                 updatedAt = System.currentTimeMillis()
             )
 
-            val file = File(diaryDir, "$today.json")
-            file.writeText(entry.toJson().toString(2))
-            updateIndex(entry)
+            storage.updateDiary(personaId, entry)
         } else {
             generateDailyDiary(chatTexts, affectionLevel)
         }
@@ -337,7 +402,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
 
     fun appendLlmDiaryUpdate(llmUpdateContent: String, chatTexts: List<String>, affectionLevel: Int) {
         val today = dateFormat.format(Date())
-        val existing = getDiaryByDate(today) ?: return
+        val existing = storage.getDiary(personaId, today) ?: return
         if (getTodayDiaryAppendCount() >= 3) return
 
         val combined = chatTexts.takeLast(20).joinToString(" | ")
@@ -366,11 +431,57 @@ class DiaryManager(private val context: Context, private val personaId: String =
             updatedAt = System.currentTimeMillis()
         )
 
-        val file = File(diaryDir, "$today.json")
-        file.writeText(entry.toJson().toString(2))
-        updateIndex(entry)
+        storage.updateDiary(personaId, entry)
         lastUpdateTime = System.currentTimeMillis()
     }
+
+    /**
+     * 将记忆池溢出的归档内容追加到今日日记作为长期记忆
+     * @param archivedContent 归档的记忆内容
+     */
+    fun appendMemoryArchive(archivedContent: String) {
+        if (archivedContent.isBlank()) return
+        try {
+            val today = dateFormat.format(Date())
+            val existing = storage.getDiary(personaId, today)
+
+            val archiveSection = "\n\n--- 记忆归档 ---\n$archivedContent"
+
+            if (existing != null) {
+                // 追加到已有日记
+                val updatedEntry = existing.copy(
+                    content = existing.content + archiveSection,
+                    tags = existing.tags.toMutableList().apply {
+                        if (!contains("memory_archive")) add("memory_archive")
+                    },
+                    updatedAt = System.currentTimeMillis()
+                )
+                storage.updateDiary(personaId, updatedEntry)
+            } else {
+                // No diary exists yet — create one with the same archive section format
+                val entry = DiaryEntry(
+                    date = today,
+                    title = "记忆归档",
+                    content = "--- 记忆归档 ---\n$archivedContent",
+                    mood = "calm",
+                    moodEmoji = "📝",
+                    affectionLevel = 0,
+                    messageCount = 0,
+                    keyMemories = listOf(),
+                    tags = listOf("memory_archive"),
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis(),
+                    appVersion = com.aicompanion.BuildConfig.VERSION_NAME
+                )
+                storage.insertDiary(personaId, entry)
+            }
+            AppLogger.i(TAG, "记忆归档已写入日记: ${archivedContent.take(60)}...")
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "[Diary-Archive] 记忆归档写入文件失败: ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    // ─── Business logic (unchanged) ────────────────────────────
 
     private fun summarizeChatTexts(chatTexts: List<String>): String {
         if (chatTexts.isEmpty()) return "今天安静地度过了。"
@@ -446,7 +557,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
             }
             response?.text?.trim()
         } catch (e: Exception) {
-            Log.w(TAG, "generateLlmDiarySummary failed: ${e.message}")
+            Log.w(TAG, "[Diary-LLM] generateLlmDiarySummary生成日记总结失败: ${e.javaClass.simpleName}: ${e.message}")
             null
         }
     }
@@ -519,18 +630,26 @@ class DiaryManager(private val context: Context, private val personaId: String =
         return tips.random()
     }
 
-    fun deleteDiary(date: String): Boolean {
-        val file = File(diaryDir, "$date.json")
-        val deleted = file.delete()
-        if (deleted) {
-            val index = readIndex()
-            index.remove(date)
-            writeIndex(index)
+    private fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
+        var dot = 0f
+        var normA = 0f
+        var normB = 0f
+        for (i in a.indices) {
+            dot += a[i] * b[i]
+            normA += a[i] * a[i]
+            normB += b[i] * b[i]
         }
-        return deleted
+        val denom = kotlin.math.sqrt(normA) * kotlin.math.sqrt(normB)
+        return if (denom > 0f) dot / denom else 0f
     }
 
-    fun getDiaryCount(): Int = diaryDir.listFiles()?.count { it.isFile && it.extension == "json" && it.name != INDEX_FILE } ?: 0
+    // ─── Delete / Count (SQLite) ───────────────────────────────
+
+    fun deleteDiary(date: String): Boolean = storage.deleteDiary(personaId, date)
+
+    fun getDiaryCount(): Int = storage.getDiaryCount(personaId)
+
+    // ─── Export / Share (unchanged - operate on in-memory List) ─
 
     fun exportToMarkdown(entries: List<DiaryEntry>): String {
         val sb = StringBuilder()
@@ -608,9 +727,11 @@ class DiaryManager(private val context: Context, private val personaId: String =
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
         } catch (e: Exception) {
-            Log.e(TAG, "shareExport failed: ${e.message}", e)
+            Log.e(TAG, "[Diary-Share] shareExport分享导出失败: ${e.javaClass.simpleName}: ${e.message}", e)
         }
     }
+
+    // ─── Import (SQLite-backed) ────────────────────────────────
 
     data class ImportResult(
         val imported: Int,
@@ -652,8 +773,6 @@ class DiaryManager(private val context: Context, private val personaId: String =
                     errors.add("无法识别日记格式")
                 }
             }
-
-            rebuildIndex()
         } catch (e: Exception) {
             errors.add("JSON解析失败: ${e.message}")
         }
@@ -667,34 +786,8 @@ class DiaryManager(private val context: Context, private val personaId: String =
     }
 
     fun importDiary(entry: DiaryEntry): Boolean {
-        val file = File(diaryDir, "${entry.date}.json")
-        if (file.exists()) return false
-        return try {
-            file.writeText(entry.toJson().toString(2))
-            true
-        } catch (_: Exception) { false }
-    }
-
-    private fun rebuildIndex() {
-        val index = JSONObject()
-        diaryDir.listFiles()?.filter { it.isFile && it.extension == "json" && it.name != INDEX_FILE }?.forEach { file ->
-            try {
-                val json = JSONObject(file.readText())
-                val date = json.optString("date", "")
-                if (date.isNotBlank()) {
-                    val idxObj = JSONObject().apply {
-                        put("title", json.optString("title", ""))
-                        put("mood", json.optString("mood", "normal"))
-                        put("mood_emoji", json.optString("mood_emoji", "😊"))
-                        put("affection_level", json.optInt("affection_level", 0))
-                        put("message_count", json.optInt("message_count", 0))
-                        put("created_at", json.optLong("created_at", 0))
-                        put("version", json.optInt("version", 1))
-                    }
-                    index.put(date, idxObj)
-                }
-            } catch (e: Exception) { AppLogger.e("DiaryManager", "rebuildIndex: ${e.message}") }
-        }
-        writeIndex(index)
+        val existing = storage.getDiary(personaId, entry.date)
+        if (existing != null) return false
+        return storage.insertDiary(personaId, entry)
     }
 }

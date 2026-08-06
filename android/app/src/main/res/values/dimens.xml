@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    星尘设计系统 - 间距与尺寸
+    基于 Impeccable 8pt 网格系统：所有间距为 4dp 的倍数
+    核心原则：一致性 > 灵活性，使用语义化命名
+-->
+<resources>
+    <!-- ===== 基础间距 (4pt 网格) ===== -->
+    <dimen name="space_0">0dp</dimen>
+    <dimen name="space_1">2dp</dimen>   <!-- 微间距：图标内边距 -->
+    <dimen name="space_2">4dp</dimen>   <!-- 最小间距：紧凑元素间 -->
+    <dimen name="space_3">8dp</dimen>   <!-- 标准小间距 -->
+    <dimen name="space_4">12dp</dimen>  <!-- 元素内间距 -->
+    <dimen name="space_5">16dp</dimen>  <!-- 标准间距：卡片内边距 -->
+    <dimen name="space_6">20dp</dimen>  <!-- 中等间距 -->
+    <dimen name="space_7">24dp</dimen>  <!-- 大间距：区块间距 -->
+    <dimen name="space_8">32dp</dimen>  <!-- 超大间距：页面边距 -->
+    <dimen name="space_9">40dp</dimen>  <!-- 区块分隔 -->
+    <dimen name="space_10">48dp</dimen> <!-- 页面级间距 -->
+    <dimen name="space_12">64dp</dimen> <!-- 超大分隔 -->
+
+    <!-- ===== 语义化间距 ===== -->
+    <!-- 页面级 -->
+    <dimen name="page_horizontal">@dimen/space_5</dimen>  <!-- 16dp 页面水平边距 -->
+    <dimen name="page_vertical">@dimen/space_5</dimen>    <!-- 16dp 页面垂直边距 -->
+
+    <!-- 卡片 -->
+    <dimen name="card_padding">@dimen/space_5</dimen>     <!-- 16dp 卡片内边距 -->
+    <dimen name="card_gap">@dimen/space_3</dimen>         <!-- 8dp 卡片间距 -->
+    <dimen name="card_radius">16dp</dimen>                <!-- 16dp 卡片圆角 -->
+
+    <!-- 列表项 -->
+    <dimen name="list_item_height">56dp</dimen>           <!-- 标准列表项高度 -->
+    <dimen name="list_item_padding">@dimen/space_5</dimen> <!-- 16dp 列表项内边距 -->
+    <dimen name="list_item_gap">@dimen/space_2</dimen>    <!-- 4dp 列表项间距 -->
+
+    <!-- 消息气泡 -->
+    <dimen name="bubble_padding_h">@dimen/space_4</dimen> <!-- 12dp 气泡水平内边距 -->
+    <dimen name="bubble_padding_v">@dimen/space_3</dimen> <!-- 8dp 气泡垂直内边距 -->
+    <dimen name="bubble_radius">18dp</dimen>              <!-- 18dp 气泡圆角 -->
+    <dimen name="bubble_radius_small">6dp</dimen>         <!-- 6dp 气泡小圆角（尾巴侧） -->
+    <dimen name="bubble_max_width">280dp</dimen>          <!-- 气泡最大宽度 -->
+    <dimen name="bubble_gap">@dimen/space_2</dimen>       <!-- 4dp 气泡间距 -->
+
+    <!-- 输入框 -->
+    <dimen name="input_padding_h">@dimen/space_5</dimen>  <!-- 16dp 输入框水平内边距 -->
+    <dimen name="input_padding_v">@dimen/space_3</dimen>  <!-- 8dp 输入框垂直内边距 -->
+    <dimen name="input_radius">24dp</dimen>               <!-- 24dp 输入框圆角（药丸形） -->
+    <dimen name="input_height">44dp</dimen>               <!-- 44dp 输入框高度（满足 44pt 触控目标） -->
+
+    <!-- 按钮 -->
+    <dimen name="button_height">44dp</dimen>              <!-- 44dp 按钮高度 -->
+    <dimen name="button_radius">22dp</dimen>              <!-- 22dp 按钮圆角（药丸形） -->
+    <dimen name="button_padding_h">@dimen/space_7</dimen> <!-- 24dp 按钮水平内边距 -->
+    <dimen name="button_icon_size">20dp</dimen>           <!-- 20dp 按钮图标尺寸 -->
+    <dimen name="icon_button_size">40dp</dimen>           <!-- 40dp 图标按钮尺寸 -->
+    <dimen name="fab_size">56dp</dimen>                   <!-- 56dp FAB 尺寸 -->
+
+    <!-- 头像 -->
+    <dimen name="avatar_small">28dp</dimen>               <!-- 28dp 小头像（消息列表） -->
+    <dimen name="avatar_medium">36dp</dimen>              <!-- 36dp 中头像（工具栏） -->
+    <dimen name="avatar_large">56dp</dimen>               <!-- 56dp 大头像（个人资料） -->
+    <dimen name="avatar_xlarge">80dp</dimen>              <!-- 80dp 超大头像 -->
+    <dimen name="avatar_border">2dp</dimen>               <!-- 2dp 头像边框 -->
+
+    <!-- 工具栏 -->
+    <dimen name="toolbar_height">52dp</dimen>             <!-- 52dp 工具栏高度 -->
+    <dimen name="toolbar_icon_size">22dp</dimen>          <!-- 22dp 工具栏图标 -->
+
+    <!-- 底部栏 -->
+    <dimen name="bottom_bar_height">60dp</dimen>          <!-- 60dp 底部栏高度 -->
+
+    <!-- 分隔线 -->
+    <dimen name="divider_height">0.5dp</dimen>            <!-- 0.5dp 分隔线 -->
+    <dimen name="divider_margin">@dimen/space_5</dimen>   <!-- 16dp 分隔线边距 -->
+
+    <!-- 标签/Chip -->
+    <dimen name="chip_height">32dp</dimen>                <!-- 32dp Chip 高度 -->
+    <dimen name="chip_radius">16dp</dimen>                <!-- 16dp Chip 圆角 -->
+    <dimen name="chip_padding_h">@dimen/space_4</dimen>   <!-- 12dp Chip 水平内边距 -->
+
+    <!-- 进度条 -->
+    <dimen name="progress_height">4dp</dimen>             <!-- 4dp 进度条高度 -->
+    <dimen name="progress_radius">2dp</dimen>             <!-- 2dp 进度条圆角 -->
+
+    <!-- 描边 -->
+    <dimen name="stroke_thin">0.5dp</dimen>               <!-- 0.5dp 细描边 -->
+    <dimen name="stroke_normal">1dp</dimen>               <!-- 1dp 标准描边 -->
+    <dimen name="stroke_thick">2dp</dimen>                <!-- 2dp 粗描边 -->
+
+    <!-- 阴影 -->
+    <dimen name="elevation_low">2dp</dimen>               <!-- 2dp 低阴影 -->
+    <dimen name="elevation_medium">4dp</dimen>            <!-- 4dp 中阴影 -->
+    <dimen name="elevation_high">8dp</dimen>              <!-- 8dp 高阴影 -->
+
+    <!-- ===== 动效时长 (Impeccable + Anime.js 原则) ===== -->
+    <!-- 微交互：100-200ms，标准过渡：200-350ms，复杂动画：350-500ms -->
+    <integer name="duration_instant">75</integer>         <!-- 75ms 即时反馈 -->
+    <integer name="duration_quick">150</integer>          <!-- 150ms 微交互 -->
+    <integer name="duration_standard">250</integer>       <!-- 250ms 标准过渡 -->
+    <integer name="duration_emphasized">400</integer>     <!-- 400ms 强调过渡 -->
+    <integer name="duration_complex">550</integer>        <!-- 550ms 复杂动画 -->
+
+    <!-- ===== 文字大小 (排版系统) ===== -->
+    <dimen name="text_display">28sp</dimen>
+    <dimen name="text_headline">22sp</dimen>
+    <dimen name="text_title">17sp</dimen>
+    <dimen name="text_body">15sp</dimen>
+    <dimen name="text_body_secondary">14sp</dimen>
+    <dimen name="text_caption">12sp</dimen>
+    <dimen name="text_overline">11sp</dimen>
+</resources>

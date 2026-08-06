@@ -1,0 +1,20 @@
+// Tauri IPC 命令层模块
+pub mod chat;
+pub mod persona;
+pub mod memory;
+pub mod voice;
+pub mod settings;
+pub mod group_chat;
+pub mod virtual_world;
+pub mod plugin;
+pub mod diary;
+pub mod moments;
+pub mod sticker;
+pub mod achievement;
+pub mod calendar;
+pub mod capsule;
+pub mod album;
+pub mod model;
+pub mod system;
+pub mod pixelpet;
+pub mod agent;

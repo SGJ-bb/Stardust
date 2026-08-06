@@ -4,18 +4,18 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0d1117">
+    android:background="@color/bg_base">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="#1a1a30"
+        android:background="@drawable/bg_toolbar_glass"
         android:elevation="4dp"
         app:title="成就殿堂"
-        app:titleTextColor="#ffffff"
+        app:titleTextColor="@color/text_primary"
         app:navigationIcon="@android:drawable/ic_menu_close_clear_cancel"
-        app:navigationIconTint="#aabbdd" />
+        app:navigationIconTint="@color/text_secondary" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -23,14 +23,14 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:padding="16dp"
-        android:background="#161b22">
+        android:background="@color/surface_card">
 
         <TextView
             android:id="@+id/tv_achievement_progress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="已解锁 0/18"
-            android:textColor="#e6edf3"
+            android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -53,7 +53,7 @@
         android:orientation="horizontal"
         android:paddingHorizontal="8dp"
         android:paddingVertical="6dp"
-        android:background="#161b22">
+        android:background="@color/surface_card">
 
         <com.google.android.material.chip.Chip
             android:id="@+id/chip_cat_all"
@@ -119,10 +119,10 @@
             android:id="@+id/listview_achievements"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:divider="#1c2128"
+            android:divider="@color/stroke_subtle"
             android:dividerHeight="1dp"
-            android:padding="8dp"
-            android:background="#0d1117" />
+            android:padding="16dp"
+            android:background="@color/bg_base" />
 
         <TextView
             android:id="@+id/tv_achievement_empty"
@@ -130,7 +130,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:text="暂无此类成就"
-            android:textColor="#667788"
+            android:textColor="@color/text_muted"
             android:textSize="14sp"
             android:visibility="gone" />
     </FrameLayout>

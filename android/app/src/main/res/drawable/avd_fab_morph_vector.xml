@@ -1,0 +1,52 @@
+<!--
+    avd_fab_morph_vector.xml — FAB 按钮形态变换矢量图（anim_fab_morph 的 drawable 源）
+    包含：+号图标 (竖线+横线) + 展开横条 + 光晕扩散圆
+    viewport: 24x24, 中心在 (12, 12)
+    颜色使用 brand_primary (#667eea)
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- ===== 光晕扩散层（第二层圆，初始透明） ===== -->
+    <path
+        android:name="glow_ring"
+        android:pathData="M12,2 A10,10 0 1,1 12,22 A10,10 0 1,1 12,2 Z"
+        android:fillColor="#33667eea"
+        android:pivotX="12"
+        android:pivotY="12"/>
+
+    <!-- ===== +号 竖线 ===== -->
+    <group android:name="plus_vertical"
+        android:pivotX="12"
+        android:pivotY="12">
+        <path
+            android:name="vertical_line"
+            android:pathData="M12,5 L12,19"
+            android:strokeColor="#667eea"
+            android:strokeWidth="2.2"
+            android:strokeLineCap="round"/>
+    </group>
+
+    <!-- ===== +号 横线（展开时向两侧延伸） ===== -->
+    <group android:name="plus_horizontal"
+        android:pivotX="12"
+        android:pivotY="12">
+        <path
+            android:name="horizontal_line"
+            android:pathData="M5,12 L19,12"
+            android:strokeColor="#667eea"
+            android:strokeWidth="2.2"
+            android:strokeLineCap="round"/>
+    </group>
+
+    <!-- ===== 展开后的横条（替代+号的横向长条，初始透明） ===== -->
+    <path
+        android:name="expand_bar"
+        android:pathData="M4,11.5 L20,11.5 L20,12.5 L4,12.5 Z"
+        android:fillColor="#667eea"
+        android:alpha="0"/>
+
+</vector>

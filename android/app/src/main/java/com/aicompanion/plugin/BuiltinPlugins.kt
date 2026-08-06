@@ -163,7 +163,12 @@ class SearchMemoryPlugin : ToolPlugin {
         val args = JSONObject(arguments)
         val query = args.optString("query", "")
         if (query.isBlank()) return "错误：请提供搜索关键词"
-        return onSearchMemory?.invoke(query, 5) ?: "记忆搜索功能未初始化"
+        return try {
+            onSearchMemory?.invoke(query, 5) ?: "记忆搜索功能未初始化"
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.e("SearchMemoryPlugin", "[Plugin-Memory] search_memory执行失败: ${e.javaClass.simpleName}: ${e.message} | query='${query.take(30)}'")
+            "记忆搜索出错: ${e.message}"
+        }
     }
 }
 
@@ -188,7 +193,12 @@ class SearchDiaryPlugin : ToolPlugin {
         val query = args.optString("query", "")
         if (query.isBlank()) return "错误：请提供搜索关键词"
         val topK = args.optInt("top_k", 3).coerceIn(1, 10)
-        return onSearchDiary?.invoke(query, topK) ?: "日记搜索功能未初始化"
+        return try {
+            onSearchDiary?.invoke(query, topK) ?: "日记搜索功能未初始化"
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.e("SearchDiaryPlugin", "[Plugin-Diary] search_diary执行失败: ${e.javaClass.simpleName}: ${e.message} | query='${query.take(30)}'")
+            "日记搜索出错: ${e.message}"
+        }
     }
 }
 
@@ -292,6 +302,10 @@ class GenerateImagePlugin(private val context: Context) : ToolPlugin {
     var associatedEventId: String? = null
     var worldId: String = ""
 
+    private var _enabledCached: Boolean? = null
+    private var _enabledCheckedAt = 0L
+    private val CACHE_DURATION_MS = 30_000L // 30秒缓存
+
     companion object {
         private val _generatedImagePaths = java.util.concurrent.ConcurrentLinkedQueue<String>()
         val generatedImagePaths: List<String> get() = _generatedImagePaths.toList()
@@ -311,15 +325,42 @@ class GenerateImagePlugin(private val context: Context) : ToolPlugin {
     }
 
     override fun isEnabled(): Boolean {
-        val vwManager = VirtualWorldManager(context, worldId)
-        if (vwManager.hasImageModelConfigured()) return true
-        val globalVw = VirtualWorldManager(context, "")
-        return globalVw.hasImageModelConfigured()
+        // 30秒内缓存结果，避免频繁实例化 VirtualWorldManager
+        val now = System.currentTimeMillis()
+        if (_enabledCached != null && (now - _enabledCheckedAt) < CACHE_DURATION_MS) {
+            return _enabledCached!!
+        }
+        val vwManager = com.aicompanion.virtualworld.VirtualWorldManager(context, worldId)
+        var result = vwManager.hasImageModelConfigured()
+        if (!result) {
+            val globalVw = com.aicompanion.virtualworld.VirtualWorldManager(context, "")
+            result = globalVw.hasImageModelConfigured()
+        }
+        _enabledCached = result
+        _enabledCheckedAt = now
+        return result
     }
 
     override fun getDefinition() = ToolDefinition(
         name = "generate_image",
-        description = "根据文字描述生成一张图片。适用场景：1)虚拟世界推演时，为重要场景或关键时刻生成配图；2)用户让你画图、生成图片时；3)你想用图片展示某个场景时。只在确实需要图片时调用，不要每次都调用。",
+        description = """根据文字描述生成一张图片。严格按以下条件判断是否调用：
+
+【必须调用的场景】
+- 用户明确要求画图、生成图片、发照片、发图
+- 虚拟世界推演中发生重大剧情转折（初次相遇/告白/战斗/死亡/婚礼等）
+- 场景有强烈的视觉画面感且对理解剧情有帮助（星空下的对话、雨中的奔跑、樱花飘落等）
+- 用户描述了一个具体画面想看效果
+
+【不要调用的场景】
+- 普通日常对话（吃饭、聊天、学习）
+- 纯文字就能表达清楚的场景
+- 连续多条记录都已生成过图片（避免刷屏）
+- 内容涉及敏感/暴力/成人内容
+
+【prompt编写规范】
+- 用英文描述，包含主体、动作、环境、氛围、光影
+- 示例："a girl with silver hair standing under cherry blossoms at sunset, soft golden light, anime style"
+- 风格保持一致：anime/manga风格，与角色设定匹配""",
         parameters = mapOf(
             "type" to "object",
             "properties" to mapOf(
@@ -360,7 +401,7 @@ class GenerateImagePlugin(private val context: Context) : ToolPlugin {
                 "图片生成失败，请稍后再试"
             }
         } catch (e: Exception) {
-            AppLogger.e("GenerateImagePlugin", "execute failed: ${e.message}")
+            AppLogger.e("GenerateImagePlugin", "[Plugin-Image] generate_image图片生成失败: ${e.javaClass.simpleName}: ${e.message} | prompt='${fullPrompt.take(50)}'")
             "图片生成失败：${e.message}"
         }
     }

@@ -106,7 +106,7 @@ class GlobalMemoryPool(
                 }
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "consolidate failed: ${e.message}")
+            AppLogger.e(TAG, "[Memory-Global] 全局记忆池整合失败: ${e.javaClass.simpleName}: ${e.message}")
         }
 
         if (totalCharCount > MAX_CHARS) {
@@ -154,7 +154,7 @@ class GlobalMemoryPool(
                 .putInt("write_count", writeCount)
                 .apply()
         } catch (e: Exception) {
-            AppLogger.e(TAG, "saveToStorage error: ${e.message}")
+            AppLogger.e(TAG, "[Memory-Global] 全局记忆保存到存储失败: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -170,7 +170,7 @@ class GlobalMemoryPool(
             writeCount = prefs.getInt("write_count", 0)
             recalcCharCount()
         } catch (e: Exception) {
-            AppLogger.e(TAG, "loadFromStorage error: ${e.message}")
+            AppLogger.e(TAG, "[Memory-Global] 全局记忆从存储加载失败: ${e.javaClass.simpleName}: ${e.message}")
             entries.clear()
         }
     }
@@ -186,5 +186,16 @@ class GlobalMemoryPool(
         prefs.edit().clear().apply()
     }
 
+    fun delete(entryId: String) = synchronized(lock) {
+        val idx = entries.indexOfFirst { it.id == entryId }
+        if (idx >= 0) {
+            val removed = entries.removeAt(idx)
+            totalCharCount -= removed.content.length
+            saveToStorage()
+        }
+    }
+
     fun getStats(): String = "全局${entries.size}条 | ${totalCharCount}字"
+
+    fun getAll(): List<MemoryEntry> = synchronized(lock) { entries.toList() }
 }

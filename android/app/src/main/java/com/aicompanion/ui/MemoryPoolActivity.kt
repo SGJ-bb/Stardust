@@ -7,10 +7,27 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.aicompanion.memory.ContextManager
 import com.aicompanion.memory.MemoryEntry
+import com.aicompanion.R
 
 class MemoryPoolActivity : AppCompatActivity() {
+
+    companion object {
+        private const val TAG = "MemoryPoolActivity"
+    }
+
+    // 文件级颜色常量
+    private val COLOR_GLOBAL_TITLE = 0xFF34d399.toInt() // 跨场景记忆标题
+    private val COLOR_CARD_BG = 0x22ffffff.toInt() // 卡片背景
+    private val COLOR_BADGE_TEXT = 0xFF1a1a2e.toInt() // 标签文字
+    private val COLOR_DELETE_TEXT = 0xFFff6666.toInt() // 删除按钮
+    private val COLOR_MEMORY_SUMMARY = 0xFF9c7cff.toInt() // 总结类型
+    private val COLOR_MEMORY_DETAIL = 0xFF7dd3fc.toInt() // 细节类型
+    private val COLOR_MEMORY_INHERIT = 0xFFfbbf24.toInt() // 继承类型
+    private val COLOR_MEMORY_GLOBAL = 0xFF34d399.toInt() // 全局类型
+    private val COLOR_MEMORY_DEFAULT = 0xFF808890.toInt() // 默认类型
 
     private lateinit var contextManager: ContextManager
     private lateinit var container: LinearLayout
@@ -29,12 +46,12 @@ class MemoryPoolActivity : AppCompatActivity() {
         container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 24, 32, 32)
-            setBackgroundColor(0xFF0a0a1a.toInt())
+            setBackgroundColor(ContextCompat.getColor(this@MemoryPoolActivity, R.color.bg_base))
         }
 
         tvStats = TextView(this).apply {
             textSize = 14f
-            setTextColor(0xFFaabbdd.toInt())
+            setTextColor(ContextCompat.getColor(this@MemoryPoolActivity, R.color.text_secondary))
             setPadding(0, 0, 0, 16)
         }
         container.addView(tvStats)
@@ -43,6 +60,19 @@ class MemoryPoolActivity : AppCompatActivity() {
 
         scrollView.addView(container)
         setContentView(scrollView)
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
+        }
     }
 
     private fun refreshList() {
@@ -50,13 +80,14 @@ class MemoryPoolActivity : AppCompatActivity() {
 
         val entries = contextManager.memoryPool.getAll()
         val details = contextManager.memoryPool.getAllDetails()
+        val globalEntries = contextManager.globalMemoryPool.getAll()
         tvStats.text = contextManager.getSessionStats()
 
-        if (entries.isEmpty() && details.isEmpty()) {
+        if (entries.isEmpty() && details.isEmpty() && globalEntries.isEmpty()) {
             val emptyView = TextView(this).apply {
-                text = "记忆池为空\n\n开始聊天后，AI会自动提取并记录场景、剧情和关键信息\n每2轮对话提取记忆，每10轮对话压缩整理"
+                text = "记忆池为空\n\n开始聊天后，AI会自动提取并记录场景、剧情和关键信息\n每2轮对话提取记忆，每10轮对话压缩整理\n\n群聊中的重要信息也会同步到跨场景记忆"
                 textSize = 14f
-                setTextColor(0xFF667788.toInt())
+                setTextColor(ContextCompat.getColor(this@MemoryPoolActivity, R.color.text_muted))
                 gravity = android.view.Gravity.CENTER
                 setPadding(0, 64, 0, 0)
                 alpha = 0.7f
@@ -65,11 +96,25 @@ class MemoryPoolActivity : AppCompatActivity() {
             return
         }
 
+        // 跨场景共享记忆（包含群聊同步过来的记忆）
+        if (globalEntries.isNotEmpty()) {
+            val globalTitle = TextView(this).apply {
+                text = "🌐 跨场景记忆（含群聊同步）"
+                textSize = 15f
+                setTextColor(COLOR_GLOBAL_TITLE)
+                setPadding(0, 8, 0, 8)
+            }
+            container.addView(globalTitle)
+            for (entry in globalEntries) {
+                addEntryView(entry, isGlobal = true)
+            }
+        }
+
         if (entries.isNotEmpty()) {
             val sectionTitle = TextView(this).apply {
                 text = "📝 总结记忆"
                 textSize = 15f
-                setTextColor(0xFFc4b5fd.toInt())
+                setTextColor(ContextCompat.getColor(this@MemoryPoolActivity, R.color.brand_accent))
                 setPadding(0, 8, 0, 8)
             }
             container.addView(sectionTitle)
@@ -82,7 +127,7 @@ class MemoryPoolActivity : AppCompatActivity() {
             val detailTitle = TextView(this).apply {
                 text = "🔍 细节记忆"
                 textSize = 15f
-                setTextColor(0xFF7dd3fc.toInt())
+                setTextColor(ContextCompat.getColor(this@MemoryPoolActivity, R.color.accent_cyan))
                 setPadding(0, 16, 0, 8)
             }
             container.addView(detailTitle)
@@ -92,10 +137,10 @@ class MemoryPoolActivity : AppCompatActivity() {
         }
     }
 
-    private fun addEntryView(entry: MemoryEntry) {
+    private fun addEntryView(entry: MemoryEntry, isGlobal: Boolean = false) {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0x22ffffff)
+            setBackgroundColor(COLOR_CARD_BG)
             setPadding(16, 12, 16, 12)
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -109,13 +154,28 @@ class MemoryPoolActivity : AppCompatActivity() {
         }
 
         val categoryBadge = TextView(this).apply {
-            text = entry.category
+            text = if (isGlobal) "全局" else entry.category
             textSize = 10f
-            setTextColor(0xFF1a1a2e.toInt())
-            setBackgroundColor(getCategoryColor(entry.category))
+            setTextColor(COLOR_BADGE_TEXT)
+            setBackgroundColor(getCategoryColor(if (isGlobal) "全局" else entry.category))
             setPadding(8, 2, 8, 2)
         }
         headerRow.addView(categoryBadge)
+
+        if (isGlobal) {
+            val sceneBadge = TextView(this).apply {
+                text = "跨场景"
+                textSize = 10f
+                setTextColor(COLOR_BADGE_TEXT)
+                setBackgroundColor(COLOR_MEMORY_GLOBAL)
+                setPadding(8, 2, 8, 2)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(4, 0, 0, 0) }
+            }
+            headerRow.addView(sceneBadge)
+        }
 
         val spacer = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
@@ -125,10 +185,12 @@ class MemoryPoolActivity : AppCompatActivity() {
         val deleteBtn = TextView(this).apply {
             text = "✕"
             textSize = 14f
-            setTextColor(0xFFff6666.toInt())
+            setTextColor(COLOR_DELETE_TEXT)
             setPadding(16, 0, 0, 0)
             setOnClickListener {
-                if (entry.category == "细节") {
+                if (isGlobal) {
+                    contextManager.globalMemoryPool.delete(entry.id)
+                } else if (entry.category == "细节") {
                     contextManager.memoryPool.deleteDetailEntry(entry.id)
                 } else {
                     contextManager.memoryPool.delete(entry.id)
@@ -143,7 +205,7 @@ class MemoryPoolActivity : AppCompatActivity() {
         val contentText = TextView(this).apply {
             text = entry.content
             textSize = 14f
-            setTextColor(0xFFe8e8f0.toInt())
+            setTextColor(ContextCompat.getColor(this@MemoryPoolActivity, R.color.text_primary))
             setPadding(0, 8, 0, 0)
         }
         card.addView(contentText)
@@ -152,10 +214,11 @@ class MemoryPoolActivity : AppCompatActivity() {
     }
 
     private fun getCategoryColor(category: String): Int = when (category) {
-        "总结" -> 0xFF9c7cff.toInt()
-        "细节" -> 0xFF7dd3fc.toInt()
-        "继承" -> 0xFFfbbf24.toInt()
-        else -> 0xFF808890.toInt()
+        "总结" -> COLOR_MEMORY_SUMMARY
+        "细节" -> COLOR_MEMORY_DETAIL
+        "继承" -> COLOR_MEMORY_INHERIT
+        "全局" -> COLOR_MEMORY_GLOBAL
+        else -> COLOR_MEMORY_DEFAULT
     }
 
     override fun onResume() {

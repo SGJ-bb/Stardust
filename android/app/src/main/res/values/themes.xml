@@ -1,17 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    星尘设计系统 - 主题定义
+    基于 Impeccable 设计原则 + Material3 DayNight 主题
+    支持: 暗色(默认) / 亮色 / 跟随系统 自动切换
+    核心原则：统一色彩令牌、语义化引用、一致性优先
+-->
 <resources>
-    <style name="Theme.Companion" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="colorPrimary">@color/accent_blue</item>
-        <item name="colorPrimaryVariant">@color/purple_700</item>
-        <item name="colorOnPrimary">@color/white</item>
+
+    <!-- ===== 主主题 (DayNight — 支持暗/亮自动切换) ===== -->
+    <style name="Theme.Companion" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- 品牌色 -->
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorPrimaryVariant">@color/brand_secondary</item>
+        <item name="colorOnPrimary">@color/text_on_accent</item>
         <item name="colorSecondary">@color/accent_cyan</item>
-        <item name="colorSecondaryVariant">@color/teal_700</item>
+        <item name="colorSecondaryVariant">@color/accent_purple</item>
+        <item name="colorOnSecondary">@color/text_on_accent</item>
+
+        <!-- 表面 -->
         <item name="colorSurface">@color/surface_dark</item>
         <item name="colorOnSurface">@color/text_primary</item>
-        <item name="android:statusBarColor">@color/bg_start</item>
-        <item name="android:navigationBarColor">@color/bg_start</item>
+        <item name="colorSurfaceVariant">@color/surface_card</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+
+        <!-- 背景 -->
+        <item name="android:statusBarColor">@color/bg_base</item>
+        <item name="android:navigationBarColor">@color/bg_base</item>
         <item name="android:windowBackground">@color/bg_start</item>
 
+        <!-- 错误/语义色 -->
+        <item name="colorError">@color/semantic_error</item>
+        <item name="colorOnError">@color/text_on_accent</item>
+
+        <!-- 过渡动画 (Impeccable: 快速流畅) -->
         <item name="android:activityOpenEnterAnimation">@anim/slide_in_right</item>
         <item name="android:activityOpenExitAnimation">@anim/fade_out</item>
         <item name="android:activityCloseEnterAnimation">@anim/fade_in</item>
@@ -20,19 +41,37 @@
         <item name="android:windowEnterTransition">@android:transition/fade</item>
         <item name="android:windowExitTransition">@android:transition/fade</item>
 
+        <!-- 边缘效果 -->
         <item name="android:colorEdgeEffect">@color/accent_purple</item>
 
+        <!-- 对话框主题 -->
         <item name="alertDialogTheme">@style/ThemeOverlay.Companion.AlertDialog</item>
         <item name="android:alertDialogTheme">@style/ThemeOverlay.Companion.AlertDialog.Legacy</item>
         <item name="android:datePickerDialogTheme">@style/ThemeOverlay.Companion.DatePicker</item>
         <item name="android:timePickerDialogTheme">@style/ThemeOverlay.Companion.TimePicker</item>
+
+        <!-- 文本外观 (引用设计系统排版) -->
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.Stardust.Display</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Stardust.Headline</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.Stardust.Title</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.Stardust.Body</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.Stardust.BodySecondary</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.Stardust.Caption</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.Stardust.Overline</item>
+
+        <!-- 涟漪 -->
+        <item name="colorControlHighlight">@color/ripple_accent</item>
+        <item name="colorControlActivated">@color/brand_primary</item>
     </style>
 
+    <!-- ===== 对话框覆盖主题 ===== -->
     <style name="ThemeOverlay.Companion.AlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="colorSurface">@color/surface_card</item>
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.Stardust.Button.Primary</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.Stardust.Button.Secondary</item>
     </style>
 
     <style name="ThemeOverlay.Companion.AlertDialog.Legacy" parent="android:Theme.DeviceDefault.Dialog.Alert">
@@ -56,30 +95,24 @@
         <item name="colorOnSurface">@color/text_primary</item>
     </style>
 
-    <style name="ToolbarTitleStyle" parent="TextAppearance.Material3.TitleMedium">
-        <item name="android:textSize">18sp</item>
-        <item name="android:textColor">#ffffff</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="android:letterSpacing">0.02</item>
-    </style>
-
-    <style name="AnimeCardView" parent="Widget.Material3.CardView.Filled">
-        <item name="cardCornerRadius">16dp</item>
-        <item name="cardElevation">0dp</item>
-        <item name="strokeColor">@color/stroke</item>
-        <item name="strokeWidth">1dp</item>
-        <item name="cardBackgroundColor">@color/surface_card</item>
-    </style>
-
-    <style name="AnimeButton" parent="Widget.Material3.Button.TonalButton">
+    <!-- ===== 工具栏标题 (引用设计系统排版) ===== -->
+    <style name="ToolbarTitleStyle" parent="TextAppearance.Stardust.ToolbarTitle">
         <item name="android:textColor">@color/text_primary</item>
-        <item name="cornerRadius">12dp</item>
-        <item name="android:stateListAnimator">@null</item>
+    </style>
+
+    <!-- ===== 兼容旧样式 (Legacy Compatibility) ===== -->
+    <style name="AnimeCardView" parent="Widget.Stardust.Card">
+        <!-- 旧 AnimeCardView 现在指向设计系统标准卡片 -->
+    </style>
+
+    <style name="AnimeButton" parent="Widget.Stardust.Button.Secondary">
+        <!-- 旧 AnimeButton 现在指向设计系统次按钮 -->
     </style>
 
     <style name="AnimeFab" parent="Widget.Material3.FloatingActionButton.Primary">
-        <item name="fabCustomSize">56dp</item>
-        <item name="elevation">6dp</item>
+        <item name="fabCustomSize">@dimen/fab_size</item>
+        <item name="elevation">@dimen/elevation_high</item>
         <item name="borderWidth">0dp</item>
     </style>
+
 </resources>

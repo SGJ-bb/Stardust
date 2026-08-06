@@ -110,7 +110,22 @@ class HomeActivity : AppCompatActivity() {
         val btnSettings = findViewById<View>(R.id.btn_settings_entry)
         com.aicompanion.anim.AnimeUtils.setupTouchScale(btnSettings)
         btnSettings.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+            // 设置页已迁移到 Compose 版 SettingsScreen，从 MainActivity 进入
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+        }
+
+        val btnWechatChat = findViewById<View>(R.id.btn_wechat_chat_entry)
+        com.aicompanion.anim.AnimeUtils.setupTouchScale(btnWechatChat)
+        btnWechatChat.setOnClickListener {
+            val authManager = com.aicompanion.ilink.IlinkAuthManager(this)
+            if (!authManager.isBound) {
+                Toast.makeText(this, "请先绑定微信（设置→微信连接）", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val intent = Intent(this, com.aicompanion.ilink.WechatChatActivity::class.java)
+            intent.putExtra(com.aicompanion.ilink.WechatChatActivity.EXTRA_PERSONA_ID, personaManager.getActivePersona().id)
+            startActivity(intent)
         }
 
         findViewById<View>(R.id.btn_export_personas).setOnClickListener {
@@ -218,8 +233,25 @@ class HomeActivity : AppCompatActivity() {
         val userAbilities: String = ""
     )
 
-    private fun generatePersonaWithAI(keywords: String): AIGeneratedPersona? {
-        val apiClient = com.aicompanion.AppContainer.apiClient ?: return null
+    private suspend fun generatePersonaWithAI(keywords: String): AIGeneratedPersona? {
+        // 确保 ApiClient 已初始化（HomeActivity 可能是第一个 Activity）
+        val container = com.aicompanion.AppContainer
+        if (container.apiClient == null) {
+            container.rebuildApiClient()
+        }
+        val apiClient = container.apiClient
+
+        // 区分性错误提示
+        if (apiClient == null) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    this@HomeActivity,
+                    "API 未配置，请先在设置中填写 API 地址和密钥",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            return null
+        }
         val prompt = buildString {
             append("请为一个AI角色生成完整、详尽的角色设定。\n")
             if (keywords.isNotBlank()) {
@@ -304,6 +336,15 @@ class HomeActivity : AppCompatActivity() {
                 0xFF0a0a1a.toInt()
             }
             findViewById<View>(R.id.home_root)?.setBackgroundColor(bgColor)
+
+            // 设置工具栏背景跟随主题方案
+            val toolbarBg = try {
+                android.graphics.Color.parseColor(scheme.toolbarColor)
+            } catch (_: Exception) {
+                val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                if (isDark) 0xCC14142A.toInt() else 0xCCF5F6FA.toInt()
+            }
+            findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(toolbarBg)
         } catch (e: Exception) { com.aicompanion.util.AppLogger.e("HomeActivity", "applyTheme: ${e.message}") }
     }
 
@@ -338,9 +379,9 @@ class HomeActivity : AppCompatActivity() {
                 val ivAvatar = holder.itemView.findViewById<ImageView>(R.id.iv_picker_avatar)
                 tvName?.text = p.name
                 tvDesc?.text = p.personality.ifBlank { p.description.ifBlank { "暂无简介" } }
-                val avatarPath = p.avatarPath.ifBlank {
-                    getSharedPreferences("avatar_data", MODE_PRIVATE).getString("ai_avatar", "") ?: ""
-                }
+                val avatarPath = com.aicompanion.util.AvatarManager.getAiAvatarPath(
+                    this@HomeActivity, p.id, p.avatarPath
+                )
                 if (avatarPath.isNotBlank() && File(avatarPath).exists()) {
                     try {
                         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -567,8 +608,8 @@ class HomeActivity : AppCompatActivity() {
 
         if (spinnerGender != null) {
             val genderOptions = arrayOf("未设定", "男", "女")
-            val genderAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, genderOptions)
-            genderAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            val genderAdapter = android.widget.ArrayAdapter(this, R.layout.spinner_item_dark, genderOptions)
+            genderAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_dark)
             spinnerGender.adapter = genderAdapter
             val savedGender = getSharedPreferences("app_prefs", MODE_PRIVATE).getString("user_gender", "") ?: ""
             val genderIndex = when (savedGender) { "male" -> 1; "female" -> 2; else -> 0 }
@@ -770,10 +811,9 @@ class HomeActivity : AppCompatActivity() {
             val lastMsg = lastMsgCache[persona.id] ?: getLastMessage(persona.id).also { lastMsgCache[persona.id] = it }
             holder.tvLastMsg.text = lastMsg
 
-            val avatarPath = persona.avatarPath.ifBlank {
-                val avatarPrefs = this@HomeActivity.getSharedPreferences("avatar_data", MODE_PRIVATE)
-                avatarPrefs.getString("ai_avatar", "") ?: ""
-            }
+            val avatarPath = com.aicompanion.util.AvatarManager.getAiAvatarPath(
+                this@HomeActivity, persona.id, persona.avatarPath
+            )
             if (avatarPath.isNotBlank() && File(avatarPath).exists()) {
                 try {
                     var bmp = avatarCache.get(avatarPath)

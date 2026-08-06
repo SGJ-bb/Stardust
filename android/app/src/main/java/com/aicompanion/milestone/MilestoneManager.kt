@@ -14,16 +14,15 @@ data class Milestone(
     val category: String = "general"
 )
 
-class MilestoneManager(private val context: Context) {
+class MilestoneManager(private val context: Context, private val personaId: String = "default") {
     companion object {
         private const val TAG = "MilestoneManager"
-        private const val PREFS_NAME = "milestones"
         private const val KEY_MILESTONES = "milestone_list"
         private const val KEY_NOTIFIED_TODAY = "notified_today"
     }
 
     private val prefs: SharedPreferences by lazy {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences("milestones_$personaId", Context.MODE_PRIVATE)
     }
 
     @Synchronized

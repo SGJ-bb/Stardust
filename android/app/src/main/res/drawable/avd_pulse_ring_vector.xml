@@ -1,0 +1,32 @@
+<!-- 脉冲扩散环 - Vector定义：2个同心圆环 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="16"
+    android:viewportHeight="16">
+
+    <!-- 内环 - 品牌主色半透明 -->
+    <group android:name="ring_inner"
+        android:pivotX="8"
+        android:pivotY="8">
+        <path
+            android:pathData="M8,1 A7,7 0 1,1 7.99,1"
+            android:strokeWidth="1.5"
+            android:strokeColor="@color/brand_primary"
+            android:fillColor="@android:color/transparent"
+            android:strokeLineCap="round" />
+    </group>
+
+    <!-- 外环 - 品牌主色更透明 -->
+    <group android:name="ring_outer"
+        android:pivotX="8"
+        android:pivotY="8">
+        <path
+            android:pathData="M8,2 A6,6 0 1,1 7.99,2"
+            android:strokeWidth="1"
+            android:strokeColor="@color/brand_primary"
+            android:fillColor="@android:color/transparent"
+            android:strokeLineCap="round" />
+    </group>
+
+</vector>

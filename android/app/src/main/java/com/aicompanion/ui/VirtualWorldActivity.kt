@@ -1,7 +1,9 @@
 package com.aicompanion.ui
 
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
+import android.graphics.drawable.RippleDrawable
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -12,6 +14,7 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -37,6 +40,16 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+// 文件级颜色常量
+private val COLOR_SIM_RUNNING = 0xFF64ffda.toInt()      // 推演运行状态颜色（青绿色）
+private val COLOR_SIM_PAUSED = 0xFF8899bb.toInt()       // 推演暂停状态颜色（灰蓝色）
+private val COLOR_TITLE_TEXT = 0xFFC4B5FD.toInt()      // 标题文字颜色（淡紫色）
+private val COLOR_SUBTITLE_TEXT = 0xFF99AACC.toInt()  // 副标题文字颜色（灰蓝色）
+private val COLOR_DESC_TEXT = 0xFF8888AA.toInt()      // 描述文字颜色（灰紫色）
+private val COLOR_DETAIL_TEXT = 0xFFe0e0f0.toInt()      // 详情文本颜色（浅灰白色）
+private const val COLOR_CARD_BACKGROUND = 0x1AFFFFFF   // 卡片背景颜色（半透明白色）
+private const val COLOR_RIPPLE_FOREGROUND = 0x33FFFFFF  // Ripple 前景色（半透明白色）
+
 class VirtualWorldActivity : AppCompatActivity() {
 
     private lateinit var worldManager: VirtualWorldManager
@@ -58,11 +71,14 @@ class VirtualWorldActivity : AppCompatActivity() {
     private lateinit var tvStoryEmpty: TextView
     private lateinit var layoutUploadedImages: LinearLayout
     private lateinit var scrollUploadedImages: android.widget.HorizontalScrollView
+    private var tvVwMemoryStats: TextView? = null
+    private var tvVwMemoryContent: TextView? = null
 
     private var isSimRunning = false
     private var simJob: Job? = null
 
     companion object {
+        private const val TAG = "VirtualWorldActivity"
         private const val REQUEST_PICK_WORLD_IMAGE = 3001
         const val EXTRA_WORLD_ID = "world_id"
     }
@@ -83,6 +99,19 @@ class VirtualWorldActivity : AppCompatActivity() {
         loadStory()
 
         animateEntrance()
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
+        }
     }
 
     private fun animateEntrance() {
@@ -124,6 +153,14 @@ class VirtualWorldActivity : AppCompatActivity() {
         tvStoryEmpty = findViewById(R.id.tv_story_empty)
         layoutUploadedImages = findViewById(R.id.layout_uploaded_images)
         scrollUploadedImages = findViewById(R.id.scroll_uploaded_images)
+        tvVwMemoryStats = findViewById(R.id.tv_vw_memory_stats)
+        tvVwMemoryContent = findViewById(R.id.tv_vw_memory_content)
+
+        tvVwMemoryContent?.setOnClickListener { showMemoryDetailDialog() }
+        tvVwMemoryContent?.isClickable = true
+        tvVwMemoryContent?.focusable = View.FOCUSABLE
+        tvVwMemoryContent?.foreground = RippleDrawable(
+            ColorStateList.valueOf(COLOR_RIPPLE_FOREGROUND), null, null)
 
         storyAdapter = StoryEventAdapter()
         rvStory.layoutManager = LinearLayoutManager(this)
@@ -196,8 +233,8 @@ class VirtualWorldActivity : AppCompatActivity() {
 
         val intervalOptions = arrayOf("每1分钟", "每5分钟", "每15分钟", "每30分钟", "每1小时", "每3小时", "每6小时")
         val intervalValues = intArrayOf(1, 5, 15, 30, 60, 180, 360)
-        val intervalAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, intervalOptions)
-        intervalAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val intervalAdapter = ArrayAdapter(this, R.layout.spinner_item_dark, intervalOptions)
+        intervalAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_dark)
         spinnerTickInterval.adapter = intervalAdapter
         val currentIntervalIdx = intervalValues.indexOf(config.tickIntervalMinutes).coerceAtLeast(0)
         spinnerTickInterval.setSelection(currentIntervalIdx)
@@ -236,6 +273,7 @@ class VirtualWorldActivity : AppCompatActivity() {
         findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_upload_image).setOnClickListener {
             val intent = Intent(Intent.ACTION_PICK)
             intent.type = "image/*"
+            @Suppress("DEPRECATION")
             startActivityForResult(intent, REQUEST_PICK_WORLD_IMAGE)
         }
 
@@ -338,11 +376,11 @@ class VirtualWorldActivity : AppCompatActivity() {
     private fun updateSimStatus() {
         if (isSimRunning) {
             tvSimStatus.text = "▶ 推演中"
-            tvSimStatus.setTextColor(0xFF64ffda.toInt())
+            tvSimStatus.setTextColor(COLOR_SIM_RUNNING)
             btnStartStop.text = "⏸ 暂停推演"
         } else {
             tvSimStatus.text = "⏸ 已暂停"
-            tvSimStatus.setTextColor(0xFF8899bb.toInt())
+            tvSimStatus.setTextColor(COLOR_SIM_PAUSED)
             btnStartStop.text = "▶ 开始推演"
         }
         tvSimStatus.animate().scaleX(1.2f).scaleY(1.2f).setDuration(150).withEndAction {
@@ -457,7 +495,7 @@ class VirtualWorldActivity : AppCompatActivity() {
         personaManager.load()
 
         val personaDescs = config.memberPersonaIds.mapNotNull { pid ->
-            val p = personaManager.getPersona(pid) ?: return@mapNotNull null
+            personaManager.getPersona(pid) ?: return@mapNotNull null
             val identity = PromptBuilder.buildIdentity(this, pid)
             val prefs = getSharedPreferences("persona_data_$pid", MODE_PRIVATE)
             buildString {
@@ -507,7 +545,7 @@ class VirtualWorldActivity : AppCompatActivity() {
                 if (bracketStart >= 0 && bracketEnd > bracketStart) {
                     text = text.substring(bracketStart, bracketEnd + 1)
                 }
-                val json = org.json.JSONObject(text as String)
+                val json = org.json.JSONObject(text)
                 etBackground.setText(json.optString("worldBackground", ""))
                 etRules.setText(json.optString("worldRules", ""))
                 etRelations.setText(json.optString("worldRelations", ""))
@@ -571,7 +609,7 @@ class VirtualWorldActivity : AppCompatActivity() {
                     val tv = TextView(this).apply {
                         text = detail
                         textSize = 13f
-                        setTextColor(0xFFe0e0f0.toInt())
+                        setTextColor(COLOR_DETAIL_TEXT)
                         setPadding(40, 32, 40, 32)
                     }
                     scrollView.addView(tv)
@@ -601,6 +639,105 @@ class VirtualWorldActivity : AppCompatActivity() {
                 rvStory.scrollToPosition(0)
             }
         }
+        loadVwMemoryPool()
+    }
+
+    private fun loadVwMemoryPool() {
+        try {
+            val pool = worldManager.vwMemoryPool
+            val stats = pool.getStats()
+            tvVwMemoryStats?.text = stats
+
+            if (pool.isEmpty) {
+                tvVwMemoryContent?.text = "暂无记忆，开始推演后将自动积累..."
+            } else {
+                tvVwMemoryContent?.text = pool.getVwBlock()
+            }
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.w(TAG, "加载VW记忆池失败: ${e.message}")
+            tvVwMemoryContent?.text = "记忆池加载失败"
+        }
+    }
+
+    private fun showMemoryDetailDialog() {
+        val pool = worldManager.vwMemoryPool
+        if (pool.isEmpty) {
+            Toast.makeText(this, "暂无记忆", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val allEntries = pool.getAllEntries().reversed()
+
+        val grouped = allEntries.groupBy { it.location.ifBlank { "未知地点" } }
+
+        val scrollView = ScrollView(this)
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 24)
+        }
+
+        for ((loc, locEntries) in grouped) {
+            TextView(this).apply {
+                text = "📍 $loc (${locEntries.size}条)"
+                textSize = 16f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(COLOR_TITLE_TEXT)
+                setPadding(0, 24, 0, 12)
+            }.let { container.addView(it) }
+
+            for (entry in locEntries) {
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(20, 16, 20, 16)
+                    setBackgroundColor(COLOR_CARD_BACKGROUND)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).also { it.setMargins(0, 4, 0, 4) }
+                }
+
+                TextView(this).apply {
+                    text = "🕐 第${entry.day}天 ${String.format("%02d", entry.hour)}时"
+                    textSize = 13f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(COLOR_SUBTITLE_TEXT)
+                }.let { card.addView(it) }
+
+                if (entry.weather.isNotBlank() || entry.mood.isNotBlank()) {
+                    TextView(this).apply {
+                        text = buildString {
+                            if (entry.weather.isNotBlank()) append("🌤 ${entry.weather}  ")
+                            if (entry.mood.isNotBlank()) append("💫 ${entry.mood}")
+                        }
+                        textSize = 12f
+                        setTextColor(COLOR_DESC_TEXT)
+                        setPadding(0, 4, 0, 0)
+                    }.let { card.addView(it) }
+                }
+
+                TextView(this).apply {
+                    text = entry.fullContent.ifBlank { entry.summary }
+                    textSize = 13f
+                    setTextColor(COLOR_DETAIL_TEXT)
+                    setLineSpacing(4f, 1f)
+                    setPadding(0, 8, 0, 0)
+                }.let { card.addView(it) }
+
+                container.addView(card)
+            }
+        }
+
+        scrollView.addView(container)
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("🧠 世界记忆池详情 (${allEntries.size}条)")
+            .setView(scrollView)
+            .setPositiveButton("关闭", null)
+            .show()
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return (dp * resources.displayMetrics.density).toInt()
     }
 
     private fun refreshUploadedImages() {
@@ -635,10 +772,15 @@ class VirtualWorldActivity : AppCompatActivity() {
                         .show()
                 }
             }
-            try {
-                val bmp = BitmapFactory.decodeFile(path)
-                imageView.setImageBitmap(bmp)
-            } catch (_: Exception) {}
+            // 在 IO 线程解码图片，避免阻塞主线程
+            lifecycleScope.launch {
+                try {
+                    val bmp = withContext(Dispatchers.IO) {
+                        BitmapFactory.decodeFile(path)
+                    }
+                    imageView.setImageBitmap(bmp)
+                } catch (_: Exception) {}
+            }
             layoutUploadedImages.addView(imageView)
         }
     }
@@ -648,10 +790,15 @@ class VirtualWorldActivity : AppCompatActivity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(24, 24, 24, 24)
         }
-        try {
-            val bmp = BitmapFactory.decodeFile(path)
-            imageView.setImageBitmap(bmp)
-        } catch (_: Exception) {}
+        // 在 IO 线程解码图片，避免阻塞主线程
+        lifecycleScope.launch {
+            try {
+                val bmp = withContext(Dispatchers.IO) {
+                    BitmapFactory.decodeFile(path)
+                }
+                imageView.setImageBitmap(bmp)
+            } catch (_: Exception) {}
+        }
         AlertDialog.Builder(this)
             .setView(imageView)
             .setPositiveButton("关闭", null)
@@ -698,6 +845,7 @@ class VirtualWorldActivity : AppCompatActivity() {
         }.joinToString("\n")
     }
 
+    @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_PICK_WORLD_IMAGE && resultCode == RESULT_OK && data != null) {
@@ -748,15 +896,60 @@ class VirtualWorldActivity : AppCompatActivity() {
             holder.tvSpeaker.text = event.speakerName
             holder.tvContent.text = event.content
 
+            // 点击事件内容查看完整详情
+            holder.itemView.setOnClickListener {
+                val clickedEvent = events[position]
+                val detailText = buildString {
+                    appendLine("【时间】第${clickedEvent.virtualDay}天 ${String.format("%02d:%02d", clickedEvent.virtualHour, clickedEvent.virtualMinute)}")
+                    appendLine("【说话人】${clickedEvent.speakerName}")
+                    appendLine("【类型】${clickedEvent.eventType}")
+                    appendLine()
+                    appendLine("【完整内容】")
+                    append(clickedEvent.content)
+                    if (clickedEvent.imageUrl.isNotBlank()) {
+                        appendLine()
+                        appendLine("【配图】${clickedEvent.imageUrl}")
+                    }
+                }
+
+                val scrollView = android.widget.ScrollView(this@VirtualWorldActivity)
+                val textView = android.widget.TextView(this@VirtualWorldActivity).apply {
+                    text = detailText
+                    textSize = 14f
+                    setTextColor(COLOR_DETAIL_TEXT)
+                    setPadding(48, 40, 48, 40)
+                    setLineSpacing(0f, 1.4f)
+                }
+                scrollView.addView(textView)
+
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(this@VirtualWorldActivity)
+                    .setTitle("第${clickedEvent.virtualDay}天${clickedEvent.virtualHour}时 · 详情")
+                    .setView(scrollView)
+                    .setPositiveButton("关闭", null)
+                    .show()
+            }
+
             if (event.imageUrl.isNotBlank()) {
                 val file = File(event.imageUrl)
                 if (file.exists()) {
-                    try {
-                        val bmp = BitmapFactory.decodeFile(event.imageUrl)
-                        holder.ivImage.setImageBitmap(bmp)
-                        holder.ivImage.visibility = View.VISIBLE
-                    } catch (_: Exception) {
-                        holder.ivImage.visibility = View.GONE
+                    holder.ivImage.visibility = View.VISIBLE
+                    // 在 IO 线程解码图片，避免阻塞主线程
+                    lifecycleScope.launch {
+                        try {
+                            val bmp = withContext(Dispatchers.IO) {
+                                BitmapFactory.decodeFile(event.imageUrl)
+                            }
+                            // 验证 holder 仍显示同一事件，避免视图复用问题
+                            if (holder.bindingAdapterPosition != RecyclerView.NO_POSITION &&
+                                events.getOrNull(holder.bindingAdapterPosition)?.imageUrl == event.imageUrl) {
+                                holder.ivImage.setImageBitmap(bmp)
+                            }
+                        } catch (_: Exception) {
+                            if (holder.bindingAdapterPosition != RecyclerView.NO_POSITION &&
+                                events.getOrNull(holder.bindingAdapterPosition)?.imageUrl == event.imageUrl) {
+                                holder.ivImage.visibility = View.GONE
+                            }
+                        }
                     }
                 } else {
                     holder.ivImage.visibility = View.GONE

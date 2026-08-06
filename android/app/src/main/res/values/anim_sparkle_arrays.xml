@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 星光闪烁关键帧定义 -->
+<resources>
+    <!-- 弹入缩放关键帧：先放大到1.2再回弹到1.0 -->
+    <array name="sparkle_scale_keyframes">
+        <item>0f;0</item>
+        <item>1.2f;0.6</item>
+        <item>1.0f;1.0</item>
+    </array>
+
+    <!-- 透明度脉动关键帧：从0到255再到180循环 -->
+    <array name="sparkle_alpha_keyframes">
+        <item>0;0</item>
+        <item>255;0.4</item>
+        <item>180;0.8</item>
+        <item>255;1.0</item>
+    </array>
+</resources>

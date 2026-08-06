@@ -52,6 +52,12 @@ class Live2DWebView @JvmOverloads constructor(
     private val textureCache = Collections.synchronizedMap(mutableMapOf<String, File>())
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    // 防抖时间戳
+    private var lastTapTime = 0L
+    private var lastEmotionTime = 0L
+    private var lastActionTime = 0L
+    private val DEBOUNCE_MS = 100L
+
     private fun detectMaxTextureSize(): Int {
         return try {
             val egl = javax.microedition.khronos.egl.EGLContext.getEGL() as javax.microedition.khronos.egl.EGL10
@@ -80,9 +86,12 @@ class Live2DWebView @JvmOverloads constructor(
             egl.eglDestroySurface(display, surface)
             egl.eglDestroyContext(display, context)
             egl.eglTerminate(display)
-            addLog("GPU maxTextureSize detected: ${maxTex[0]}")
-            val raw = maxTex[0].coerceIn(2048, 8192)
-            if (isPowerOfTwo(raw)) raw else Integer.highestOneBit(raw)
+            addLog("GPU maxTextureSize detected (native EGL): ${maxTex[0]}")
+            // WebView WebGL 的 maxTextureSize 通常比原生 EGL 小（如 4096 vs 16383）
+            // 使用保守值 4096 确保兼容性，因为 WebView 可能使用不同的 GL 实现
+            val safeMax = 4096
+            addLog("Using safe maxTextureSize for WebView: $safeMax")
+            safeMax
         } catch (e: Exception) {
             addLog("GPU detection failed: ${e.message}, using 4096")
             4096
@@ -92,7 +101,6 @@ class Live2DWebView @JvmOverloads constructor(
     private inner class LocalModelServer : NanoHTTPD("127.0.0.1", 0) {
         override fun serve(session: IHTTPSession): Response {
             val uri = session.uri.trimStart('/')
-            addLog("HTTP ${session.method} /$uri")
 
             if (session.method == Method.OPTIONS) {
                 return newFixedLengthResponse(Response.Status.OK, "text/plain", "").apply {
@@ -328,7 +336,6 @@ class Live2DWebView @JvmOverloads constructor(
                             val file = File(pathPart)
                             if (file.exists() && file.isFile) {
                                 val mime = getMime(file.name)
-                                addLog("SERVE: ${file.name} mime=$mime size=${file.length()}")
                                 return buildResponse(mime, getEncoding(mime), java.io.BufferedInputStream(file.inputStream()), file.length())
                             }
 
@@ -344,7 +351,6 @@ class Live2DWebView @JvmOverloads constructor(
                             var foundFile = resolveResourcePath(requestedPath, modelDir)
                             if (foundFile != null && foundFile.exists()) {
                                 val mime = getMime(foundFile.name)
-                                addLog("SERVE(resolved): ${foundFile.name} mime=$mime size=${foundFile.length()}")
                                 return buildResponse(mime, getEncoding(mime), java.io.BufferedInputStream(foundFile.inputStream()), foundFile.length())
                             }
 
@@ -353,7 +359,6 @@ class Live2DWebView @JvmOverloads constructor(
                                 foundFile = resolveResourcePath(requestedPath, parentDir)
                                 if (foundFile != null && foundFile.exists()) {
                                     val mime = getMime(foundFile.name)
-                                    addLog("SERVE(parent): ${foundFile.name} mime=$mime size=${foundFile.length()}")
                                     return buildResponse(mime, getEncoding(mime), java.io.BufferedInputStream(foundFile.inputStream()), foundFile.length())
                                 }
                             }
@@ -362,7 +367,6 @@ class Live2DWebView @JvmOverloads constructor(
                             foundFile = resolveResourcePath(justName, modelDir)
                             if (foundFile != null && foundFile.exists()) {
                                 val mime = getMime(foundFile.name)
-                                addLog("SERVE(name): ${foundFile.name} mime=$mime size=${foundFile.length()}")
                                 return buildResponse(mime, getEncoding(mime), java.io.BufferedInputStream(foundFile.inputStream()), foundFile.length())
                             }
 
@@ -370,7 +374,6 @@ class Live2DWebView @JvmOverloads constructor(
                                 foundFile = resolveResourcePath(justName, parentDir)
                                 if (foundFile != null && foundFile.exists()) {
                                     val mime = getMime(foundFile.name)
-                                    addLog("SERVE(parentName): ${foundFile.name} mime=$mime size=${foundFile.length()}")
                                     return buildResponse(mime, getEncoding(mime), java.io.BufferedInputStream(foundFile.inputStream()), foundFile.length())
                                 }
                             }
@@ -472,7 +475,30 @@ class Live2DWebView @JvmOverloads constructor(
                     return@launch
                 }
 
-                val srcDir = modelFile.parentFile ?: return@launch
+                // 模型JSON所在目录
+                val modelSrcDir = modelFile.parentFile ?: return@launch
+                // 父目录（可能包含纹理子目录如 xxx.4096/ 等）
+                val parentSrcDir = modelSrcDir.parentFile
+
+                // 判断是否需要复制父目录：检查模型JSON所在目录的同级是否有"纹理专用"子目录
+                // Live2D模型常见结构：父目录/模型名/model.json + 父目录/模型名.4096/texture.png
+                // 纹理目录的特征：目录名以模型目录名开头 + 后缀（如 .4096, .8192, .2048）
+                var srcDir = modelSrcDir
+                if (parentSrcDir != null) {
+                    val siblingDirs = parentSrcDir.listFiles()?.filter { it.isDirectory } ?: emptyList()
+                    val hasTextureSiblingDirs = siblingDirs.any { dir ->
+                        // 纹理兄弟目录的特征：目录名以模型目录名开头 + 数字后缀
+                        // 如 "真夜白音.4096", "小恶魔.8192" 等
+                        dir.name != modelSrcDir.name &&
+                            dir.name.startsWith(modelSrcDir.name + ".") &&
+                            dir.walkTopDown().any { f -> f.isFile && f.extension.lowercase() in listOf("png", "jpg", "jpeg", "webp") }
+                    }
+                    if (hasTextureSiblingDirs) {
+                        srcDir = parentSrcDir
+                        addLog("Detected texture sibling dirs (e.g. ${modelSrcDir.name}.xxxx), using parent dir for copy")
+                    }
+                }
+
                 val cacheDirName = srcDir.name
                 val localDir = File(modelCacheDir, cacheDirName)
                 if (localDir.exists()) {
@@ -481,6 +507,7 @@ class Live2DWebView @JvmOverloads constructor(
                 localDir.mkdirs()
 
                 addLog("Copying model to cache: ${localDir.absolutePath}")
+                addLog("Source dir: ${srcDir.absolutePath}")
                 var copyCount = 0
                 var skipCount = 0
                 srcDir.walkTopDown().filter { it.isFile }.forEach { srcFile ->
@@ -488,7 +515,6 @@ class Live2DWebView @JvmOverloads constructor(
                         val relPath = srcFile.absolutePath.substring(srcDir.absolutePath.length).trimStart('/', '\\')
                         if (shouldSkipFile(relPath, srcFile.name)) {
                             skipCount++
-                            addLog("SKIP: $relPath")
                             return@forEach
                         }
                         val dstFile = File(localDir, relPath)
@@ -499,14 +525,11 @@ class Live2DWebView @JvmOverloads constructor(
                             }
                         }
                         copyCount++
-                        if (srcFile.name.endsWith(".png") || srcFile.name.endsWith(".moc3") || srcFile.name.endsWith(".json")) {
-                            addLog("COPY: $relPath (${srcFile.length()} bytes)")
-                        }
                     } catch (e: Exception) {
                         addLog("Copy warn: ${srcFile.name} - ${e.message}")
                     }
                 }
-                addLog("Copy done: $copyCount files copied, $skipCount skipped")
+                addLog("Copy done: $copyCount files, $skipCount skipped")
 
                 val cacheFiles = localDir.walkTopDown().filter { it.isFile }.toList()
                 addLog("Cache validation: ${cacheFiles.size} files in cache dir ${localDir.name}")
@@ -523,16 +546,6 @@ class Live2DWebView @JvmOverloads constructor(
                 val texturesInCache = cacheFiles.filter { it.extension.lowercase() in listOf("png", "jpg", "jpeg") }
                 addLog("Cache contents: modelJson=${modelJsonInCache.name}, moc=${mocInCache?.name ?: "NONE"}, textures=${texturesInCache.size}")
 
-                val preCompressTextures = localDir.walkTopDown().filter { it.isFile && it.extension.lowercase() in listOf("png", "jpg", "jpeg") }.toList()
-                addLog("Pre-compress: ${preCompressTextures.size} texture files")
-                preCompressTextures.forEach { addLog("  SRC TEX: ${it.relativeTo(localDir).path.replace("\\", "/")} ${it.length()}B") }
-
-                checkAndCompressTextures(localDir)
-
-                val postCompressTextures = localDir.walkTopDown().filter { it.isFile && it.extension.lowercase() in listOf("png", "jpg", "jpeg") }.toList()
-                addLog("Post-compress: ${postCompressTextures.size} texture files remain")
-                postCompressTextures.forEach { addLog("  TEX: ${it.relativeTo(localDir).path.replace("\\", "/")} ${it.length()}B") }
-
                 val cachedModelJson = findModelJsonRecursive(localDir)
                 if (cachedModelJson == null) {
                     addLog("ERROR: model3.json not found in cache after copy")
@@ -541,17 +554,31 @@ class Live2DWebView @JvmOverloads constructor(
                 }
 
                 val modelDir = cachedModelJson.parentFile ?: return@launch
-                modelBasePath = modelDir.absolutePath
+                // 使用缓存根目录作为HTTP服务器的根路径，这样兄弟纹理子目录也能被访问
+                modelBasePath = localDir.absolutePath
                 textureCache.clear()
 
-                validateAndFixModel(cachedModelJson, modelDir)
+                // 先验证和修复，再处理纹理（确保修复后的纹理也被处理）
+                // 传入 localDir（缓存根目录），因为纹理可能在兄弟目录中
+                validateAndFixModel(cachedModelJson, modelDir, localDir)
 
-                verifyAndRepairCache(cachedModelJson, modelDir, srcDir)
+                verifyAndRepairCache(cachedModelJson, modelDir, srcDir, localDir)
+
+                // 纹理处理放在修复之后，搜索整个缓存目录（包括兄弟纹理子目录）
+                val preCompressTextures = localDir.walkTopDown().filter { it.isFile && it.extension.lowercase() in listOf("png", "jpg", "jpeg") }.toList()
+                addLog("Pre-compress: ${preCompressTextures.size} texture(s)")
+
+                checkAndCompressTextures(localDir)
+
+                val postCompressTextures = localDir.walkTopDown().filter { it.isFile && it.extension.lowercase() in listOf("png", "jpg", "jpeg") }.toList()
+                addLog("Post-compress: ${postCompressTextures.size} texture(s)")
 
                 withContext(Dispatchers.Main) {
                     if (!isDestroyed) {
-                        val html = buildLive2DHtml(cachedModelJson.name)
-                        val htmlFile = File(modelDir, "view.html")
+                        // 计算模型JSON相对于缓存根目录的路径
+                        val modelRelPath = cachedModelJson.relativeTo(localDir).path.replace("\\", "/")
+                        val html = buildLive2DHtml(modelRelPath)
+                        val htmlFile = File(localDir, "view.html")
                         htmlFile.writeText(html, Charsets.UTF_8)
 
                         ensureServerRunning()
@@ -613,7 +640,7 @@ class Live2DWebView @JvmOverloads constructor(
         return false
     }
 
-    private fun verifyAndRepairCache(modelJsonFile: File, modelDir: File, srcDir: File) {
+    private fun verifyAndRepairCache(modelJsonFile: File, modelDir: File, srcDir: File, cacheRootDir: File) {
         try {
             val content = modelJsonFile.readText()
             val json = org.json.JSONObject(content)
@@ -718,24 +745,16 @@ class Live2DWebView @JvmOverloads constructor(
                             addLog("Repaired from source: $refPath (${srcFile.length()} bytes)")
                         } catch (e: Exception) {
                             addLog("Repair copy failed: $refPath - ${e.message}")
-                            val found = findFileByName(File(refPath).name, srcDir)
-                            if (found != null && found.exists() && found.length() > 0) {
-                                try {
-                                    cacheFile.parentFile?.mkdirs()
-                                    found.inputStream().use { input ->
-                                        cacheFile.outputStream().use { output ->
-                                            input.copyTo(output)
-                                        }
-                                    }
-                                    repairedCount++
-                                    addLog("Repaired by name search: ${found.name} -> $refPath")
-                                } catch (e2: Exception) {
-                                    addLog("Repair by name also failed: ${e2.message}")
-                                }
-                            }
                         }
                     } else {
-                        val found = findFileByName(File(refPath).name, srcDir)
+                        // 源目录中按路径找不到，尝试在缓存根目录和源目录中按文件名搜索
+                        val fileName = File(refPath).name
+                        // 1. 先在缓存根目录搜索（纹理可能在兄弟目录中已被复制过来）
+                        var found = findFileByName(fileName, cacheRootDir)
+                        // 2. 再在源目录搜索
+                        if (found == null || !found.exists() || found.length() == 0L) {
+                            found = findFileByName(fileName, srcDir)
+                        }
                         if (found != null && found.exists() && found.length() > 0) {
                             try {
                                 cacheFile.parentFile?.mkdirs()
@@ -750,7 +769,7 @@ class Live2DWebView @JvmOverloads constructor(
                                 addLog("Repair by name failed: ${e.message}")
                             }
                         } else {
-                            addLog("INTEGRITY CHECK: cannot repair $refPath, file not found in source")
+                            addLog("INTEGRITY CHECK: cannot repair $refPath, file not found in source or cache")
                         }
                     }
                 }
@@ -766,7 +785,7 @@ class Live2DWebView @JvmOverloads constructor(
         }
     }
 
-    private fun validateAndFixModel(modelJsonFile: File, modelDir: File) {
+    private fun validateAndFixModel(modelJsonFile: File, modelDir: File, cacheRootDir: File) {
         try {
             val content = modelJsonFile.readText()
             val json = org.json.JSONObject(content)
@@ -804,8 +823,8 @@ class Live2DWebView @JvmOverloads constructor(
                 val textures = fileRefs.optJSONArray(texturesKey)
                 if (textures != null) {
                     val validTextures = org.json.JSONArray()
-                    var removedCount = 0
                     var textureFixed = false
+                    var missingTextureCount = 0
                     for (i in 0 until textures.length()) {
                         val texPath = textures.optString(i)
                         if (texPath.isNotEmpty()) {
@@ -813,35 +832,57 @@ class Live2DWebView @JvmOverloads constructor(
                             if (texFile.exists()) {
                                 validTextures.put(texPath)
                             } else {
+                                // 1. 先在模型目录内搜索同名文件
                                 var found = findFileByName(texFile.name, modelDir)
-                                if (found == null && modelDir.parentFile != null) {
-                                    found = findFileByName(texFile.name, modelDir.parentFile)
-                                }
                                 if (found != null) {
                                     val newPath = found.relativeTo(modelDir).path.replace("\\", "/")
                                     validTextures.put(newPath)
                                     fixedRefs.add("$texPath -> $newPath")
                                     textureFixed = true
                                 } else {
-                                    addLog("Missing texture: $texPath")
-                                    missingFiles.add(texPath)
-                                    removedCount++
+                                    // 2. 在缓存根目录下搜索（纹理可能在兄弟目录中）
+                                    found = findFileByName(texFile.name, cacheRootDir)
+                                    if (found != null) {
+                                        // 将纹理复制到 modelDir 下的正确相对路径位置
+                                        val targetFile = File(modelDir, texPath)
+                                        targetFile.parentFile?.mkdirs()
+                                        try {
+                                            found.inputStream().use { input ->
+                                                targetFile.outputStream().use { output ->
+                                                    input.copyTo(output)
+                                                }
+                                            }
+                                            validTextures.put(texPath)
+                                            fixedRefs.add("$texPath (copied from sibling dir)")
+                                            textureFixed = true
+                                            addLog("Copied texture from sibling dir: ${found.absolutePath} -> ${targetFile.absolutePath}")
+                                        } catch (e: Exception) {
+                                            addLog("Failed to copy texture from sibling dir: ${e.message}")
+                                            validTextures.put(texPath)
+                                            missingTextureCount++
+                                            missingFiles.add(texPath)
+                                        }
+                                    } else {
+                                        // 3. 都找不到，保留原始路径，让 verifyAndRepairCache 从源目录修复
+                                        addLog("Missing texture: $texPath (will try to repair from source)")
+                                        validTextures.put(texPath)
+                                        missingTextureCount++
+                                        missingFiles.add(texPath)
+                                    }
                                 }
                             }
                         }
                     }
-                    if (removedCount > 0 || textureFixed) {
+                    if (textureFixed) {
                         fileRefs.put(texturesKey, validTextures)
                         needsSave = true
-                        if (removedCount > 0) {
-                            addLog("Removed $removedCount missing texture(s), ${validTextures.length()} remaining")
-                        }
-                        if (textureFixed) {
-                            addLog("Fixed texture path(s)")
-                        }
+                        addLog("Fixed texture path(s)")
                     }
-                    if (validTextures.length() == 0) {
-                        addLog("ERROR: All textures are missing! Creating placeholder")
+                    if (missingTextureCount > 0) {
+                        addLog("WARN: $missingTextureCount texture(s) missing in cache, pending repair from source")
+                    }
+                    if (validTextures.length() == 0 && missingTextureCount == 0) {
+                        addLog("ERROR: No textures referenced at all! Creating placeholder")
                         val placeholderFile = File(modelDir, "placeholder.png")
                         if (!placeholderFile.exists()) {
                             try {
@@ -1146,10 +1187,10 @@ class Live2DWebView @JvmOverloads constructor(
                     }
 
                     val modelDirFile = cachedModelJson.parentFile ?: localDir
-                    modelBasePath = modelDirFile.absolutePath
+                    modelBasePath = localDir.absolutePath
                     textureCache.clear()
 
-                    validateAndFixModel(cachedModelJson, modelDirFile)
+                    validateAndFixModel(cachedModelJson, modelDirFile, localDir)
 
                     val modelJsonFile = modelJsonPath.substringAfterLast("/")
                     val html = buildLive2DHtml(modelJsonFile)
@@ -1215,8 +1256,9 @@ class Live2DWebView @JvmOverloads constructor(
                     val w = options.outWidth
                     val h = options.outHeight
                     val tooLarge = w > maxTextureSize || h > maxTextureSize
-                    addLog("Texture[$index]: ${file.name} ${w}x${h} tooLarge=$tooLarge max=$maxTextureSize")
-                    if (tooLarge) needsResize.add(file)
+                    val isNPOT = !isPowerOfTwo(w) || !isPowerOfTwo(h)
+                    addLog("Texture[$index]: ${file.name} ${w}x${h} tooLarge=$tooLarge NPOT=$isNPOT max=$maxTextureSize")
+                    if (tooLarge || isNPOT) needsResize.add(file)
                 } catch (e: Throwable) {
                     addLog("Bounds error ${file.name}: ${e.message}")
                 }
@@ -1257,6 +1299,14 @@ class Live2DWebView @JvmOverloads constructor(
                         targetH = (h * scale).toInt()
                     }
 
+                    // NPOT -> POT: 向下取最近的2的幂，避免GPU兼容性问题
+                    if (!isPowerOfTwo(targetW)) {
+                        targetW = Integer.highestOneBit(targetW).coerceAtLeast(64)
+                    }
+                    if (!isPowerOfTwo(targetH)) {
+                        targetH = Integer.highestOneBit(targetH).coerceAtLeast(64)
+                    }
+
                     val maxPixels = maxTextureSize * maxTextureSize
                     if (targetW * targetH > maxPixels) {
                         val extraScale = Math.sqrt((targetW * targetH).toDouble() / maxPixels)
@@ -1269,8 +1319,8 @@ class Live2DWebView @JvmOverloads constructor(
                     val inSampleSize = calculateInSampleSize(options, targetW, targetH)
                     val decodeOpts = BitmapFactory.Options().apply {
                         inPreferredConfig = Bitmap.Config.ARGB_8888
-                        inPremultiplied = false
                         this.inSampleSize = inSampleSize
+                        inPremultiplied = false
                     }
 
                     val bitmap = try {
@@ -1470,6 +1520,9 @@ class Live2DWebView @JvmOverloads constructor(
 
     fun tapModel(x: Float, y: Float) {
         if (isDestroyed) return
+        val now = System.currentTimeMillis()
+        if (now - lastTapTime < DEBOUNCE_MS) return
+        lastTapTime = now
         post {
             try {
                 evaluateJavascript("window.tapModel && window.tapModel($x, $y)", null)
@@ -1479,6 +1532,9 @@ class Live2DWebView @JvmOverloads constructor(
 
     fun tapModelRegion(x: Float, y: Float, modelHeight: Float) {
         if (isDestroyed) return
+        val now = System.currentTimeMillis()
+        if (now - lastTapTime < DEBOUNCE_MS) return
+        lastTapTime = now
         val normalizedY = y / modelHeight.coerceAtLeast(1f)
         val region = when {
             normalizedY < 0.25f -> "head"
@@ -1499,6 +1555,9 @@ class Live2DWebView @JvmOverloads constructor(
 
     fun setEmotion(emotion: Emotion) {
         if (isDestroyed) return
+        val now = System.currentTimeMillis()
+        if (now - lastEmotionTime < DEBOUNCE_MS) return
+        lastEmotionTime = now
         post {
             try {
                 evaluateJavascript("window.setLive2DEmotion && window.setLive2DEmotion('${emotion.name.lowercase()}')", null)
@@ -1508,6 +1567,9 @@ class Live2DWebView @JvmOverloads constructor(
 
     fun setAction(action: Action) {
         if (isDestroyed) return
+        val now = System.currentTimeMillis()
+        if (now - lastActionTime < DEBOUNCE_MS) return
+        lastActionTime = now
         post {
             try {
                 evaluateJavascript("window.triggerLive2DAction && window.triggerLive2DAction('${action.name.lowercase()}')", null)
@@ -1562,16 +1624,153 @@ class Live2DWebView @JvmOverloads constructor(
         <body>
             <div id="loading">[0] Loading...</div>
             <canvas id="live2d-canvas"></canvas>
+            <script>
+                var loadStep = 0;
+                var loadingEl = document.getElementById('loading');
+                var _origTexParami = null;
+                var errors = [];
+
+                function step(msg) {
+                    loadStep++;
+                    var text = '[' + loadStep + '] ' + msg;
+                    console.log('[L2D] ' + text);
+                    if (loadingEl && !loadingEl.classList.contains('error')) loadingEl.textContent = text;
+                }
+
+                function err(msg) {
+                    errors.push(msg);
+                    console.error('[L2D] ' + msg);
+                    loadingEl.className = 'error';
+                    loadingEl.textContent = 'ERROR:\n' + errors.join('\n');
+                }
+
+                try {
+                    // 在 prototype patch 之前保存原始方法，用于后续直接修复纹理
+                    if (typeof WebGL2RenderingContext !== 'undefined') {
+                        _origTexParami = WebGL2RenderingContext.prototype.texParameteri;
+                    } else if (typeof WebGLRenderingContext !== 'undefined') {
+                        _origTexParami = WebGLRenderingContext.prototype.texParameteri;
+                    }
+
+                    // === 第1层防御：Prototype 级别 patch ===
+                    // 直接修改 WebGL2/WebGL1 原型链上的方法，这样无论 PIXI 内部如何缓存引用都会走到我们的 patch
+                    function patchPrototype(proto, version) {
+                        if (!proto || !proto.texParameteri) return;
+                        var _origTP = proto.texParameteri;
+                        proto.texParameteri = function(target, pname, param) {
+                            if (target === this.TEXTURE_2D) {
+                                if (pname === this.TEXTURE_MIN_FILTER) {
+                                    if (param === this.LINEAR_MIPMAP_LINEAR || param === this.LINEAR_MIPMAP_NEAREST ||
+                                        param === this.NEAREST_MIPMAP_LINEAR || param === this.NEAREST_MIPMAP_NEAREST) {
+                                        return _origTP.call(this, target, pname, this.LINEAR);
+                                    }
+                                }
+                                if ((pname === this.TEXTURE_WRAP_S || pname === this.TEXTURE_WRAP_T) &&
+                                    (param === this.REPEAT || param === this.MIRRORED_REPEAT)) {
+                                    return _origTP.call(this, target, pname, this.CLAMP_TO_EDGE);
+                                }
+                            }
+                            return _origTP.call(this, target, pname, param);
+                        };
+                        step('Prototype texParameteri patched (' + version + ')');
+                    }
+                    if (typeof WebGL2RenderingContext !== 'undefined') {
+                        patchPrototype(WebGL2RenderingContext.prototype, 'WebGL2');
+                    }
+                    if (typeof WebGLRenderingContext !== 'undefined') {
+                        patchPrototype(WebGLRenderingContext.prototype, 'WebGL1');
+                    }
+
+                    // patch generateMipmap prototype
+                    if (typeof WebGL2RenderingContext !== 'undefined' && WebGL2RenderingContext.prototype.generateMipmap) {
+                        WebGL2RenderingContext.prototype.generateMipmap = function() {};
+                        step('Prototype generateMipmap patched (WebGL2)');
+                    }
+                    if (typeof WebGLRenderingContext !== 'undefined' && WebGLRenderingContext.prototype.generateMipmap) {
+                        WebGLRenderingContext.prototype.generateMipmap = function() {};
+                        step('Prototype generateMipmap patched (WebGL1)');
+                    }
+
+                    // patch pixelStorei prototype - 强制预乘alpha
+                    function patchPixelStoreiProto(proto, version) {
+                        if (!proto || !proto.pixelStorei) return;
+                        var _origPS = proto.pixelStorei;
+                        proto.pixelStorei = function(pname, param) {
+                            if (pname === this.UNPACK_PREMULTIPLY_ALPHA_WEBGL) {
+                                return _origPS.call(this, pname, true);
+                            }
+                            return _origPS.call(this, pname, param);
+                        };
+                        step('Prototype pixelStorei patched (' + version + ')');
+                    }
+                    if (typeof WebGL2RenderingContext !== 'undefined') {
+                        patchPixelStoreiProto(WebGL2RenderingContext.prototype, 'WebGL2');
+                    }
+                    if (typeof WebGLRenderingContext !== 'undefined') {
+                        patchPixelStoreiProto(WebGLRenderingContext.prototype, 'WebGL1');
+                    }
+
+                    // === 第2层防御：getContext 拦截 + 实例级 patch ===
+                    var _patchedContexts = new WeakSet();
+                    var _origGetContext = HTMLCanvasElement.prototype.getContext;
+                    HTMLCanvasElement.prototype.getContext = function(type) {
+                        var ctx = _origGetContext.apply(this, arguments);
+                        if (ctx && !_patchedContexts.has(ctx) &&
+                            (type === 'webgl2' || type === 'webgl' || type === 'experimental-webgl')) {
+                            _patchedContexts.add(ctx);
+                            try {
+                                var isWebGL2 = (ctx instanceof WebGL2RenderingContext);
+                                var maxTex = ctx.getParameter(ctx.MAX_TEXTURE_SIZE);
+                                step('GL context: ' + (isWebGL2 ? 'WebGL2' : 'WebGL1') + ', maxTex=' + maxTex);
+
+                                // 实例级 patch 作为 prototype patch 的补充
+                                var _origTP = ctx.texParameteri.bind(ctx);
+                                ctx.texParameteri = function(target, pname, param) {
+                                    if (target === ctx.TEXTURE_2D) {
+                                        if (pname === ctx.TEXTURE_MIN_FILTER) {
+                                            if (param === ctx.LINEAR_MIPMAP_LINEAR || param === ctx.LINEAR_MIPMAP_NEAREST ||
+                                                param === ctx.NEAREST_MIPMAP_LINEAR || param === ctx.NEAREST_MIPMAP_NEAREST) {
+                                                return _origTP(target, pname, ctx.LINEAR);
+                                            }
+                                        }
+                                        if ((pname === ctx.TEXTURE_WRAP_S || pname === ctx.TEXTURE_WRAP_T) &&
+                                            (param === ctx.REPEAT || param === ctx.MIRRORED_REPEAT)) {
+                                            return _origTP(target, pname, ctx.CLAMP_TO_EDGE);
+                                        }
+                                    }
+                                    return _origTP(target, pname, param);
+                                };
+                                ctx.texParameteri._l2dPatched = true;
+
+                                var _origPS = ctx.pixelStorei.bind(ctx);
+                                ctx.pixelStorei = function(pname, param) {
+                                    if (pname === ctx.UNPACK_PREMULTIPLY_ALPHA_WEBGL) {
+                                        return _origPS(pname, true);
+                                    }
+                                    return _origPS(pname, param);
+                                };
+
+                                ctx.generateMipmap = function() {};
+
+                                step('GL instance patched (pre-PIXI via getContext)');
+                            } catch(e) {
+                                step('GL patch error: ' + e.message);
+                            }
+                        }
+                        return ctx;
+                    };
+                    step('getContext interception ready');
+                } catch(e) {
+                    step('getContext intercept error: ' + e.message);
+                }
+            </script>
             <script src="/js/live2dcubismcore.min.js"></script>
             <script src="/js/live2d.min.js"></script>
             <script src="/js/pixi.min.js"></script>
             <script src="/js/pixi-live2d-display.min.js"></script>
             <script>
-                var loadStep = 0;
-                var loadingEl = document.getElementById('loading');
                 var canvas = document.getElementById('live2d-canvas');
                 var app = null, model = null;
-                var errors = [];
                 var canvasW = 0, canvasH = 0;
                 var baseScale = 1.0;
                 var modelNaturalW = 0, modelNaturalH = 0;
@@ -1597,20 +1796,6 @@ class Live2DWebView @JvmOverloads constructor(
                     } catch(e) {}
                 }
 
-                function step(msg) {
-                    loadStep++;
-                    var text = '[' + loadStep + '] ' + msg;
-                    console.log('[L2D] ' + text);
-                    if (loadingEl && !loadingEl.classList.contains('error')) loadingEl.textContent = text;
-                }
-
-                function err(msg) {
-                    errors.push(msg);
-                    console.error('[L2D] ' + msg);
-                    loadingEl.className = 'error';
-                    loadingEl.textContent = 'ERROR:\n' + errors.join('\n');
-                }
-
                 var checkCount = 0;
                 function checkReady() {
                     checkCount++;
@@ -1629,14 +1814,6 @@ class Live2DWebView @JvmOverloads constructor(
                         var h = window.innerHeight;
                         canvasW = w; canvasH = h;
 
-                        try {
-                            var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                            if (gl) {
-                                var maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-                                step('GL maxTextureSize=' + maxTex);
-                            }
-                        } catch(e) { step('GL probe failed: ' + e.message); }
-
                         app = new PIXI.Application({
                             view: canvas, width: w, height: h, backgroundAlpha: 0,
                             antialias: false, autoStart: true,
@@ -1644,32 +1821,47 @@ class Live2DWebView @JvmOverloads constructor(
                         });
                         if(app.ticker) app.ticker.targetFPS = 24;
 
-                        try {
-                            var _gl = app.renderer.gl;
-                            if (_gl) {
-                                var _origTexParameteri = _gl.texParameteri.bind(_gl);
-                                _gl.texParameteri = function(target, pname, param) {
-                                    if (target === _gl.TEXTURE_2D) {
-                                        if (pname === _gl.TEXTURE_MIN_FILTER) {
-                                            if (param === _gl.LINEAR_MIPMAP_LINEAR || param === _gl.LINEAR_MIPMAP_NEAREST ||
-                                                param === _gl.NEAREST_MIPMAP_LINEAR || param === _gl.NEAREST_MIPMAP_NEAREST) {
-                                                return _origTexParameteri(target, pname, _gl.LINEAR);
+                        if (_patchedContexts.has(app.renderer.gl) && app.renderer.gl.texParameteri._l2dPatched) {
+                            step('GL patch verified OK (pre-PIXI)');
+                        } else {
+                            step('GL patch not active on PIXI context, applying fallback...');
+                            try {
+                                var gl = app.renderer.gl;
+                                _patchedContexts.add(gl);
+                                var isWebGL2 = (gl instanceof WebGL2RenderingContext);
+                                var maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+                                step('Fallback GL: ' + (isWebGL2 ? 'WebGL2' : 'WebGL1') + ', maxTex=' + maxTex);
+
+                                var _origTP = gl.texParameteri.bind(gl);
+                                gl.texParameteri = function(target, pname, param) {
+                                    if (target === gl.TEXTURE_2D) {
+                                        if (pname === gl.TEXTURE_MIN_FILTER) {
+                                            if (param === gl.LINEAR_MIPMAP_LINEAR || param === gl.LINEAR_MIPMAP_NEAREST ||
+                                                param === gl.NEAREST_MIPMAP_LINEAR || param === gl.NEAREST_MIPMAP_NEAREST) {
+                                                return _origTP(target, pname, gl.LINEAR);
                                             }
                                         }
-                                        if ((pname === _gl.TEXTURE_WRAP_S || pname === _gl.TEXTURE_WRAP_T) &&
-                                            (param === _gl.REPEAT || param === _gl.MIRRORED_REPEAT)) {
-                                            return _origTexParameteri(target, pname, _gl.CLAMP_TO_EDGE);
+                                        if ((pname === gl.TEXTURE_WRAP_S || pname === gl.TEXTURE_WRAP_T) &&
+                                            (param === gl.REPEAT || param === gl.MIRRORED_REPEAT)) {
+                                            return _origTP(target, pname, gl.CLAMP_TO_EDGE);
                                         }
                                     }
-                                    return _origTexParameteri(target, pname, param);
+                                    return _origTP(target, pname, param);
                                 };
-                                var _origGenerateMipmap = _gl.generateMipmap.bind(_gl);
-                                _gl.generateMipmap = function(target) {
-                                    return;
+                                gl.texParameteri._l2dPatched = true;
+
+                                var _origPS = gl.pixelStorei.bind(gl);
+                                gl.pixelStorei = function(pname, param) {
+                                    if (pname === gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL) {
+                                        return _origPS(pname, true);
+                                    }
+                                    return _origPS(pname, param);
                                 };
-                                step('GL texture patch applied');
-                            }
-                        } catch(e) { step('GL patch failed: ' + e.message); }
+
+                                gl.generateMipmap = function() {};
+                                step('Fallback GL patch applied');
+                            } catch(e) { step('Fallback GL patch error: ' + e.message); }
+                        }
 
                         step('OK');
                         var modelPath = '${modelFileName.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")}';
@@ -1691,8 +1883,15 @@ class Live2DWebView @JvmOverloads constructor(
                                         step('Texture count: ' + textures.length);
                                         for (var ti = 0; ti < textures.length; ti++) {
                                             var tex = textures[ti];
-                                            var texInfo = tex ? ('valid=' + tex.valid + ', w=' + tex.width + ', h=' + tex.height + ', baseTexture=' + (tex.baseTexture ? tex.baseTexture.hasLoaded : 'null')) : 'null';
-                                            step('Texture[' + ti + ']: ' + texInfo);
+                                            if (tex) {
+                                                var bt = tex.baseTexture;
+                                                var texInfo = 'valid=' + tex.valid + ', w=' + tex.width + ', h=' + tex.height +
+                                                    ', loaded=' + (bt ? bt.hasLoaded : 'null') +
+                                                    ', isPow2=' + (bt ? (bt.width > 0 && (bt.width & (bt.width - 1)) === 0 && bt.height > 0 && (bt.height & (bt.height - 1)) === 0) : '?');
+                                                step('Texture[' + ti + ']: ' + texInfo);
+                                            } else {
+                                                step('Texture[' + ti + ']: null');
+                                            }
                                         }
                                     } else {
                                         step('WARN: internalModel.textures is null');
@@ -1712,12 +1911,101 @@ class Live2DWebView @JvmOverloads constructor(
                                 }
                             } catch(glErr) { }
 
+                            // 强制修复所有已上传纹理的GL参数——PIXI可能绕过了我们的patch
+                            try {
+                                var gl = app.renderer.gl;
+                                if (gl && _origTexParami) {
+                                    var fixedCount = 0;
+                                    // 遍历PIXI纹理缓存
+                                    var texCache = PIXI.utils.TextureCache || PIXI.Texture.TextureCache;
+                                    if (texCache) {
+                                        var keys = Object.keys(texCache);
+                                        for (var ki = 0; ki < keys.length; ki++) {
+                                            var pTex = texCache[keys[ki]];
+                                            if (pTex && pTex.baseTexture && pTex.baseTexture._glTextures) {
+                                                var glTextures = pTex.baseTexture._glTextures;
+                                                var uid = app.renderer.uid || app.renderer.CONTEXT_UID;
+                                                var glTex = glTextures[uid] || glTextures[0];
+                                                if (glTex && glTex.texture) {
+                                                    gl.bindTexture(gl.TEXTURE_2D, glTex.texture);
+                                                    _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                                                    _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                                                    _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                                                    _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                                                    fixedCount++;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // 也遍历PIXI内部纹理管理器
+                                    if (app.renderer.texture && app.renderer.texture.managedTextures) {
+                                        var managed = app.renderer.texture.managedTextures;
+                                        for (var mi = 0; mi < managed.length; mi++) {
+                                            var mTex = managed[mi];
+                                            if (mTex && mTex._glTextures) {
+                                                var uid2 = app.renderer.uid || app.renderer.CONTEXT_UID;
+                                                var glTex2 = mTex._glTextures[uid2] || mTex._glTextures[0];
+                                                if (glTex2 && glTex2.texture) {
+                                                    gl.bindTexture(gl.TEXTURE_2D, glTex2.texture);
+                                                    _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                                                    _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                                                    _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                                                    _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                                                    fixedCount++;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    gl.bindTexture(gl.TEXTURE_2D, null);
+                                    step('Fixed ' + fixedCount + ' texture GL params');
+                                }
+                            } catch(fixErr) { step('Texture fix error: ' + fixErr.message); }
+
                             m.anchor.set(0.5, 0.5);
                             var sx = w / m.width, sy = h / m.height;
                             baseScale = Math.min(sx, sy) * 0.8;
                             m.scale.set(baseScale);
                             m.x = w / 2; m.y = h / 2;
                             app.stage.addChild(m);
+
+                            // 延迟修复：PIXI在addChild/首帧渲染时可能重置纹理参数
+                            setTimeout(function() {
+                                try {
+                                    var gl = app.renderer.gl;
+                                    if (gl && _origTexParami) {
+                                        var fixCount = 0;
+                                        if (app.renderer.texture && app.renderer.texture.managedTextures) {
+                                            var mgd = app.renderer.texture.managedTextures;
+                                            for (var fi = 0; fi < mgd.length; fi++) {
+                                                var fTex = mgd[fi];
+                                                if (fTex && fTex._glTextures) {
+                                                    var fUid = app.renderer.uid || app.renderer.CONTEXT_UID;
+                                                    var fGlTex = fTex._glTextures[fUid] || fTex._glTextures[0];
+                                                    if (fGlTex && fGlTex.texture) {
+                                                        gl.bindTexture(gl.TEXTURE_2D, fGlTex.texture);
+                                                        _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                                                        _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                                                        _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                                                        _origTexParami.call(gl, gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                                                        fixCount++;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        gl.bindTexture(gl.TEXTURE_2D, null);
+                                        if (fixCount > 0) step('Delayed fix: ' + fixCount + ' textures');
+                                    }
+                                } catch(de) { step('Delayed fix error: ' + de.message); }
+                            }, 500);
+
+                            try {
+                                var gl = app.renderer.gl;
+                                if (gl) {
+                                    var errCode = gl.getError();
+                                    step('GL state after load: err=' + (errCode === gl.NO_ERROR ? 'none' : '0x' + errCode.toString(16)));
+                                    while (gl.getError() !== gl.NO_ERROR) {}
+                                }
+                            } catch(glErr) { step('GL check error: ' + glErr.message); }
                             loadingEl.style.display = 'none';
                             step('Done!');
                             if (window.Live2DBridge) {

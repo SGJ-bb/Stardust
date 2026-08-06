@@ -1,0 +1,77 @@
+<!--
+    anim_wave_breath.xml — 波浪呼吸动画
+    用途：用于 Live2D 区域底部或背景的装饰性波浪
+    包含：2层正弦波浪路径（前层+后层），一前一后产生层次感
+    动画效果：
+      - 前层波浪水平滚动 (3000ms) + 垂直呼吸起伏
+      - 后层波浪水平滚动 (4000ms，不同步) + 垂直呼吸起伏
+      - 两层速度差异产生视差效果
+    尺寸：240dp x 40dp（宽而扁）
+-->
+<animated-vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/avd_wave_breath_vector">
+
+    <!-- ===== 前层波浪动画 ===== -->
+    <!-- 前层水平滚动 -->
+    <target android:name="wave_front">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateX"
+                android:duration="3000"
+                android:valueFrom="0"
+                android:valueTo="120"
+                android:valueType="floatType"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/linear_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 前层垂直呼吸 (scaleY 模拟起伏) -->
+    <target android:name="wave_front">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="2500"
+                android:valueFrom="1"
+                android:valueTo="1.3"
+                android:pivotY="40"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- ===== 后层波浪动画 ===== -->
+    <!-- 后层水平滚动（更慢，产生视差） -->
+    <target android:name="wave_back">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateX"
+                android:duration="4000"
+                android:valueFrom="0"
+                android:valueTo="120"
+                android:valueType="floatType"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/linear_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 后层垂直呼吸 (与前层错开相位) -->
+    <target android:name="wave_back">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="2800"
+                android:valueFrom="1"
+                android:valueTo="1.2"
+                android:pivotY="40"
+                android:startOffset="800"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+</animated-vector>

@@ -67,8 +67,8 @@
             android:clipToPadding="false"
             android:paddingTop="10dp"
             android:paddingBottom="10dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp" />
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp" />
 
     </LinearLayout>
 </FrameLayout>

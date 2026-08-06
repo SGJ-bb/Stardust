@@ -1,5 +1,14 @@
 package com.aicompanion.rag
 
+/**
+ * 文本分块器
+ *
+ * 除了按段落/句子切分长文本外,还会从每个分块中提取 [[链接文本]] 形式的超链接,
+ * 用于树结构 RAG 的上下文扩展(检索时沿链接跳转到相关分块)。
+ *
+ * 链接格式: [[任意文本]] (不支持嵌套),与 Obsidian Wikilink 语法兼容。
+ * 链接文本本身会保留在分块内容中(供 LLM 阅读),同时被记录到 chunk.links。
+ */
 class TextChunker(
     private val maxChars: Int = RagConfig.chunkMaxChars,
     private val overlapChars: Int = RagConfig.chunkOverlapChars
@@ -8,8 +17,28 @@ class TextChunker(
     data class Chunk(
         val index: Int,
         val text: String,
-        val sourceField: String = ""
+        val sourceField: String = "",
+        /** 从该分块中提取到的 [[链接]] 文本列表(已去重) */
+        val links: List<String> = emptyList()
     )
+
+    /**
+     * [[链接]] 提取正则
+     * - 匹配 [[后跟非 ] 的字符,以 ]] 结尾
+     * - 支持 [[目标|别名]] 形式,提取时取"目标"部分
+     */
+    private val linkPattern = Regex("\\[\\[([^\\]|\\]]+)(?:\\|[^\\]]+)?\\]\\]")
+
+    /**
+     * 从文本中提取所有 [[链接]] 的目标文本(去重,保持顺序)
+     */
+    private fun extractLinks(text: String): List<String> {
+        return linkPattern.findAll(text)
+            .map { it.groupValues[1].trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .toList()
+    }
 
     fun chunkPersona(fields: Map<String, String>): List<Chunk> {
         val chunks = mutableListOf<Chunk>()
@@ -19,7 +48,8 @@ class TextChunker(
             if (text.isBlank()) continue
 
             if (text.length <= maxChars) {
-                chunks.add(Chunk(globalIndex++, text.trim(), fieldName))
+                val trimmed = text.trim()
+                chunks.add(Chunk(globalIndex++, trimmed, fieldName, extractLinks(trimmed)))
             } else {
                 val subChunks = splitLongText(text.trim(), fieldName, globalIndex)
                 chunks.addAll(subChunks)
@@ -32,7 +62,10 @@ class TextChunker(
 
     fun chunkText(text: String, sourceLabel: String = ""): List<Chunk> {
         if (text.isBlank()) return emptyList()
-        if (text.length <= maxChars) return listOf(Chunk(0, text.trim(), sourceLabel))
+        if (text.length <= maxChars) {
+            val trimmed = text.trim()
+            return listOf(Chunk(0, trimmed, sourceLabel, extractLinks(trimmed)))
+        }
 
         return splitLongText(text.trim(), sourceLabel, 0)
     }
@@ -46,14 +79,16 @@ class TextChunker(
 
         for (para in paragraphs) {
             if (current.length + para.length > maxChars && current.isNotEmpty()) {
-                chunks.add(Chunk(localIndex++, current.toString().trim(), fieldName))
+                val chunkText = current.toString().trim()
+                chunks.add(Chunk(localIndex++, chunkText, fieldName, extractLinks(chunkText)))
                 val overlap = buildOverlap(current.toString(), overlapChars)
                 current = StringBuilder(overlap)
             }
 
             if (para.length > maxChars) {
                 if (current.isNotEmpty()) {
-                    chunks.add(Chunk(localIndex++, current.toString().trim(), fieldName))
+                    val chunkText = current.toString().trim()
+                    chunks.add(Chunk(localIndex++, chunkText, fieldName, extractLinks(chunkText)))
                     current = StringBuilder()
                 }
                 val subChunks = splitLongSentence(para, fieldName, localIndex)
@@ -67,7 +102,8 @@ class TextChunker(
         }
 
         if (current.isNotBlank()) {
-            chunks.add(Chunk(localIndex++, current.toString().trim(), fieldName))
+            val chunkText = current.toString().trim()
+            chunks.add(Chunk(localIndex++, chunkText, fieldName, extractLinks(chunkText)))
         }
 
         return chunks
@@ -82,7 +118,8 @@ class TextChunker(
 
         for (sentence in sentences) {
             if (current.length + sentence.length > maxChars && current.isNotEmpty()) {
-                chunks.add(Chunk(idx++, current.toString().trim(), fieldName))
+                val chunkText = current.toString().trim()
+                chunks.add(Chunk(idx++, chunkText, fieldName, extractLinks(chunkText)))
                 val overlap = buildOverlap(current.toString(), overlapChars / 2)
                 current = StringBuilder(overlap)
             }
@@ -90,15 +127,18 @@ class TextChunker(
         }
 
         if (current.isNotBlank()) {
-            chunks.add(Chunk(idx++, current.toString().trim(), fieldName))
+            val chunkText = current.toString().trim()
+            chunks.add(Chunk(idx++, chunkText, fieldName, extractLinks(chunkText)))
         }
 
         if (chunks.isEmpty()) {
-            val step = maxChars - overlapChars
+            // 确保 step > 0,避免死循环(当 maxChars <= overlapChars 时)
+            val step = (maxChars - overlapChars).coerceAtLeast(1)
             var pos = 0
             while (pos < text.length) {
                 val end = (pos + maxChars).coerceAtMost(text.length)
-                chunks.add(Chunk(idx++, text.substring(pos, end), fieldName))
+                val chunkText = text.substring(pos, end)
+                chunks.add(Chunk(idx++, chunkText, fieldName, extractLinks(chunkText)))
                 pos += step
             }
         }

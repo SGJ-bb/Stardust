@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <!-- 时间标签 -->
+    <TextView
+        android:id="@+id/tv_time_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="4dp"
+        android:background="#CFCFCF"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end">
+
+        <!-- 右侧占位，推气泡靠右 -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- 消息气泡区域 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginEnd="8dp">
+
+            <!-- 气泡容器，限制最大宽度为屏幕70% -->
+            <LinearLayout
+                android:id="@+id/bubble_user"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#95EC69"
+                android:padding="10dp">
+
+                <TextView
+                    android:id="@+id/tv_user_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#000000"
+                    android:textSize="15sp"
+                    android:textIsSelectable="true"
+                    android:maxEms="15"
+                    android:breakStrategy="simple" />
+
+                <!-- 图片消息 -->
+                <ImageView
+                    android:id="@+id/iv_user_image"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxWidth="200dp"
+                    android:maxHeight="200dp"
+                    android:adjustViewBounds="true"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- 用户头像 -->
+        <ImageView
+            android:id="@+id/iv_user_avatar"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_avatar_default_user"
+            android:scaleType="centerCrop"
+            android:contentDescription="用户头像" />
+
+    </LinearLayout>
+
+</LinearLayout>

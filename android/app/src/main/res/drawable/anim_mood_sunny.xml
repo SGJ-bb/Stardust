@@ -1,0 +1,280 @@
+<!--
+    anim_mood_sunny.xml — 开心情动画（太阳笑脸）
+    用途：当情绪为"开心"时显示的小太阳动画
+    包含：太阳圆形 + 8条光芒射线 + 笑脸（眼睛+微笑）
+    动画效果：整体旋转 + 光芒脉冲缩放 + 眨眼效果
+    尺寸：32dp x 32dp
+-->
+<animated-vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/avd_mood_sunny_vector">
+
+    <!-- 整体旋转动画 -->
+    <target android:name="sun_group">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="rotation"
+                android:duration="8000"
+                android:valueFrom="0"
+                android:valueTo="360"
+                android:interpolator="@android:anim/linear_interpolator"
+                android:repeatCount="infinite"
+                android:repeatMode="restart"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光芒1 脉冲缩放 -->
+    <target android:name="ray1">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="ray1">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="0"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光芒2 脉冲缩放 (错开200ms) -->
+    <target android:name="ray2">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="200"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="ray2">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="200"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光芒3 脉冲缩放 (错开400ms) -->
+    <target android:name="ray3">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="400"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="ray3">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="400"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光芒4 脉冲缩放 (错开600ms) -->
+    <target android:name="ray4">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="600"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="ray4">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="600"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光芒5 脉冲缩放 (错开800ms) -->
+    <target android:name="ray5">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="800"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="ray5">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="800"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光芒6 脉冲缩放 (错开1000ms) -->
+    <target android:name="ray6">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="1000"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="ray6">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="1000"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光芒7 脉冲缩放 (错开1200ms) -->
+    <target android:name="ray7">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="1200"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="ray7">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="1200"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 光芒8 脉冲缩放 (错开1400ms) -->
+    <target android:name="ray8">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="1400"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="ray8">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="1200"
+                android:valueFrom="0.8"
+                android:valueTo="1.2"
+                android:startOffset="1400"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 左眼眨眼动画 -->
+    <target android:name="left_eye">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="200"
+                android:valueFrom="1"
+                android:valueTo="0.1"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:startOffset="4000"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 右眼眨眼动画 -->
+    <target android:name="right_eye">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="200"
+                android:valueFrom="1"
+                android:valueTo="0.1"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:startOffset="4200"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+</animated-vector>

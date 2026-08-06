@@ -1,0 +1,782 @@
+[
+  {
+    "id": 1,
+    "name": "群聊入口",
+    "emoji": "💬",
+    "category": "core",
+    "usage": "首页功能入口卡片 — 群聊导航",
+    "prompt_en": "Minimalist chat bubble icon, gradient purple to blue, soft rounded corners, subtle glow effect, modern flat design style, clean white background, app icon style 1024x1024",
+    "prompt_zh": "极简聊天气泡图标，紫蓝渐变，圆角柔和发光，现代扁平化设计，APP图标风格",
+    "priority": 1
+  },
+  {
+    "id": 2,
+    "name": "虚拟世界",
+    "emoji": "🌍",
+    "category": "core",
+    "usage": "首页功能入口卡片 — 虚拟世界导航",
+    "prompt_en": "Stylized globe icon with floating particles and sparkles, deep space blue to teal gradient, isometric perspective, glassmorphism effect, modern tech aesthetic, app icon style 1024x1024",
+    "prompt_zh": "风格化地球仪图标，漂浮粒子和闪光，深空蓝到青色渐变，等轴透视，玻璃拟态效果",
+    "priority": 1
+  },
+  {
+    "id": 3,
+    "name": "个人档案",
+    "emoji": "👤",
+    "category": "core",
+    "usage": "首页功能入口卡片 — 档案导航",
+    "prompt_en": "Elegant silhouette profile card icon, warm coral to orange gradient, minimalist line art with filled accent, subtle shadow, modern UI icon style, clean background 1024x1024",
+    "prompt_zh": "优雅的剪影个人资料卡图标，暖珊瑚橙渐变，极简线条填充，现代UI图标",
+    "priority": 1
+  },
+  {
+    "id": 4,
+    "name": "收藏星标",
+    "emoji": "⭐",
+    "category": "chat",
+    "usage": "长按消息收藏 / 收藏消息标题",
+    "prompt_en": "Shining star icon, golden yellow gradient with sparkle rays, rounded star shape, soft glow halo, premium quality feel, modern flat icon on transparent background",
+    "prompt_zh": "闪耀星星图标，金黄渐变带光芒射线，圆角星形柔和光晕，高品质扁平图标",
+    "priority": 2
+  },
+  {
+    "id": 5,
+    "name": "点缀皮肤",
+    "emoji": "🎨",
+    "category": "chat",
+    "usage": "长按消息点缀 / 皮肤商店标题",
+    "prompt_en": "Artist palette icon with colorful paint splashes, vibrant rainbow gradient accents, creative and playful style, smooth rounded edges, modern app icon 1024x1024",
+    "prompt_zh": "艺术家调色板图标，彩虹飞溅色彩，创意活泼风格，圆润边缘现代APP图标",
+    "priority": 2
+  },
+  {
+    "id": 6,
+    "name": "删除",
+    "emoji": "🗑️",
+    "category": "chat",
+    "usage": "长按消息删除 / 动态列表删除",
+    "prompt_en": "Minimalist trash bin icon, soft red to coral gradient, clean geometric shape, subtle 3D depth, modern material design style, friendly not harsh, transparent background",
+    "prompt_zh": "极简垃圾桶图标，柔红珊瑚渐变，干净几何形状，微3D深度，友好的Material Design风格",
+    "priority": 2
+  },
+  {
+    "id": 7,
+    "name": "引用回复",
+    "emoji": "💬",
+    "category": "chat",
+    "usage": "长按消息引用回复",
+    "prompt_en": "Curved reply arrow inside speech bubble, indigo to violet gradient, sleek modern lines, subtle animation hint, messaging app icon style, clean background",
+    "prompt_zh": "弯曲的回复箭头在气泡内，靛蓝紫渐变，流畅现代线条，消息应用图标风格",
+    "priority": 2
+  },
+  {
+    "id": 8,
+    "name": "爱心点赞",
+    "emoji": "❤️",
+    "category": "chat",
+    "usage": "表情反应-爱心 / 收藏消息 / AI消息点赞",
+    "prompt_en": "Heart icon with gentle pulse effect suggestion, rose red to pink gradient, smooth organic curves, slightly rounded, romantic but modern, app icon style",
+    "prompt_zh": "心形图标带轻微脉动效果暗示，玫红粉红渐变，平滑有机曲线，浪漫而现代",
+    "priority": 2
+  },
+  {
+    "id": 9,
+    "name": "笑哭反应",
+    "emoji": "😂",
+    "category": "chat",
+    "usage": "表情反应-笑哭",
+    "prompt_en": "Laughing face with tears of joy, cheerful yellow-orange tone, cute round expression, kawaii style but professional, soft shadows, emoji-style illustration",
+    "prompt_zh": "笑哭表情脸，欢快黄橙色调，可爱圆润表情，卡哇伊但专业的emoji风格插画",
+    "priority": 3
+  },
+  {
+    "id": 10,
+    "name": "惊讶反应",
+    "emoji": "😮",
+    "category": "chat",
+    "usage": "表情反应-惊讶",
+    "prompt_en": "Surprised face with wide eyes, soft purple-blue tone, expressive cartoon style, round cute shape, modern emoji illustration style",
+    "prompt_zh": "惊讶大眼睛脸，柔和紫蓝色调，表现力强的卡通风格，圆润可爱现代emoji插画",
+    "priority": 3
+  },
+  {
+    "id": 11,
+    "name": "哭泣反应",
+    "emoji": "😢",
+    "category": "chat",
+    "usage": "表情反应-哭泣",
+    "prompt_en": "Sad crying face with tear drops, gentle blue tone, empathetic expression, soft rounded features, comforting emoji illustration",
+    "prompt_zh": "悲伤哭泣脸带泪滴，温柔蓝色调，共情表情，柔和圆润特征，安慰性emoji插画",
+    "priority": 3
+  },
+  {
+    "id": 12,
+    "name": "生气反应",
+    "emoji": "😡",
+    "category": "chat",
+    "usage": "表情反应-生气",
+    "prompt_en": "Angry face with steam puffs, warm red-orange tone, fierce but cute expression, comic style anger, animated emoji look",
+    "prompt_zh": "生气脸带蒸汽喷出，暖红橙色调，凶猛但可爱表情，漫画风格愤怒感",
+    "priority": 3
+  },
+  {
+    "id": 13,
+    "name": "点赞拇指",
+    "emoji": "👍",
+    "category": "chat",
+    "usage": "表情反应-点赞 / 成就-品味鉴定师 / AI消息点赞",
+    "prompt_en": "Thumbs up icon, vibrant green to emerald gradient, bold confident gesture, slight 3D depth, modern social media like button style",
+    "prompt_zh": "竖起大拇指图标，鲜艳绿翡翠渐变，大胆自信手势，轻微3D深度，社交媒体点赞按钮风格",
+    "priority": 2
+  },
+  {
+    "id": 14,
+    "name": "鼓掌反应",
+    "emoji": "👏",
+    "category": "chat",
+    "usage": "表情反应-鼓掌",
+    "prompt_en": "Clapping hands icon, warm amber to gold gradient, dynamic motion feel, celebratory gesture, modern flat illustration style",
+    "prompt_zh": "拍手图标，温暖琥珀金渐变，动态运动感，庆祝手势，现代扁平插画风格",
+    "priority": 3
+  },
+  {
+    "id": 15,
+    "name": "庆祝成功",
+    "emoji": "🎉",
+    "category": "chat",
+    "usage": "表情反应-庆祝 / 创建群组成功 / 专注完成 / 时光胶囊开启",
+    "prompt_en": "Party popper with confetti burst, multicolor festive gradient, joyful explosion of celebration elements, vibrant happy energy, event icon style",
+    "prompt_zh": "派对彩炮带五彩纸屑爆发，多彩节日渐变，欢乐庆祝元素爆发，充满活力的快乐能量",
+    "priority": 2
+  },
+  {
+    "id": 16,
+    "name": "移除关闭",
+    "emoji": "❌",
+    "category": "chat",
+    "usage": "表情反应-移除",
+    "prompt_en": "Clean X close icon, soft gray to slate gradient, perfect symmetry, thin elegant lines, minimal modern UI element, subtle hover state hint",
+    "prompt_zh": "干净的X关闭图标，柔和灰石板渐变，完美对称，纤细优雅线条，极简现代UI元素",
+    "priority": 4
+  },
+  {
+    "id": 17,
+    "name": "数据总览",
+    "emoji": "📊",
+    "category": "profile",
+    "usage": "个人资料页-相遇数据总览标题",
+    "prompt_en": "Data analytics dashboard icon, bar chart with upward trend, cyan to blue gradient, clean infographic style, modern business intelligence aesthetic",
+    "prompt_zh": "数据分析仪表盘图标，柱状图带上升趋势，青蓝渐变，简洁信息图风格，现代商业智能美学",
+    "priority": 2
+  },
+  {
+    "id": 18,
+    "name": "连续打卡",
+    "emoji": "🔥",
+    "category": "profile",
+    "usage": "个人资料页-连续打卡天数统计",
+    "prompt_en": "Flame icon with heat waves, fiery orange to red gradient, dynamic energy feel, streak counter badge style, motivational fitness app aesthetic",
+    "prompt_zh": "火焰图标带热浪，火橙红渐变，动态能量感，连续打卡徽章风格，激励性健身APP美学",
+    "priority": 2
+  },
+  {
+    "id": 19,
+    "name": "发送消息数",
+    "emoji": "✍️",
+    "category": "profile",
+    "usage": "个人资料页-我发的消息数统计",
+    "prompt_en": "Quill pen writing icon, elegant indigo gradient, ink flow detail, literary sophisticated feel, writer notebook aesthetic",
+    "prompt_zh": "羽毛笔书写图标，优雅靛蓝渐变，墨水流动细节，文学精致感，作家笔记本美学",
+    "priority": 3
+  },
+  {
+    "id": 20,
+    "name": "AI回复数",
+    "emoji": "🤖",
+    "category": "profile",
+    "usage": "个人资料页-TA回的消息数统计 / 群聊自动模式标签",
+    "prompt_en": "Robot head icon with friendly glowing eyes, metallic silver to cyan circuit glow, cute AI assistant character, futuristic but approachable",
+    "prompt_zh": "机器人头像图标带友好发光眼，金属银青色电路光晕，可爱AI助手角色，未来感但亲切",
+    "priority": 2
+  },
+  {
+    "id": 21,
+    "name": "总字数统计",
+    "emoji": "📝",
+    "category": "profile",
+    "usage": "个人资料页-字数统计 / 虚拟世界编辑按钮 / 记忆总结按钮",
+    "prompt_en": "Document page with word count indicator, sage green gradient, paper texture hint, academic clean style, note-taking app icon",
+    "prompt_zh": "文档页面带字数指示器，鼠尾草绿渐变，纸张纹理暗示，学术整洁风格，笔记应用图标",
+    "priority": 3
+  },
+  {
+    "id": 22,
+    "name": "活跃时段",
+    "emoji": "🌙",
+    "category": "profile",
+    "usage": "个人资料页-活跃时段统计 / 日记情绪-感性",
+    "prompt_en": "Crescent moon with activity pulse rings, deep navy to purple gradient, night time theme, sleep tracking app aesthetic, calm serene mood",
+    "prompt_zh": "新月带活动脉冲环，深海军蓝紫渐变，夜间主题，睡眠追踪APP美学，平静安宁氛围",
+    "priority": 3
+  },
+  {
+    "id": 23,
+    "name": "天气晴朗",
+    "emoji": "☀️",
+    "category": "toolbar",
+    "usage": "Toolbar天气显示(晴) / 虚拟世界天气选项",
+    "prompt_en": "Bright sun with lens flare, warm golden yellow, radiant sunbeams, weather widget icon style, clean meteorological symbol",
+    "prompt_zh": "明亮太阳带镜头光晕，温暖金黄色，辐射阳光束，天气小部件图标风格，干净的气象符号",
+    "priority": 2
+  },
+  {
+    "id": 24,
+    "name": "定时唤醒闹钟",
+    "emoji": "⏰",
+    "category": "toolbar",
+    "usage": "定时唤醒页/闹钟页标题 / 添加唤醒任务时间标签",
+    "prompt_en": "Alarm clock icon with ringing bells, classic alarm clock shape in modern flat style, coral red accent color, time management app icon",
+    "prompt_zh": "闹钟图标带响铃，经典闹钟形状现代扁平风格，珊瑚红强调色，时间管理APP图标",
+    "priority": 2
+  },
+  {
+    "id": 25,
+    "name": "魔法闪光",
+    "emoji": "✨",
+    "category": "toolbar",
+    "usage": "动态页标题 / 激活页标题 / 新会话提示 / 设置页赞助装饰 / 时光胶囊创建",
+    "prompt_en": "Sparkle magic wand icon, shimmering gold to white gradient, particle trail effect, magical transformation feel, premium feature indicator",
+    "prompt_zh": "闪光魔法棒图标，闪烁金白渐变，粒子轨迹效果，魔法变身感，高级功能指示器",
+    "priority": 2
+  },
+  {
+    "id": 26,
+    "name": "设备信息",
+    "emoji": "📱",
+    "category": "toolbar",
+    "usage": "本地模型页-设备信息区块标题",
+    "prompt_en": "Smartphone device icon with signal waves, tech blue gradient, hardware specification feel, settings device info section icon",
+    "prompt_zh": "智能手机设备图标带信号波，科技蓝渐变，硬件规格感觉，设置设备信息区段图标",
+    "priority": 4
+  },
+  {
+    "id": 27,
+    "name": "功能设置齿轮",
+    "emoji": "⚙️",
+    "category": "toolbar",
+    "usage": "本地模型页-功能开关区块 / 虚拟世界推演设置按钮",
+    "prompt_en": "Gear/cog icon with mechanical precision, steel gray to blue gradient, interlocking teeth detail, engineering settings icon, modern flat",
+    "prompt_zh": "齿轮/齿轮图标带机械精度，钢灰蓝渐变，啮合齿细节，工程设置图标，现代扁平",
+    "priority": 3
+  },
+  {
+    "id": 28,
+    "name": "可用模型包",
+    "emoji": "📦",
+    "category": "toolbar",
+    "usage": "本地模型页-可用模型区块标题",
+    "prompt_en": "3D box package icon with AI brain symbol, deep purple gradient, model packaging concept, machine learning asset icon",
+    "prompt_zh": "3D盒子包装图标带AI大脑符号，深紫色渐变，模型打包概念，机器学习资产图标",
+    "priority": 4
+  },
+  {
+    "id": 29,
+    "name": "说明小贴士",
+    "emoji": "💡",
+    "category": "toolbar",
+    "usage": "本地模型页-说明区块 / API客户端Prompt模板 / 日记今日小贴士",
+    "prompt_en": "Light bulb idea icon with illumination glow, warm amber to yellow, bright filament detail, eureka moment feeling, tip/help section icon",
+    "prompt_zh": "灯泡想法图标带照明光晕，温暖琥珀黄色，明亮灯丝细节，顿悟时刻感觉，提示帮助区段图标",
+    "priority": 3
+  },
+  {
+    "id": 30,
+    "name": "虚拟时间面板",
+    "emoji": "⏱",
+    "category": "virtual_world",
+    "usage": "虚拟世界-虚拟时间面板标题",
+    "prompt_en": "Hourglass with flowing sand particles, temporal blue gradient, time manipulation feel, fantasy game UI element, mystical atmosphere",
+    "prompt_zh": "沙漏带流动沙粒，时间蓝渐变，时间操控感，奇幻游戏UI元素，神秘氛围",
+    "priority": 3
+  },
+  {
+    "id": 31,
+    "name": "时间倍率闪电",
+    "emoji": "⚡",
+    "category": "virtual_world",
+    "usage": "虚拟世界-时间倍率设置标签",
+    "prompt_en": "Lightning bolt with speed lines, electric yellow to cyan gradient, power up energy feel, fast-forward control icon, gaming UI style",
+    "prompt_zh": "闪电带速度线，电黄青渐变，充能能量感，快进控制图标，游戏UI风格",
+    "priority": 3
+  },
+  {
+    "id": 32,
+    "name": "起始之地定位",
+    "emoji": "📍",
+    "category": "virtual_world",
+    "usage": "虚拟世界-起始之地设置标签 / 当前位置显示前缀",
+    "prompt_en": "Location pin marker with map grid, map pin red to orange gradient, GPS coordinate feel, adventure map waypoint icon, exploration theme",
+    "prompt_zh": "位置标记针带地图网格，地图针红橙渐变，GPS坐标感觉，冒险地图航点图标，探索主题",
+    "priority": 3
+  },
+  {
+    "id": 33,
+    "name": "编辑世界观卷轴",
+    "emoji": "📝",
+    "category": "virtual_world",
+    "usage": "虚拟世界-编辑世界观按钮 / 对话框标题",
+    "prompt_en": "Scroll manuscript with quill, parchment tan to brown gradient, fantasy world-building lore book, RPG quest journal aesthetic",
+    "prompt_zh": "卷轴手稿带羽毛笔，羊皮纸棕褐渐变，奇幻世界观设定之书，RPG任务日志美学",
+    "priority": 3
+  },
+  {
+    "id": 34,
+    "name": "上传图片相机",
+    "emoji": "📷",
+    "category": "virtual_world",
+    "usage": "虚拟世界-上传图片按钮 / 新建动态图片选项 / 相册相机按钮",
+    "prompt_en": "Camera shutter icon with aperture blades, lens reflex detail, photography black to silver gradient, gallery upload button, media picker style",
+    "prompt_zh": "相机快门图标带光圈叶片，镜头反射细节，摄影黑银渐变，画廊上传按钮，媒体选择器风格",
+    "priority": 3
+  },
+  {
+    "id": 35,
+    "name": "推演索引剪贴板",
+    "emoji": "📋",
+    "category": "virtual_world",
+    "usage": "虚拟世界-推演索引按钮 / 运行日志对话框标题 / 微信查看日志 / 免责声明按钮",
+    "prompt_en": "Clipboard with checklist items, office paper white with blue clip, simulation log feel, scenario planning document icon",
+    "prompt_zh": "剪贴板带检查清单项，办公纸张白配蓝色夹子，模拟日志感觉，场景规划文档图标",
+    "priority": 3
+  },
+  {
+    "id": 36,
+    "name": "重置世界循环",
+    "emoji": "🔄",
+    "category": "virtual_world",
+    "usage": "虚拟世界-重置世界按钮 / 新会话确认",
+    "prompt_en": "Circular refresh arrow loop, green to teal gradient, reset/restart cycle feel, world regeneration icon, clean symmetrical arrows",
+    "prompt_zh": "圆形刷新箭头循环，绿青渐变，重置重启循环感，世界重生图标，干净对称箭头",
+    "priority": 3
+  },
+  {
+    "id": 37,
+    "name": "初始场景场记板",
+    "emoji": "🎬",
+    "category": "virtual_world",
+    "usage": "虚拟世界-初始场景输入标签 / 相册幻灯片按钮",
+    "prompt_en": "Movie clapperboard icon, cinema black and white with red accent stripe, scene director aesthetic, storytelling opening shot icon",
+    "prompt_zh": "电影场记板图标，电影黑白配红色条纹，导演美学，故事开场镜头图标",
+    "priority": 4
+  },
+  {
+    "id": 38,
+    "name": "叙事风格羽毛笔",
+    "emoji": "✍️",
+    "category": "virtual_world",
+    "usage": "虚拟世界-叙事风格输入标签",
+    "prompt_en": "Fountain pen nib with ink swirl calligraphy, elegant burgundy gradient, narrative writing feel, literature prose style icon",
+    "prompt_zh": "钢笔尖带墨水漩涡书法，优雅酒红渐变，叙事写作感，文学散文风格图标",
+    "priority": 4
+  },
+  {
+    "id": 39,
+    "name": "成就-初次对话",
+    "emoji": "💬",
+    "category": "achievement",
+    "usage": "成就: 初次对话",
+    "prompt_en": "Achievement badge, circular medal shape with gold border, glossy 3D finish, two chat bubbles colliding creating sparks, celebratory sparkles around edge, game unlock style, dark background",
+    "prompt_zh": "成就徽章，圆形奖牌金边光泽3D效果，两个聊天气泡碰撞产生火花，边缘庆祝闪光，游戏解锁风格",
+    "priority": 5
+  },
+  {
+    "id": 40,
+    "name": "成就-健谈伙伴",
+    "emoji": "🗣",
+    "category": "achievement",
+    "usage": "成就: 健谈伙伴",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, open mouth with sound waves radiating outward, voice communication feel, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，张开的嘴巴带声波向外扩散，语音交流感，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 41,
+    "name": "成就-话痨达人",
+    "emoji": "📢",
+    "category": "achievement",
+    "usage": "成就: 话痨达人",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, megaphone loudspeaker with concentric sound wave rings, broadcasting feel, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，扩音器喇叭带同心声波环，广播感，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 42,
+    "name": "成就-无话不说",
+    "emoji": "🌟",
+    "category": "achievement",
+    "usage": "成就: 无话不说",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, supernova exploding star with radiating light beams, ultimate conversation mastery, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，超新星爆发星星带放射光芒束，终极对话精通，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 43,
+    "name": "成就-三日之约",
+    "emoji": "🔥",
+    "category": "achievement",
+    "usage": "成就: 三日之约",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, burning flame over calendar date mark number three, streak commitment feel, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，燃烧火焰在日历日期标记数字三上方，连续承诺感，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 44,
+    "name": "成就-七日同行",
+    "emoji": "🏆",
+    "category": "achievement",
+    "usage": "成就: 七日同行",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, golden trophy medal with number seven engraved, weekly milestone feel, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，金色奖牌奖章刻有数字七，每周里程碑感，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 45,
+    "name": "成就-月之羁绊",
+    "emoji": "👑",
+    "category": "achievement",
+    "usage": "成就: 月之羁绊",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, crown with crescent moon decoration and star gems, monthly bond relationship, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，皇冠带月牙装饰和星星宝石，每月羁绊关系，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 46,
+    "name": "成就-初见好感",
+    "emoji": "❤",
+    "category": "achievement",
+    "usage": "成就: 初见好感",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, heart with first meeting sparkle glow, new connection beginning feel, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，心形带初遇闪光辉光，新连接开始感，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 47,
+    "name": "成就-亲密伙伴",
+    "emoji": "💕",
+    "category": "achievement",
+    "usage": "成就: 亲密伙伴",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, two intertwined hearts with connecting thread, close partnership feel, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，两颗交织的心带连线丝，亲密伙伴关系感，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 48,
+    "name": "成就-灵魂羁绊",
+    "emoji": "💖",
+    "category": "achievement",
+    "usage": "成就: 灵魂羁绊",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, large glowing heart with soul flame aura, deepest bond level, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，大型发光心形带灵魂火焰光环，最深羁绊等级，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 49,
+    "name": "成就-回忆初现",
+    "emoji": "📝",
+    "category": "achievement",
+    "usage": "成就: 回忆初现",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, feather quill writing glowing memory light points, first memory emergence, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，羽毛笔书写发光记忆光点，首次记忆浮现，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 50,
+    "name": "成就-记忆之书",
+    "emoji": "📚",
+    "category": "achievement",
+    "usage": "成就: 记忆之书",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, open magical book with floating glowing text symbols, memory collection feel, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，打开的魔法书带漂浮发光文字符号，记忆收集感，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 51,
+    "name": "成就-生活记录者",
+    "emoji": "📔",
+    "category": "achievement",
+    "usage": "成就: 生活记录者",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, daily journal notebook with life scene silhouettes on cover, chronicler achievement, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，日常日记本封面带生活场景剪影，记录者成就，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 52,
+    "name": "成就-回忆史官",
+    "emoji": "📕",
+    "category": "achievement",
+    "usage": "成就: 回忆史官",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, thick ancient history scroll with seal stamp, historian recorder achievement, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，厚重古代历史卷轴带印章，历史学家记录者成就，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 53,
+    "name": "成就-彩蛋猎人",
+    "emoji": "🥚",
+    "category": "achievement",
+    "usage": "成就: 彩蛋猎人",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, colorful easter egg with question mark pattern, secret discovery hunter, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，彩色复活节彩蛋带问号图案，秘密发现猎人，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 54,
+    "name": "成就-秘密探索者",
+    "emoji": "🔮",
+    "category": "achievement",
+    "usage": "成就: 秘密探索者",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, crystal ball with mysterious swirling mist inside, secret explorer discovery, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，水晶球内部神秘旋转迷雾，秘密探索发现，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 55,
+    "name": "成就-夜猫子",
+    "emoji": "🦉",
+    "category": "achievement",
+    "usage": "成就: 夜猫子",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, owl with large luminous eyes under moonlight, night owl late night activity, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，猫头鹰带大发光眼睛在月光下，夜猫子深夜活动，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 56,
+    "name": "成就-早起鸟",
+    "emoji": "🌅",
+    "category": "achievement",
+    "usage": "成就: 早起鸟",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, rising sun behind mountain peak with bird silhouette, early bird morning routine, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，日出在山峰后带鸟影轮廓，早起鸟晨间例行，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 57,
+    "name": "成就-专注新人",
+    "emoji": "🍅",
+    "category": "achievement",
+    "usage": "成就: 专注新人(番茄钟)",
+    "prompt_en": "Achievement badge, circular medal gold border glossy 3D, tomato shaped timer clock with countdown segments, productivity focus technique, pomodoro work session, game achievement unlock, dark bg",
+    "prompt_zh": "成就徽章圆形金边光泽3D，番茄形状计时器时钟带倒计时分段，生产力专注技术，番茄工作时段，游戏成就解锁",
+    "priority": 5
+  },
+  {
+    "id": 58,
+    "name": "添加成员加号",
+    "emoji": "➕",
+    "category": "functional",
+    "usage": "群聊添加成员FAB按钮 / 管理群成员对话框标题",
+    "prompt_en": "Plus sign add button, circular green gradient, floating action button style, material design FAB, clean minimal icon",
+    "prompt_zh": "加号添加按钮，圆形绿色渐变，浮动操作按钮风格，Material Design FAB，干净极简图标",
+    "priority": 3
+  },
+  {
+    "id": 59,
+    "name": "警告提示三角",
+    "emoji": "⚠️",
+    "category": "functional",
+    "usage": "创建群组警告提示 / 配置缺失警告 / 不兼容性警告 / 使用须知免责声明",
+    "prompt_en": "Warning triangle exclamation mark, amber yellow caution sign, alert notification icon, friendly warning not scary, modern flat design",
+    "prompt_zh": "警告三角感叹号，琥珀黄 caution标志，警报通知图标，友好不吓人的警告，现代扁平设计",
+    "priority": 4
+  },
+  {
+    "id": 60,
+    "name": "音乐抖音音符",
+    "emoji": "🎵",
+    "category": "functional",
+    "usage": "设置页底部抖音ID链接 / 助眠白噪音模式",
+    "prompt_en": "Music note with sound wave, melodic purple gradient, audio streaming icon, TikTok music vibe, rhythmic flow design",
+    "prompt_zh": "音乐音符带声波，旋律紫渐变，音频流图标，TikTok音乐氛围，节奏流动设计",
+    "priority": 4
+  },
+  {
+    "id": 61,
+    "name": "公告广播喇叭",
+    "emoji": "📢",
+    "category": "functional",
+    "usage": "设置页底部公告区块大图标",
+    "prompt_en": "Megaphone loudspeaker announcement, coral red attention-grabbing color, broadcast news bulletin style, important notice indicator, bold visual presence",
+    "prompt_zh": "扩音器喇叭公告，珊瑚红引人注目颜色，广播新闻公报风格，重要通知指示器，强烈的视觉存在感",
+    "priority": 4
+  },
+  {
+    "id": 62,
+    "name": "录音麦克风",
+    "emoji": "🎤",
+    "category": "functional",
+    "usage": "录音状态提示 / 通话界面静音按钮",
+    "prompt_en": "Microphone icon with recording indicator dot, studio mic aesthetic, voice input button, podcast recording feel, professional audio equipment style",
+    "prompt_zh": "麦克风图标带录制指示点，工作室麦克风美学，语音输入按钮，播客录制感觉，专业音频设备风格",
+    "priority": 3
+  },
+  {
+    "id": 63,
+    "name": "发动态铅笔",
+    "emoji": "✏️",
+    "category": "functional",
+    "usage": "动态页发动态按钮 / 发动态对话框标题",
+    "prompt_en": "Pencil edit compose icon, graphite gray to blue gradient, write new content, writing tool minimal style, content creation button",
+    "prompt_zh": "铅笔编辑撰写图标，石墨灰蓝渐变，写新内容，写作工具极简风格，内容创作按钮",
+    "priority": 4
+  },
+  {
+    "id": 64,
+    "name": "未解锁锁头",
+    "emoji": "🔒",
+    "category": "functional",
+    "usage": "成就列表项-未解锁 / 时光胶囊-未到期",
+    "prompt_en": "Locked padlock icon, muted gray tone, locked achievement placeholder, subtle chain detail, awaiting unlock feel, inactive state design",
+    "prompt_zh": "锁定挂锁图标，柔和灰色调，锁定成就占位符，微妙链条细节，等待解锁感觉，非激活状态设计",
+    "priority": 4
+  },
+  {
+    "id": 65,
+    "name": "时光胶囊-已开启",
+    "emoji": "📭",
+    "category": "functional",
+    "usage": "时光胶囊状态-已打开",
+    "prompt_en": "Open envelope with glowing light spilling out, revealed treasure feel, warm amber inner glow, time capsule opened reveal moment, nostalgic discovery",
+    "prompt_zh": "打开的信封带溢出的发光，揭示宝藏感觉，温暖琥珀内发光，时光胶囊打开揭示时刻，怀旧发现",
+    "priority": 4
+  },
+  {
+    "id": 66,
+    "name": "时光胶囊-到期礼物",
+    "emoji": "🎁",
+    "category": "functional",
+    "usage": "时光胶囊状态-到期未开",
+    "prompt_en": "Wrapped gift box with ribbon bow, festive anticipation feel, waiting to be opened surprise, celebration package ready, excited unboxing mood",
+    "prompt_zh": "包装好的礼品盒带缎带蝴蝶结，节日期待感，等待打开惊喜，庆典包裹就绪，兴奋拆箱心情",
+    "priority": 4
+  },
+  {
+    "id": 67,
+    "name": "微信链接",
+    "emoji": "🔗",
+    "category": "functional",
+    "usage": "微信绑定页面标题和按钮",
+    "prompt_en": "Link chain connection icon, WeChat green brand color gradient, secure connection bridge feel, social platform integration, connected status indicator",
+    "prompt_zh": "链接链条连接图标，微信品牌绿色渐变，安全连接桥接感，社交平台整合，已连接状态指示器",
+    "priority": 4
+  },
+  {
+    "id": 68,
+    "name": "连接测试扳手",
+    "emoji": "🔧",
+    "category": "functional",
+    "usage": "微信绑定测试连接按钮和结果标题",
+    "prompt_en": "Wrench tool icon with checkmark overlay, diagnostic testing feel, engineering maintenance tool, connection health verification, technical troubleshooting",
+    "prompt_zh": "扳手工具图标带勾选覆盖层，诊断测试感，工程维护工具，连接健康验证，技术故障排除",
+    "priority": 4
+  },
+  {
+    "id": 69,
+    "name": "错误叉号",
+    "emoji": "❌",
+    "category": "functional",
+    "usage": "微信相关错误分区标题",
+    "prompt_en": "Error X cross mark in circle, soft red gradient, problem alert indicator, issue notification, clear error state communication",
+    "prompt_zh": "错误X叉号在圆圈内，柔和红渐变，问题警报指示器，问题通知，清晰的错误状态传达",
+    "priority": 5
+  },
+  {
+    "id": 70,
+    "name": "绑定成功对勾",
+    "emoji": "✅",
+    "category": "functional",
+    "usage": "微信绑定成功 / 模型推荐等级 / 模型状态已下载内置 / 截屏权限通过",
+    "prompt_en": "Checkmark success icon in circle, vibrant green gradient, verified approved feel, confirmation complete status, positive result indicator, done achieved",
+    "prompt_zh": "勾选成功图标在圆圈内，鲜艳绿渐变，验证批准感觉，确认完成状态，积极结果指示器，已完成达成",
+    "priority": 4
+  },
+  {
+    "id": 71,
+    "name": "随机生成魔棒",
+    "emoji": "✨",
+    "category": "functional",
+    "usage": "相册随机生成按钮",
+    "prompt_en": "Magic wand with sparkling trail, purple to pink gradient, random generation creativity, AI generation tool, one-click creation wonder",
+    "prompt_zh": "魔法棒带闪光轨迹，紫粉渐变，随机生成创造力，AI生成工具，一键创造奇迹",
+    "priority": 4
+  },
+  {
+    "id": 72,
+    "name": "成就Tab-聊天类别",
+    "emoji": "💬",
+    "category": "functional",
+    "usage": "成就页Tab-聊天类别 / 聊天记录页标题 / 群聊列表图标 / 评论对话框标题 / SkinShop气泡皮肤Tab",
+    "prompt_en": "Chat bubble tab icon, conversation message symbol, lavender to pink gradient, messaging category tab, active selected state design, navigation tab style",
+    "prompt_zh": "聊天气泡Tab图标，对话消息符号，薰衣草粉渐变，消息分类Tab，激活选中状态设计，导航Tab风格",
+    "priority": 4
+  },
+  {
+    "id": 73,
+    "name": "成就Tab-好感类别",
+    "emoji": "❤",
+    "category": "functional",
+    "usage": "成就页Tab-好感类别",
+    "prompt_en": "Heart affinity tab icon, relationship bonding symbol, rose red gradient, emotional connection category, love affection tab, warm intimate feel",
+    "prompt_zh": "心形亲和力Tab图标，关系纽带符号，玫红渐变，情感连接分类，爱意喜爱Tab，温暖亲密感",
+    "priority": 4
+  },
+  {
+    "id": 74,
+    "name": "成就Tab-反馈类别",
+    "emoji": "👍",
+    "category": "functional",
+    "usage": "成就页Tab-反馈类别",
+    "prompt_en": "Thumbs up feedback tab icon, user response rating symbol, green to teal gradient, interaction feedback category, positive reaction tab, engagement indicator",
+    "prompt_zh": "竖大拇指反馈Tab图标，用户响应评级符号，绿青渐变，交互反馈分类，积极反应Tab，参与度指示器",
+    "priority": 4
+  },
+  {
+    "id": 75,
+    "name": "日记开心情绪",
+    "emoji": "😊",
+    "category": "functional",
+    "usage": "日记列表项-开心情绪 / 日记详情对话框-开心选项 / 默认情绪",
+    "prompt_en": "Happy smiling face emotion icon, warm sunny yellow to orange gradient, cheerful positive feeling, diary mood entry option, joyful sentiment indicator",
+    "prompt_zh": "开心笑脸情绪图标，温暖阳光黄橙渐变，愉快积极感受，日记心情条目选项，愉悦情感指示器",
+    "priority": 4
+  },
+  {
+    "id": 76,
+    "name": "日记平静情绪",
+    "emoji": "😌",
+    "category": "functional",
+    "usage": "日记详情页-平静情绪选项",
+    "prompt_en": "Calm peaceful face emotion icon, soft sage green to blue gradient, tranquil serene feeling, meditation relaxation mood, balanced composure state",
+    "prompt_zh": "平静安详脸情绪图标，柔和鼠尾草绿蓝渐变，宁静安详感受，冥想放松心情，平衡镇定状态",
+    "priority": 4
+  },
+  {
+    "id": 77,
+    "name": "假日海滩伞",
+    "emoji": "🏖",
+    "category": "functional",
+    "usage": "日历事件-假日标签",
+    "prompt_en": "Beach umbrella holiday icon, tropical vacation feel, ocean blue to sand yellow gradient, summer leisure time, calendar special date marker, festive day off",
+    "prompt_zh": "海滩伞度假图标，热带度假感，海洋蓝沙黄渐变，夏季休闲时间，日历特殊日期标记，节日休息日",
+    "priority": 5
+  },
+  {
+    "id": 78,
+    "name": "心流大脑",
+    "emoji": "🧠",
+    "category": "functional",
+    "usage": "成就-心流之王",
+    "prompt_en": "Glowing brain icon with neural network connections lighting up, deep focus concentration feel, flow state mastery, purple to magenta gradient, cognitive excellence achievement",
+    "prompt_zh": "发光大脑图标带神经网络连接点亮，深度专注集中感，心流状态精通，紫洋红渐变，认知卓越成就",
+    "priority": 5
+  }
+]

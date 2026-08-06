@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.View
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -51,6 +52,19 @@ class ModelAdjustActivity : Activity() {
         setupSeekBar()
         setupButtons()
         setupTouchHandler()
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
+        }
     }
 
     private fun loadSavedValues() {
@@ -146,13 +160,57 @@ class ModelAdjustActivity : Activity() {
 
         findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_show_log)?.setOnClickListener {
             val log = live2dView.getLog()
-            if (log.isNotBlank()) {
-                android.app.AlertDialog.Builder(this)
-                    .setTitle("Live2D 日志")
-                    .setMessage(log.takeLast(2000))
-                    .setPositiveButton("关闭", null)
-                    .show()
+            val errorLines = log.lines().filter {
+                it.contains("ERROR", ignoreCase = true) ||
+                it.contains("FAIL", ignoreCase = true) ||
+                it.contains("exception", ignoreCase = true) ||
+                it.contains("not found", ignoreCase = true) ||
+                it.contains("MISS", ignoreCase = true) ||
+                it.contains("not renderable", ignoreCase = true)
             }
+            val displayLog = if (errorLines.isNotEmpty()) {
+                buildString {
+                    append("=== 错误摘要 ===\n")
+                    append(errorLines.joinToString("\n"))
+                    append("\n\n=== 最近日志 ===\n")
+                    append(log.lines().takeLast(30).joinToString("\n"))
+                }
+            } else {
+                log.lines().takeLast(50).joinToString("\n")
+            }
+            val scrollView = android.widget.ScrollView(this).apply {
+                val textView = android.widget.TextView(this@ModelAdjustActivity).apply {
+                    text = displayLog
+                    textSize = 11f
+                    setPadding(24, 16, 24, 16)
+                    setTextIsSelectable(true)
+                    setTextColor(android.graphics.Color.parseColor("#E0E0E0"))
+                }
+                addView(textView)
+            }
+            val dialogView = android.widget.FrameLayout(this).apply {
+                setBackgroundColor(android.graphics.Color.parseColor("#1A1A2E"))
+                addView(scrollView, android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                ))
+            }
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Live2D 日志")
+                .setView(dialogView)
+                .setPositiveButton("复制全部日志") { _, _ ->
+                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Live2D日志", log))
+                    Toast.makeText(this@ModelAdjustActivity, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                }
+                .setNeutralButton("仅复制错误") { _, _ ->
+                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    val errText = if (errorLines.isNotEmpty()) errorLines.joinToString("\n") else "无错误"
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Live2D错误", errText))
+                    Toast.makeText(this@ModelAdjustActivity, "错误日志已复制", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("关闭", null)
+                .show()
         }
     }
 

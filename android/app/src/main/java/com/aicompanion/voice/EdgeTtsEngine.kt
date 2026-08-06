@@ -254,7 +254,9 @@ object EdgeTtsEngine {
     }
 
     private fun buildSsml(text: String, voiceId: String, rate: String, pitch: String): String {
-        val escaped = text
+        // 过滤括号内的动作/状态描述，避免TTS读出(微笑)(点头)等内容
+        val filtered = filterActionText(text)
+        val escaped = filtered
             .replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
@@ -270,6 +272,19 @@ object EdgeTtsEngine {
                 </voice>
             </speak>
         """.trimIndent()
+    }
+
+    /**
+     * 过滤文本中的动作/状态描述（括号内容），返回纯净的可朗读文本
+     * 支持格式：(微笑) （轻轻点头） *叹气* 【思考】 等
+     */
+    private fun filterActionText(text: String): String {
+        var result = text
+        result = result.replace("（[^）]*）".toRegex(), "")
+        result = result.replace("\\([^)]*\\)".toRegex(), "")
+        result = result.replace("\\*[^*]*\\*".toRegex(), "")
+        result = result.replace("\\[[^\\]]*\\]".toRegex(), "")
+        return result.replace("\\s+".toRegex(), " ").trim()
     }
 
     private fun getTimestamp(): String {

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 毛玻璃工具栏背景: 半透明 + 顶部高光边线 + 底部渐隐分割线 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 底色: 半透明深色 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#CC14142A" />
+        </shape>
+    </item>
+    <!-- 顶部高光线: 60%白色 0.5dp -->
+    <item android:top="0dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#66FFFFFF" />
+            <size android:height="0.5dp" />
+        </shape>
+    </item>
+    <!-- 底部渐隐分割线: 从15%白到透明 -->
+    <item android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#26FFFFFF"
+                android:endColor="#00000000"
+                android:angle="270" />
+            <size android:height="1dp" />
+        </shape>
+    </item>
+</layer-list>

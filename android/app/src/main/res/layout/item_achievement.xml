@@ -33,7 +33,7 @@
                 android:text="成就名称"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:textColor="#e6edf3" />
+                android:textColor="@color/text_primary" />
 
             <TextView
                 android:id="@+id/tv_achievement_desc"
@@ -74,6 +74,6 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#1a2030"
+        android:background="@color/surface_card"
         android:layout_marginTop="8dp" />
 </LinearLayout>

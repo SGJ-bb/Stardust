@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 动作名称 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="动作名称 *"
+            android:textSize="13sp"
+            android:textColor="#9ca3af"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_action_name"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:hint="例如：跳跃、挥手"
+            android:textSize="14sp"
+            android:textColor="#e5e7eb"
+            android:textColorHint="#4b5563"
+            android:background="@drawable/bg_input_dark"
+            android:paddingHorizontal="12dp"
+            android:singleLine="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 提示词 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="生成提示词"
+            android:textSize="13sp"
+            android:textColor="#9ca3af"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_action_prompt"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:hint="描述这个动作的样子..."
+            android:textSize="13sp"
+            android:textColor="#e5e7eb"
+            android:textColorHint="#4b5563"
+            android:background="@drawable/bg_input_dark"
+            android:padding="12dp"
+            android:gravity="top"
+            android:inputType="textMultiLine"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 帧数 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="帧数量"
+            android:textSize="13sp"
+            android:textColor="#9ca3af"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_frame_count"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="4"
+            android:inputType="number"
+            android:textSize="14sp"
+            android:textColor="#e5e7eb"
+            android:background="@drawable/bg_input_dark"
+            android:paddingHorizontal="12dp"
+            android:singleLine="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 循环模式 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="循环模式"
+            android:textSize="13sp"
+            android:textColor="#9ca3af"
+            android:layout_marginBottom="4dp" />
+
+        <Spinner
+            android:id="@+id/spinner_loop_mode"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_input_dark"
+            android:layout_marginBottom="8dp" />
+
+    </LinearLayout>
+
+</ScrollView>

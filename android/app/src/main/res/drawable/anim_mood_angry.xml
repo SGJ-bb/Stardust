@@ -1,0 +1,136 @@
+<!--
+    anim_mood_angry.xml — 生气情动画（爆炸/怒气符号）
+    用途：当情绪为"生气"时显示的怒气动画
+    包含：膨胀的红粉色圆 + 向上飘散的蒸汽/怒气线条 + 感叹号
+    动画效果：主体脉冲膨胀 + 蒸汽向上飘散淡出 + 整体快速抖动
+    尺寸：28dp x 32dp
+-->
+<animated-vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/avd_mood_angry_vector">
+
+    <!-- 整体抖动 translateX -->
+    <target android:name="angry_group">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateX"
+                android:duration="100"
+                android:valueFrom="-1"
+                android:valueTo="1"
+                android:valueType="floatType"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 主体圆脉冲 scale -->
+    <target android:name="anger_body">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="600"
+                android:valueFrom="1"
+                android:valueTo="1.15"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="anger_body">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="600"
+                android:valueFrom="1"
+                android:valueTo="1.15"
+                android:repeatMode="reverse"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_decelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 蒸汽线1 向上飘 + 淡出 -->
+    <target android:name="steam1">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateY"
+                android:duration="1000"
+                android:valueFrom="0"
+                android:valueTo="-10"
+                android:valueType="floatType"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="steam1">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="1000"
+                android:valueFrom="200"
+                android:valueTo="0"
+                android:valueType="intType"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 蒸汽线2 向上飘 + 淡出 (错开350ms) -->
+    <target android:name="steam2">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateY"
+                android:duration="1000"
+                android:valueFrom="0"
+                android:valueTo="-10"
+                android:valueType="floatType"
+                android:startOffset="350"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="steam2">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="1000"
+                android:valueFrom="200"
+                android:valueTo="0"
+                android:valueType="intType"
+                android:startOffset="350"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+    <!-- 蒸汽线3 向上飘 + 淡出 (错开700ms) -->
+    <target android:name="steam3">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="translateY"
+                android:duration="1000"
+                android:valueFrom="0"
+                android:valueTo="-10"
+                android:valueType="floatType"
+                android:startOffset="700"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+    <target android:name="steam3">
+        <aapt:attr xmlns:android="http://schemas.android.com/apk/res/android" name="android:animation">
+            <objectAnimator
+                android:propertyName="alpha"
+                android:duration="1000"
+                android:valueFrom="200"
+                android:valueTo="0"
+                android:valueType="intType"
+                android:startOffset="700"
+                android:repeatCount="infinite"
+                android:interpolator="@android:anim/accelerate_interpolator"/>
+        </aapt:attr>
+    </target>
+
+</animated-vector>

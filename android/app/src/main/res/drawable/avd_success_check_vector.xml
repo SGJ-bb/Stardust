@@ -1,0 +1,25 @@
+<!-- 成功勾选 - Vector定义：对勾路径（√形状） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- 对勾容器组，用于整体弹出动画 -->
+    <group android:name="check_group"
+        android:pivotX="12"
+        android:pivotY="12">
+
+        <!-- 对勾路径 -->
+        <path
+            android:name="check_path"
+            android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41-1.41z"
+            android:strokeWidth="2.5"
+            android:strokeColor="#4CAF50"
+            android:fillColor="@android:color/transparent"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+
+    </group>
+
+</vector>

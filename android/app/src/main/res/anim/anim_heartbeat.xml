@@ -1,0 +1,36 @@
+<!-- 心跳动画 - 用于好感度/喜欢按钮，心形有节奏地跳动 -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/avd_heartbeat_vector">
+    <target android:name="heart_group">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/apk/res/android" name="animation">
+            <set>
+                <!-- 弹性缩放跳动效果：先放大后缩小，模拟心跳 -->
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="1.0"
+                    android:valueTo="1.25"
+                    android:duration="400"
+                    android:interpolator="@android:anim/accelerate_decelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="1.0"
+                    android:valueTo="1.25"
+                    android:duration="400"
+                    android:interpolator="@android:anim/accelerate_decelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse" />
+                <!-- 透明度脉动 -->
+                <objectAnimator
+                    android:propertyName="alpha"
+                    android:valueFrom="255"
+                    android:valueTo="180"
+                    android:duration="800"
+                    android:interpolator="@android:anim/accelerate_decelerate_interpolator"
+                    android:repeatCount="infinite"
+                    android:repeatMode="reverse" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>

@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0f0f1a">
+    android:background="@color/bg_base">
 
     <com.aicompanion.live2d.Live2DWebView
         android:id="@+id/live2d_view"
@@ -14,7 +14,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:background="#cc0f0f1a"
+        android:background="@drawable/bg_toolbar_glass"
         android:gravity="center_vertical"
         android:paddingHorizontal="16dp"
         android:orientation="horizontal">
@@ -31,7 +31,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="调整模型位置和大小"
-            android:textColor="#ffffff"
+            android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -42,7 +42,7 @@
             android:insetTop="0dp"
             android:insetBottom="0dp"
             app:icon="@android:drawable/ic_menu_info_details"
-            app:iconTint="#8899cc"
+            app:iconTint="@color/text_secondary"
             app:cornerRadius="20dp"
             app:backgroundTint="#22ffffff"
             app:strokeWidth="0dp"
@@ -62,7 +62,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="长按模型拖动移动位置"
-            android:textColor="#8899cc"
+            android:textColor="@color/text_secondary"
             android:textSize="13sp"
             android:gravity="center"
             android:paddingBottom="8dp"
@@ -79,7 +79,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="缩放"
-                android:textColor="#aabbdd"
+                android:textColor="@color/text_secondary"
                 android:textSize="14sp"
                 android:layout_marginEnd="8dp" />
 
@@ -93,14 +93,14 @@
                 android:progress="100"
                 android:thumbTint="#ff6b9d"
                 android:progressTint="#667eea"
-                android:progressBackgroundTint="#334466" />
+                android:progressBackgroundTint="@color/stroke_subtle" />
 
             <TextView
                 android:id="@+id/tv_scale_value"
                 android:layout_width="50dp"
                 android:layout_height="wrap_content"
                 android:text="100%"
-                android:textColor="#ffffff"
+                android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:gravity="center" />
         </LinearLayout>
@@ -122,7 +122,7 @@
                 app:strokeColor="#667eea"
                 app:strokeWidth="2dp"
                 app:backgroundTint="@android:color/transparent"
-                android:textColor="#aabbdd"
+                android:textColor="@color/text_secondary"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
         </LinearLayout>
 

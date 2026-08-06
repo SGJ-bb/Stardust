@@ -1,0 +1,60 @@
+<!-- 星光闪烁 - Vector定义：5颗四角星（✦形状）分布在四个角落和中心 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+
+    <!-- 整体容器组 -->
+    <group android:name="stars_container"
+        android:pivotX="32"
+        android:pivotY="32">
+
+        <!-- 左上角星星 - 金色 #ffd700 -->
+        <group android:name="star_top_left"
+            android:pivotX="12"
+            android:pivotY="12">
+            <path
+                android:pathData="M12,4 L14,10 L20,12 L14,14 L12,20 L10,14 L4,12 L10,10 Z"
+                android:fillColor="#ffd700" />
+        </group>
+
+        <!-- 右上角星星 - 粉色 #ff6b9d -->
+        <group android:name="star_top_right"
+            android:pivotX="52"
+            android:pivotY="12">
+            <path
+                android:pathData="M52,4 L54,10 L60,12 L54,14 L52,20 L50,14 L44,12 L50,10 Z"
+                android:fillColor="#ff6b9d" />
+        </group>
+
+        <!-- 左下角星星 - 青色 #64ffda -->
+        <group android:name="star_bottom_left"
+            android:pivotX="12"
+            android:pivotY="52">
+            <path
+                android:pathData="M12,44 L14,50 L20,52 L14,54 L12,60 L10,54 L4,52 L10,50 Z"
+                android:fillColor="#64ffda" />
+        </group>
+
+        <!-- 右下角星星 - 紫色 #9c7cff -->
+        <group android:name="star_bottom_right"
+            android:pivotX="52"
+            android:pivotY="52">
+            <path
+                android:pathData="M52,44 L54,50 L60,52 L54,54 L52,60 L50,54 L44,52 L50,50 Z"
+                android:fillColor="#9c7cff" />
+        </group>
+
+        <!-- 中心大星 - 金色，尺寸更大 -->
+        <group android:name="star_center"
+            android:pivotX="32"
+            android:pivotY="32">
+            <path
+                android:pathData="M32,18 L36,28 L46,32 L36,36 L32,46 L28,36 L18,32 L28,28 Z"
+                android:fillColor="#ffd700" />
+        </group>
+
+    </group>
+
+</vector>

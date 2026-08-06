@@ -1,6 +1,8 @@
 package com.aicompanion.rag
 
 import com.aicompanion.util.AppLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -16,42 +18,46 @@ class CloudEmbedder(
 
     override fun dimension(): Int = cachedDim
 
-    override suspend fun embed(texts: List<String>): List<FloatArray> {
-        if (texts.isEmpty()) return emptyList()
+    override suspend fun embed(texts: List<String>): List<FloatArray> = withContext(Dispatchers.IO) {
+        if (texts.isEmpty()) return@withContext emptyList()
         if (apiUrl.isBlank()) {
-            AppLogger.e("CloudEmbedder", "API URL is blank, falling back to empty")
-            return texts.map { FloatArray(0) }
+            AppLogger.e("CloudEmbedder", "API URL is blank, falling back to empty vectors")
+            return@withContext texts.map { FloatArray(0) }
         }
-        return try {
+        return@withContext try {
             val url = URL(apiUrl)
             val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.setRequestProperty("Content-Type", "application/json")
-            if (apiKey.isNotBlank()) {
-                conn.setRequestProperty("Authorization", "Bearer $apiKey")
-            }
-            conn.doOutput = true
-            conn.connectTimeout = 15000
-            conn.readTimeout = 30000
+            try {
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                if (apiKey.isNotBlank()) {
+                    conn.setRequestProperty("Authorization", "Bearer $apiKey")
+                }
+                conn.doOutput = true
+                conn.connectTimeout = 15000
+                conn.readTimeout = 30000
 
-            val body = JSONObject().apply {
-                put("model", model)
-                put("input", JSONArray(texts))
-            }
+                val body = JSONObject().apply {
+                    put("model", model)
+                    put("input", JSONArray(texts))
+                }
 
-            conn.outputStream.use { os ->
-                os.write(body.toString().toByteArray(Charsets.UTF_8))
-            }
+                conn.outputStream.use { os ->
+                    os.write(body.toString().toByteArray(Charsets.UTF_8))
+                }
 
-            val responseCode = conn.responseCode
-            if (responseCode != 200) {
-                val err = conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $responseCode"
-                AppLogger.e("CloudEmbedder", "API error: $err")
-                return texts.map { FloatArray(0) }
-            }
+                val responseCode = conn.responseCode
+                if (responseCode != 200) {
+                    val err = conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $responseCode"
+                    AppLogger.e("CloudEmbedder", "API error: $err")
+                    return@withContext texts.map { FloatArray(0) }
+                }
 
-            val response = conn.inputStream.bufferedReader().readText()
-            parseEmbeddingResponse(response)
+                val response = conn.inputStream.bufferedReader().readText()
+                parseEmbeddingResponse(response)
+            } finally {
+                conn.disconnect()
+            }
         } catch (e: Exception) {
             AppLogger.e("CloudEmbedder", "embed failed: ${e.message}")
             texts.map { FloatArray(0) }

@@ -1,246 +1,181 @@
 package com.aicompanion.ui
 
-import android.animation.AnimatorListenerAdapter
-import android.animation.ObjectAnimator
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.os.Handler
-import android.os.Looper
-import android.util.TypedValue
-import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.aicompanion.util.AppLogger
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 
-class ChatBubblePopup(private val context: Context) {
+// ============================================================
+// QQ 风格消息弹窗 — Compose 实现
+// 原理：StateFlow 由 MainActivity 触发，Compose 层观察并渲染 Popup
+// 优势：不依赖传统 View 树，避免被 ComposeView 遮挡，生命周期自动跟随 Activity
+// ============================================================
 
-    companion object {
-        private const val TAG = "ChatBubblePopup"
-        private const val AUTO_DISMISS_MS = 4000L
-        private const val MAX_TEXT_LENGTH = 120
-    }
+/** 弹窗数据 */
+data class ChatBubbleData(
+    val senderName: String,
+    val message: String,
+    val avatarPath: String?,
+    val timestamp: Long = System.currentTimeMillis(),
+)
 
-    private var bubbleView: View? = null
-    private var rootView: ViewGroup? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private var dismissRunnable: Runnable? = null
+/** 全局控制器：MainActivity 调用 show()，Compose 层观察 state */
+object ChatBubbleController {
+    private const val TAG = "ChatBubbleController"
+    private const val AUTO_DISMISS_MS = 4000L
+    private const val MAX_TEXT_LENGTH = 120
+
+    private val _state = MutableStateFlow<ChatBubbleData?>(null)
+    val state: StateFlow<ChatBubbleData?> = _state.asStateFlow()
 
     fun show(senderName: String, message: String, avatarPath: String? = null) {
-        dismiss()
-
-        try {
-            val activity = findActivity() ?: return
-            rootView = activity.findViewById(android.R.id.content) as? ViewGroup ?: return
-
-            val bubble = createBubbleView(senderName, message, avatarPath)
-            bubbleView = bubble
-
-            val params = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.BOTTOM or Gravity.START
-                bottomMargin = dpToPx(100)
-                leftMargin = dpToPx(16)
-                rightMargin = dpToPx(60)
-            }
-
-            rootView?.addView(bubble, params)
-
-            bubble.alpha = 0f
-            bubble.translationY = dpToPx(40).toFloat()
-            bubble.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setDuration(300)
-                .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
-                .start()
-
-            dismissRunnable = Runnable { dismissWithAnimation() }
-            handler.postDelayed(dismissRunnable!!, AUTO_DISMISS_MS)
-
-            bubble.setOnClickListener {
-                handler.removeCallbacks(dismissRunnable!!)
-                dismissWithAnimation()
-            }
-
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "show failed: ${e.message}")
-        }
-    }
-
-    private fun createBubbleView(senderName: String, message: String, avatarPath: String?): View {
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10))
-            val bg = GradientDrawable().apply {
-                setColor(0xE6222244.toInt())
-                cornerRadius = dpToPx(18).toFloat()
-                setStroke(dpToPx(1), 0x409c7cff.toInt())
-            }
-            background = bg
-            elevation = dpToPx(6).toFloat()
-        }
-
-        val avatarSize = dpToPx(36)
-        val avatarView = ImageView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(avatarSize, avatarSize).apply {
-                marginEnd = dpToPx(10)
-            }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            val bg = GradientDrawable().apply {
-                setColor(0xFF1e1e44.toInt())
-                cornerRadius = avatarSize / 2f
-            }
-            background = bg
-        }
-
-        if (!avatarPath.isNullOrBlank() && File(avatarPath).exists()) {
-            try {
-                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(avatarPath, opts)
-                opts.inSampleSize = calculateSampleSize(opts.outWidth, opts.outHeight, 72, 72)
-                opts.inJustDecodeBounds = false
-                val bmp = BitmapFactory.decodeFile(avatarPath, opts)
-                val circleBmp = cropCircle(bmp)
-                avatarView.setImageBitmap(circleBmp)
-            } catch (_: Exception) {
-                avatarView.setImageResource(android.R.drawable.ic_menu_myplaces)
-            }
-        } else {
-            avatarView.setImageResource(android.R.drawable.ic_menu_myplaces)
-        }
-
-        container.addView(avatarView)
-
-        val textContainer = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val nameView = TextView(context).apply {
-            text = senderName
-            setTextColor(0xFFc4b5fd.toInt())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        textContainer.addView(nameView)
-
-        val displayText = if (message.length > MAX_TEXT_LENGTH) {
-            message.take(MAX_TEXT_LENGTH) + "…"
-        } else {
-            message
-        }
-
-        val msgView = TextView(context).apply {
-            text = displayText
-            setTextColor(0xFFe0e0f0.toInt())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setLineSpacing(dpToPx(2).toFloat(), 1f)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dpToPx(2)
-            }
-            maxLines = 3
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        }
-        textContainer.addView(msgView)
-
-        container.addView(textContainer)
-
-        return container
-    }
-
-    private fun dismissWithAnimation() {
-        val bubble = bubbleView ?: return
-        try {
-            bubble.animate()
-                .alpha(0f)
-                .translationY(dpToPx(30).toFloat())
-                .setDuration(250)
-                .setInterpolator(android.view.animation.AccelerateInterpolator())
-                .setListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: android.animation.Animator) {
-                        removeBubble()
-                    }
-                })
-                .start()
-        } catch (e: Exception) {
-            removeBubble()
-        }
+        AppLogger.i(TAG, "show: sender=$senderName, msgLen=${message.length}")
+        _state.value = ChatBubbleData(
+            senderName = senderName,
+            message = if (message.length > MAX_TEXT_LENGTH) message.take(MAX_TEXT_LENGTH) + "…" else message,
+            avatarPath = avatarPath?.takeIf { it.isNotBlank() },
+        )
     }
 
     fun dismiss() {
-        handler.removeCallbacksAndMessages(null)
-        dismissRunnable = null
-        removeBubble()
+        _state.value = null
+    }
+}
+
+/**
+ * 向后兼容包装类。
+ * 保留原 API：chatBubblePopup?.show(...) / cleanup()
+ * 内部委托给 ChatBubbleController 的 StateFlow，由 Compose 层 ChatBubbleOverlay 观察渲染。
+ */
+class ChatBubblePopup(context: Context) {
+    fun show(senderName: String, message: String, avatarPath: String? = null) {
+        ChatBubbleController.show(senderName, message, avatarPath)
     }
 
-    private fun removeBubble() {
-        try {
-            bubbleView?.let { bv ->
-                (bv.parent as? ViewGroup)?.removeView(bv)
+    fun dismiss() = ChatBubbleController.dismiss()
+    fun cleanup() = ChatBubbleController.dismiss()
+}
+
+/**
+ * Compose 弹窗层 — 放置在 setContent 顶层，覆盖在所有页面之上。
+ * 观察ChatBubbleController.state，非空时显示 Popup，4 秒后自动消失。
+ */
+@Composable
+fun ChatBubbleOverlay() {
+    val state by ChatBubbleController.state.collectAsState()
+    val bubble = state ?: return
+
+    // 4 秒后自动消失（timestamp 变化时重新计时，支持连续弹出新消息）
+    LaunchedEffect(bubble.timestamp) {
+        delay(4000)
+        ChatBubbleController.dismiss()
+    }
+
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
+    Popup(
+        alignment = Alignment.BottomStart,
+        offset = with(density) {
+            IntOffset(
+                16.dp.roundToPx(),
+                -100.dp.roundToPx(),
+            )
+        },
+        properties = PopupProperties(
+            focusable = false,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+        ),
+        onDismissRequest = { /* 不响应系统关闭请求，由自动计时控制 */ },
+    ) {
+        Row(
+            modifier = Modifier
+                .widthIn(max = 280.dp)
+                .padding(end = 60.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0xE6222244))
+                .clickable { ChatBubbleController.dismiss() }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // 头像
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1e1e44)),
+                contentAlignment = Alignment.Center,
+            ) {
+                val avatarPath = bubble.avatarPath
+                if (!avatarPath.isNullOrBlank() && File(avatarPath).exists()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(File(avatarPath))
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    )
+                }
             }
-        } catch (_: Exception) {}
-        bubbleView = null
-    }
 
-    private fun cropCircle(bitmap: Bitmap?): Bitmap? {
-        if (bitmap == null) return null
-        val size = minOf(bitmap.width, bitmap.height)
-        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = android.graphics.Canvas(output)
-        val paint = android.graphics.Paint().apply {
-            isAntiAlias = true
-        }
-        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
-        paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
-        val dx = (bitmap.width - size) / 2f
-        val dy = (bitmap.height - size) / 2f
-        canvas.drawBitmap(bitmap, -dx, -dy, paint)
-        return output
-    }
+            Spacer(Modifier.width(10.dp))
 
-    private fun calculateSampleSize(width: Int, height: Int, reqWidth: Int, reqHeight: Int): Int {
-        var inSampleSize = 1
-        if (width > reqWidth || height > reqHeight) {
-            val halfW = width / 2
-            val halfH = height / 2
-            while (halfW / inSampleSize >= reqWidth && halfH / inSampleSize >= reqHeight) {
-                inSampleSize *= 2
+            Column(modifier = Modifier.widthIn(max = 220.dp)) {
+                Text(
+                    text = bubble.senderName,
+                    color = Color(0xFFc4b5fd),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = bubble.message,
+                    color = Color(0xFFe0e0f0),
+                    fontSize = 14.sp,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 18.sp,
+                )
             }
         }
-        return inSampleSize
-    }
-
-    private fun dpToPx(dp: Int): Int {
-        return TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, dp.toFloat(),
-            context.resources.displayMetrics
-        ).toInt()
-    }
-
-    private fun findActivity(): android.app.Activity? {
-        var ctx = context
-        while (ctx is android.content.ContextWrapper) {
-            if (ctx is android.app.Activity) return ctx
-            ctx = ctx.baseContext
-        }
-        return null
     }
 }

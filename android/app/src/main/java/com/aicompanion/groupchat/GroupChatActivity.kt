@@ -56,6 +56,10 @@ import java.util.Locale
 
 class GroupChatActivity : AppCompatActivity() {
 
+    companion object {
+        private const val TAG = "GroupChatActivity"
+    }
+
     private var groupId: String = ""
     private lateinit var groupChatManager: GroupChatManager
     private lateinit var personaManager: PersonaManager
@@ -250,6 +254,19 @@ class GroupChatActivity : AppCompatActivity() {
 
         if (messages.isNotEmpty()) {
             recyclerView.scrollToPosition(messages.size - 1)
+        }
+        applyTheme()
+    }
+
+    private fun applyTheme() {
+        try {
+            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+            val tbColor = android.graphics.Color.parseColor(scheme.toolbarColor)
+            findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)?.setBackgroundColor(tbColor)
+                ?: findViewById<View>(R.id.toolbar_container)?.setBackgroundColor(tbColor)
+            com.aicompanion.theme.ThemeManager.applyTheme(this)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "applyTheme error: ${e.message}")
         }
     }
 
@@ -596,6 +613,10 @@ class GroupChatActivity : AppCompatActivity() {
                     val aiMentions = parseAiMentions(cleanText, group)
                     cleanText = cleanText.replace(Regex("@[^\\s@]+\\s?"), "").trim()
 
+                    // 消费工具调用生成的图片
+                    val generatedImages = com.aicompanion.plugin.GenerateImagePlugin.consumeGeneratedImagePaths()
+                    val imagePath = generatedImages.firstOrNull() ?: ""
+
                     if (cleanText.isNotBlank() && cleanText != "..." && cleanText != "沉默") {
                         val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(java.util.Date())
                         val aiMsg = GroupMessage(
@@ -604,7 +625,8 @@ class GroupChatActivity : AppCompatActivity() {
                             text = cleanText,
                             time = time,
                             isUser = false,
-                            emotion = emotionStr
+                            emotion = emotionStr,
+                            imagePath = imagePath
                         )
                         messages.add(aiMsg)
                         groupChatManager.addMessage(groupId, aiMsg)
@@ -864,7 +886,7 @@ class GroupChatActivity : AppCompatActivity() {
         scrollPredictions.visibility = View.VISIBLE
     }
 
-    private fun callPersonaLLM(
+    private suspend fun callPersonaLLM(
         persona: com.aicompanion.persona.Persona,
         group: GroupChat,
         userText: String,
@@ -951,17 +973,50 @@ class GroupChatActivity : AppCompatActivity() {
             append(triggerLabel)
         }
 
+        // 获取工具定义
+        val actionMgr = com.aicompanion.action.AIActionManager(this)
+        val tools = actionMgr.getToolDefinitions()
+        val chatHistory = messages.takeLast(settingsManager.contextTurns)
+            .filter { it.text.length < 500 }
+            .map { it.isUser to it.text }
+
         return try {
-            emotionClient.sendSimplePrompt(groupContext, fullUserMsg)
+            if (tools.isNotEmpty()) {
+                emotionClient.sendChatWithToolLoop(
+                    userId = settingsManager.userId,
+                    message = fullUserMsg,
+                    personaName = persona.name,
+                    personaPrompt = groupContext,
+                    emotion = "neutral",
+                    action = "idle",
+                    memories = emptyList(),
+                    chatHistory = chatHistory,
+                    systemContext = "",
+                    tools = tools,
+                    toolExecutor = { name, args ->
+                        if (name == "generate_image") {
+                            com.aicompanion.AppContainer.setImagePluginWorldId("")
+                            com.aicompanion.AppContainer.setAssociatedEventId(null)
+                        }
+                        actionMgr.executeTool(name, args)
+                    }
+                )
+            } else {
+                emotionClient.sendSimplePrompt(groupContext, fullUserMsg)
+            }
         } catch (_: Exception) {
             null
         }
     }
 
-    private fun loadAvatarBitmap(path: String): Bitmap? {
+    private fun loadAvatarBitmap(path: String, forceRefresh: Boolean = false): Bitmap? {
         if (path.isBlank()) return null
-        val cached = avatarCache[path]
-        if (cached != null && !cached.isRecycled) return cached
+        if (!forceRefresh) {
+            val cached = avatarCache[path]
+            if (cached != null && !cached.isRecycled) return cached
+        } else {
+            avatarCache.remove(path)
+        }
         return try {
             val file = File(path)
             if (file.exists()) {
@@ -995,6 +1050,7 @@ class GroupChatActivity : AppCompatActivity() {
             val tvMsgTime: TextView = view.findViewById(R.id.tv_msg_time)
             val tvMsgText: TextView = view.findViewById(R.id.tv_msg_text)
             val bubbleContainer: FrameLayout = view.findViewById(R.id.bubble_container)
+            val ivGeneratedImage: ImageView = view.findViewById(R.id.iv_generated_image)
         }
 
         override fun getItemCount() = items.size
@@ -1023,6 +1079,19 @@ class GroupChatActivity : AppCompatActivity() {
             holder.tvMsgTime.text = msg.time
             holder.tvMsgText.text = msg.text
 
+            // 显示生成的图片
+            if (msg.imagePath.isNotBlank()) {
+                val bmp = loadAvatarBitmap(msg.imagePath)
+                if (bmp != null) {
+                    holder.ivGeneratedImage.setImageBitmap(bmp)
+                    holder.ivGeneratedImage.visibility = View.VISIBLE
+                } else {
+                    holder.ivGeneratedImage.visibility = View.GONE
+                }
+            } else {
+                holder.ivGeneratedImage.visibility = View.GONE
+            }
+
             if (!msg.isUser) {
                 applyBubbleSkin(holder.bubbleContainer, msg.senderPersonaId)
             } else {
@@ -1044,26 +1113,18 @@ class GroupChatActivity : AppCompatActivity() {
             cvAvatar: com.google.android.material.card.MaterialCardView
         ) {
             val persona = personaManager.getPersona(personaId)
-            if (persona?.avatarPath.isNullOrBlank()) {
-                val defaultAvatar = getSharedPreferences("avatar_data", MODE_PRIVATE)
-                    .getString("ai_avatar", "")
-                if (!defaultAvatar.isNullOrBlank()) {
-                    val bmp = loadAvatarBitmap(defaultAvatar)
-                    if (bmp != null) {
-                        ivAvatar.setImageBitmap(bmp)
-                    } else {
-                        ivAvatar.setImageResource(R.drawable.ic_avatar_default_ai)
-                    }
-                } else {
-                    ivAvatar.setImageResource(R.drawable.ic_avatar_default_ai)
-                }
-            } else {
-                val bmp = loadAvatarBitmap(persona!!.avatarPath)
+            val avatarPath = com.aicompanion.util.AvatarManager.getAiAvatarPath(
+                this@GroupChatActivity, personaId, persona?.avatarPath
+            )
+            if (avatarPath.isNotBlank()) {
+                val bmp = loadAvatarBitmap(avatarPath, true)
                 if (bmp != null) {
                     ivAvatar.setImageBitmap(bmp)
                 } else {
                     ivAvatar.setImageResource(R.drawable.ic_avatar_default_ai)
                 }
+            } else {
+                ivAvatar.setImageResource(R.drawable.ic_avatar_default_ai)
             }
 
             val aiFrame = BubbleSkinManager.getActiveAiFrame(this@GroupChatActivity)
@@ -1082,10 +1143,9 @@ class GroupChatActivity : AppCompatActivity() {
             ivAvatar: ImageView,
             cvAvatar: com.google.android.material.card.MaterialCardView
         ) {
-            val userAvatarPath = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                .getString("user_avatar", "")
+            val userAvatarPath = com.aicompanion.util.AvatarManager.getUserAvatarPath(this@GroupChatActivity)
             if (!userAvatarPath.isNullOrBlank()) {
-                val bmp = loadAvatarBitmap(userAvatarPath)
+                val bmp = loadAvatarBitmap(userAvatarPath, true)
                 if (bmp != null) {
                     ivAvatar.setImageBitmap(bmp)
                 } else {

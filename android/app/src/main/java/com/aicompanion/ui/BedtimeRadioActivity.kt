@@ -1,5 +1,6 @@
 package com.aicompanion.ui
 
+import com.aicompanion.R
 import android.content.Intent
 import android.media.AudioManager
 import android.os.Bundle
@@ -182,9 +183,9 @@ class BedtimeRadioActivity : AppCompatActivity() {
         spinnerTimer = Spinner(this).apply {
             adapter = ArrayAdapter.createFromResource(this@BedtimeRadioActivity,
                 com.aicompanion.R.array.bedtime_timer_options,
-                android.R.layout.simple_spinner_item
+                R.layout.spinner_item_dark
             ).also {
-                it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                it.setDropDownViewResource(R.layout.spinner_dropdown_item_dark)
             }
             onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -251,8 +252,11 @@ class BedtimeRadioActivity : AppCompatActivity() {
             200, settingsManager.apiProvider
         )
 
-        audioManager.mode = AudioManager.MODE_NORMAL
-        audioManager.isSpeakerphoneOn = true
+        @Suppress("DEPRECATION")
+        run {
+            audioManager.mode = AudioManager.MODE_NORMAL
+            audioManager.isSpeakerphoneOn = true
+        }
 
         if (autoStopMinutes > 0) {
             autoStopRunnable = Runnable { stopPlaying() }

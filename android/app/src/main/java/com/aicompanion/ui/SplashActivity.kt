@@ -1,10 +1,16 @@
 package com.aicompanion.ui
 
+import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import android.widget.ImageView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.aicompanion.R
 
 class SplashActivity : android.app.Activity() {
@@ -45,11 +51,19 @@ class SplashActivity : android.app.Activity() {
         imageView.setImageResource(R.drawable.tubiao)
         setContentView(imageView)
 
-        window.decorView.systemUiVisibility = (
-            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
-            or android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            or android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val controller = WindowInsetsControllerCompat(window, window.decorView)
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+        }
 
         imageView.alpha = 0f
         imageView.scaleX = 0.8f
@@ -72,7 +86,12 @@ class SplashActivity : android.app.Activity() {
                 .withEndAction {
                     val intent = Intent(this, HomeActivity::class.java)
                     startActivity(intent)
-                    overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, R.anim.fade_in, R.anim.fade_out)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+                    }
                     finish()
                 }
                 .start()

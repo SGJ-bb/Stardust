@@ -3,19 +3,19 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0a0a1a">
+    android:background="@color/bg_base">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="#1a1a30"
+        android:background="@drawable/bg_toolbar_glass"
         android:elevation="4dp"
         app:title="模型设置"
-        app:titleTextColor="#ffffff"
+        app:titleTextColor="@color/text_primary"
         app:titleTextAppearance="@style/ToolbarTitleStyle"
         app:navigationIcon="@android:drawable/ic_menu_close_clear_cancel"
-        app:navigationIconTint="#aabbdd" />
+        app:navigationIconTint="@color/text_secondary" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -32,11 +32,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="#1a1a30"
+                app:cardBackgroundColor="@color/surface_card"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="#2a2a4a">
+                app:rippleColor="#33FFFFFF"
+                app:strokeColor="@color/stroke_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -50,30 +50,30 @@
                         android:text="模型文件信息"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="#c4b5fd" />
+                        android:textColor="@color/brand_primary" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="模型名称"
                         android:textSize="13sp"
-                        android:textColor="#8899aa"
+                        android:textColor="@color/text_secondary"
                         android:layout_marginTop="14dp" />
 
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        app:boxBackgroundColor="#151525"
-                        app:boxStrokeColor="#2a2a4a"
-                        app:hintTextColor="#445566"
+                        app:boxBackgroundColor="@color/surface_card"
+                        app:boxStrokeColor="@color/stroke_subtle"
+                        app:hintTextColor="@color/text_muted"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_model_name"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="#e0e0f0"
-                            android:textColorHint="#556677" />
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_muted" />
                     </com.google.android.material.textfield.TextInputLayout>
 
                     <TextView
@@ -81,23 +81,23 @@
                         android:layout_height="wrap_content"
                         android:text="模型描述"
                         android:textSize="13sp"
-                        android:textColor="#8899aa"
+                        android:textColor="@color/text_secondary"
                         android:layout_marginTop="14dp" />
 
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        app:boxBackgroundColor="#151525"
-                        app:boxStrokeColor="#2a2a4a"
-                        app:hintTextColor="#445566"
+                        app:boxBackgroundColor="@color/surface_card"
+                        app:boxStrokeColor="@color/stroke_subtle"
+                        app:hintTextColor="@color/text_muted"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_model_desc"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="#e0e0f0"
-                            android:textColorHint="#556677" />
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_muted" />
                     </com.google.android.material.textfield.TextInputLayout>
 
                     <TextView
@@ -105,7 +105,7 @@
                         android:layout_height="wrap_content"
                         android:text="模型路径"
                         android:textSize="13sp"
-                        android:textColor="#8899aa"
+                        android:textColor="@color/text_secondary"
                         android:layout_marginTop="14dp" />
 
                     <TextView
@@ -113,7 +113,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:textSize="12sp"
-                        android:textColor="#667788"
+                        android:textColor="@color/text_muted"
                         android:padding="10dp"
                         android:background="@drawable/bg_model_path"
                         android:fontFamily="monospace" />
@@ -124,11 +124,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="#1a1a30"
+                app:cardBackgroundColor="@color/surface_card"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="#2a2a4a">
+                app:rippleColor="#33FFFFFF"
+                app:strokeColor="@color/stroke_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -142,14 +142,14 @@
                         android:text="动作与表情映射"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="#c4b5fd" />
+                        android:textColor="@color/brand_primary" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="配置Cubism参数映射"
                         android:textSize="12sp"
-                        android:textColor="#667788"
+                        android:textColor="@color/text_muted"
                         android:layout_marginTop="4dp" />
 
                     <com.google.android.material.button.MaterialButton
@@ -162,7 +162,7 @@
                         app:cornerRadius="22dp"
                         app:strokeColor="#667eea"
                         app:strokeWidth="1dp"
-                        android:textColor="#8899cc"
+                        android:textColor="@color/text_secondary"
                         app:backgroundTint="@android:color/transparent"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
                 </LinearLayout>
@@ -172,11 +172,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="#1a1a30"
+                app:cardBackgroundColor="@color/surface_card"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="#2a2a4a">
+                app:rippleColor="#33FFFFFF"
+                app:strokeColor="@color/stroke_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -190,14 +190,14 @@
                         android:text="渲染设置"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="#c4b5fd" />
+                        android:textColor="@color/brand_primary" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="纹理质量"
                         android:textSize="13sp"
-                        android:textColor="#8899aa"
+                        android:textColor="@color/text_secondary"
                         android:layout_marginTop="14dp" />
 
                     <RadioGroup
@@ -212,7 +212,7 @@
                             android:layout_height="wrap_content"
                             android:text="高 (512x512)"
                             android:checked="true"
-                            android:textColor="#d0d0e0"
+                            android:textColor="@color/text_secondary"
                             android:buttonTint="#667eea" />
 
                         <RadioButton
@@ -220,7 +220,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="中 (256x256)"
-                            android:textColor="#8899aa"
+                            android:textColor="@color/text_secondary"
                             android:buttonTint="#667eea" />
 
                         <RadioButton
@@ -228,14 +228,14 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="低 (128x128，省电)"
-                            android:textColor="#8899aa"
+                            android:textColor="@color/text_secondary"
                             android:buttonTint="#667eea" />
                     </RadioGroup>
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:background="#2a2a4a"
+                        android:background="@color/stroke_subtle"
                         android:layout_marginVertical="14dp" />
 
                     <TextView
@@ -243,7 +243,7 @@
                         android:layout_height="wrap_content"
                         android:text="帧率设置"
                         android:textSize="13sp"
-                        android:textColor="#8899aa" />
+                        android:textColor="@color/text_secondary" />
 
                     <RadioGroup
                         android:id="@+id/radio_fps"
@@ -257,7 +257,7 @@
                             android:layout_height="wrap_content"
                             android:text="30 FPS（流畅）"
                             android:checked="true"
-                            android:textColor="#d0d0e0"
+                            android:textColor="@color/text_secondary"
                             android:buttonTint="#667eea" />
 
                         <RadioButton
@@ -265,7 +265,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="20 FPS（省电）"
-                            android:textColor="#8899aa"
+                            android:textColor="@color/text_secondary"
                             android:buttonTint="#667eea" />
                     </RadioGroup>
                 </LinearLayout>

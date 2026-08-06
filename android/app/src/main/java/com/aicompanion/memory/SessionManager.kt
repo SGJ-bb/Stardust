@@ -65,7 +65,15 @@ class SessionManager(private val context: Context) {
             diaryCallback(poolBlock)
         }
 
-        memoryPool.consolidate(apiClient)
+        val archived = memoryPool.consolidate(apiClient)
+        if (archived.isNotBlank()) {
+            try {
+                val diaryMgr = com.aicompanion.diary.DiaryManager(context)
+                diaryMgr.appendMemoryArchive(archived)
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.w("SessionManager", "[Session-Archive] 会话切换归档写入日记失败: ${e.javaClass.simpleName}: ${e.message}")
+            }
+        }
 
         val compressedMemory = memoryPool.getPoolBlock()
 
@@ -125,7 +133,7 @@ class SessionManager(private val context: Context) {
                 arr.put(obj)
             }
             prefs.edit().putString("sessions", arr.toString()).apply()
-        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("SessionManager", "saveSessions: ${e.message}") }
+        } catch (e: Exception) { com.aicompanion.util.AppLogger.e("SessionManager", "[Session-Save] 保存会话失败: ${e.javaClass.simpleName}: ${e.message}") }
     }
 
     private fun loadSessions() {
@@ -147,7 +155,7 @@ class SessionManager(private val context: Context) {
                 currentSession = sessions.first()
             }
         } catch (e: Exception) {
-            AppLogger.e(TAG, "loadSessions error: ${e.message}")
+            AppLogger.e(TAG, "[Session-Load] 加载会话失败: ${e.javaClass.simpleName}: ${e.message}")
             sessions.clear()
         }
     }

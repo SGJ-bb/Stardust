@@ -196,8 +196,13 @@ object MemorialAlbumManager {
     }
 
     fun deleteEntry(context: Context, id: String) {
-        saveEntries(context, getEntries(context).filter { it.id != id })
-        File(id).let { if (it.exists()) it.delete() }
+        val entries = getEntries(context)
+        val entry = entries.find { it.id == id }
+        saveEntries(context, entries.filter { it.id != id })
+        entry?.let {
+            val imageFile = File(it.imagePath)
+            if (imageFile.exists()) imageFile.delete()
+        }
     }
 
     fun updateCaption(context: Context, id: String, caption: String) {

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_base"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="动作列表"
+        android:textSize="18sp"
+        android:textColor="@color/text_primary"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_add_action"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:text="+ 新建动作"
+        android:textSize="13sp"
+        android:textColor="#22c55e"
+        app:strokeColor="#22c55e"
+        app:cornerRadius="10dp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- 动作内容区 -->
+    <ScrollView
+        android:id="@+id/layout_action_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/layout_action_list_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+    </ScrollView>
+
+    <!-- 空状态 -->
+    <TextView
+        android:id="@+id/tv_empty_actions"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="暂无动作\n点击上方按钮添加新动作"
+        android:textSize="14sp"
+        android:textColor="@color/text_muted"
+        android:textAlignment="center"
+        android:visibility="gone" />
+
+</LinearLayout>

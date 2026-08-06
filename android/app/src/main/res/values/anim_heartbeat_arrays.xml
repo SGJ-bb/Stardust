@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 心跳缩放关键帧：模拟真实心跳的"扑通-扑通"节奏 -->
+<resources>
+    <array name="heartbeat_scale_keyframes">
+        <item>1.0f;0</item>
+        <item>1.2f;0.15</item>
+        <item>1.0f;0.3</item>
+        <item>1.15f;0.45</item>
+        <item>1.0f;0.6</item>
+        <item>1.05f;0.75</item>
+        <item>1.0f;1.0</item>
+    </array>
+    
+    <array name="heartbeat_alpha_keyframes">
+        <item>255;0</item>
+        <item>217;0.3</item>
+        <item>255;0.5</item>
+        <item>217;0.7</item>
+        <item>255;1.0</item>
+    </array>
+</resources>

@@ -41,7 +41,7 @@ class LocalModelActivity : AppCompatActivity() {
     ) { result ->
         if (result.resultCode == RESULT_OK && result.data != null) {
             val resultCode = result.resultCode
-            val data = result.data!!
+            val data = result.data ?: return@registerForActivityResult
             lifecycleScope.launch {
                 val success = withContext(Dispatchers.IO) {
                     modelManager.getScreenCaptureManager().startCapture(resultCode, data)

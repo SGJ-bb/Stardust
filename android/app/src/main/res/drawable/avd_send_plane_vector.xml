@@ -1,0 +1,24 @@
+<!-- 发送纸飞机 - Vector定义：简洁的折纸风格纸飞机 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- 纸飞机组，用于整体变换动画 -->
+    <group android:name="plane_group"
+        android:pivotX="12"
+        android:pivotY="12">
+        
+        <!-- 折纸风格纸飞机路径 -->
+        <path
+            android:name="plane_path"
+            android:pathData="M2.01,21L23,12 2.01,3 2,10l15,2-15,2z"
+            android:fillColor="@color/text_primary"
+            android:strokeColor="@color/text_primary"
+            android:strokeWidth="0.3"
+            android:strokeLineJoin="round" />
+            
+    </group>
+
+</vector>

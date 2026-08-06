@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <!-- 时间标签 -->
+    <TextView
+        android:id="@+id/tv_time_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="4dp"
+        android:background="#CFCFCF"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="start">
+
+        <!-- AI头像 -->
+        <ImageView
+            android:id="@+id/iv_ai_avatar"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_avatar_default_ai"
+            android:scaleType="centerCrop"
+            android:contentDescription="AI头像" />
+
+        <!-- 消息气泡区域 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginStart="8dp">
+
+            <!-- 气泡容器 -->
+            <LinearLayout
+                android:id="@+id/bubble_ai"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#FFFFFF"
+                android:padding="10dp">
+
+                <!-- AI角色名 -->
+                <TextView
+                    android:id="@+id/tv_ai_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#999999"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="2dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tv_ai_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#000000"
+                    android:textSize="15sp"
+                    android:textIsSelectable="true"
+                    android:maxEms="15"
+                    android:breakStrategy="simple" />
+
+                <!-- 图片消息 -->
+                <ImageView
+                    android:id="@+id/iv_ai_image"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxWidth="200dp"
+                    android:maxHeight="200dp"
+                    android:adjustViewBounds="true"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- 左侧占位，限制气泡宽度 -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+    </LinearLayout>
+
+</LinearLayout>

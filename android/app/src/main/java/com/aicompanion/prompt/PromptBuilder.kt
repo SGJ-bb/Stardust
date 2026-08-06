@@ -130,9 +130,17 @@ object PromptBuilder {
     }
 
     fun buildChatPrompt(identity: IdentityBlock, emotion: String, action: String, memories: List<String>, context: Context): String {
+        return buildChatPrompt(identity, emotion, action, memories, context, null)
+    }
+
+    fun buildChatPrompt(identity: IdentityBlock, emotion: String, action: String, memories: List<String>, context: Context, subjectivityBlock: String?): String {
         return buildString {
             append(buildPersonaFull(identity))
             append("\n情绪：$emotion。动作：$action。")
+            // 注入主体性状态 (情绪+驱动力+疲劳+风格指令)
+            if (!subjectivityBlock.isNullOrBlank()) {
+                append(subjectivityBlock)
+            }
             if (memories.isNotEmpty()) {
                 append("\n记得：${memories.takeLast(3).joinToString("；")}")
             }
@@ -220,9 +228,22 @@ object PromptBuilder {
         appCategory: String?,
         systemAlert: String?
     ): String {
+        return buildNagPrompt(identity, memoryContext, appCategory, systemAlert, null)
+    }
+
+    fun buildNagPrompt(
+        identity: IdentityBlock,
+        memoryContext: String?,
+        appCategory: String?,
+        systemAlert: String?,
+        subjectivityBlock: String?
+    ): String {
         return buildString {
             append(buildPersonaBase(identity))
             append(" 主动搭话，1-2句，自然不重复。")
+            if (!subjectivityBlock.isNullOrBlank()) {
+                append(subjectivityBlock)
+            }
             if (!memoryContext.isNullOrBlank()) {
                 append("\n[记忆]\n$memoryContext")
             }

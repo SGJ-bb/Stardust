@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0d1117">
+    android:background="@color/bg_base">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -12,7 +12,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:padding="12dp"
-        android:background="#161b22">
+        android:background="@drawable/bg_toolbar_glass">
 
         <ImageButton
             android:id="@+id/btn_diary_back"
@@ -28,7 +28,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="我的日记"
-            android:textColor="#e6edf3"
+            android:textColor="@color/text_primary"
             android:textSize="18sp"
             android:textStyle="bold"
             android:gravity="center" />
@@ -68,7 +68,7 @@
         android:orientation="horizontal"
         android:padding="8dp"
         android:paddingHorizontal="12dp"
-        android:background="#161b22"
+        android:background="@drawable/bg_toolbar_glass"
         android:visibility="gone">
 
         <EditText
@@ -77,8 +77,8 @@
             android:layout_height="40dp"
             android:layout_weight="1"
             android:hint="搜索日记..."
-            android:textColorHint="#667788"
-            android:textColor="#c9d1d9"
+            android:textColorHint="@color/text_muted"
+            android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:background="@drawable/bg_model_path"
             android:paddingHorizontal="12dp"
@@ -128,10 +128,10 @@
             android:id="@+id/listview_diaries"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:divider="#1c2128"
+            android:divider="@color/stroke_subtle"
             android:dividerHeight="1dp"
-            android:padding="8dp"
-            android:background="#0d1117" />
+            android:padding="16dp"
+            android:background="@color/bg_base" />
 
         <TextView
             android:id="@+id/tv_diary_empty"
@@ -139,7 +139,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:text="还没有日记呢\n多聊聊天，晚上就会生成日记啦~"
-            android:textColor="#667788"
+            android:textColor="@color/text_muted"
             android:textSize="14sp"
             android:visibility="gone"
             android:lineSpacingExtra="6dp" />
