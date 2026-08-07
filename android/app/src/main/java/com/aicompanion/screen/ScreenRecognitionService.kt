@@ -109,6 +109,71 @@ class ScreenRecognitionService : AccessibilityService() {
             }
         }
 
+        /** 长按手势（不移动坐标，持续指定时长） */
+        fun performLongPress(x: Float, y: Float, durationMs: Long): Boolean {
+            val service = currentInstance ?: return false
+            // ScreenRecognitionService 未持有 settingsManager，通过 SettingsManager(service) 读取配置
+            val settings = com.aicompanion.settings.SettingsManager(service)
+            if (!settings.longPressEnabled) {
+                AppLogger.w(TAG, "长按手势已被禁用")
+                return false
+            }
+            return try {
+                val path = Path().apply {
+                    moveTo(x, y)
+                    // 不调用 lineTo，保持原地
+                }
+                val stroke = GestureDescription.StrokeDescription(path, 0, durationMs)
+                val gesture = GestureDescription.Builder()
+                    .addStroke(stroke)
+                    .build()
+                service.dispatchGesture(gesture, null, null)
+                true
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "长按手势失败: ${e.message}")
+                false
+            }
+        }
+
+        /** 按文字找到元素后长按 */
+        fun performLongPressByText(text: String, durationMs: Long): Boolean {
+            val service = currentInstance ?: return false
+            val root = service.rootInActiveWindow ?: return false
+            try {
+                val nodes = findNodesByText(root, text)
+                for (node in nodes) {
+                    val bounds = Rect()
+                    node.getBoundsInScreen(bounds)
+                    val cx = bounds.centerX().toFloat()
+                    val cy = bounds.centerY().toFloat()
+                    return performLongPress(cx, cy, durationMs)
+                }
+                return false
+            } finally {
+                root.recycle()
+            }
+        }
+
+        /** 递归查找所有 text/contentDescription 匹配的节点 */
+        private fun findNodesByText(node: AccessibilityNodeInfo, target: String): List<AccessibilityNodeInfo> {
+            val result = mutableListOf<AccessibilityNodeInfo>()
+            findNodesByTextRecursive(node, target, result)
+            return result
+        }
+
+        private fun findNodesByTextRecursive(node: AccessibilityNodeInfo, target: String, out: MutableList<AccessibilityNodeInfo>) {
+            val text = node.text?.toString() ?: ""
+            val desc = node.contentDescription?.toString() ?: ""
+            if (text.contains(target, ignoreCase = true) || desc.contains(target, ignoreCase = true)) {
+                out.add(node)
+                return
+            }
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                findNodesByTextRecursive(child, target, out)
+            }
+        }
+
         /**
          * 预设方向滑动（自动计算坐标，基于屏幕中心，滑动距离为短边的 30%）
          * @param direction "up"/"down"/"left"/"right"

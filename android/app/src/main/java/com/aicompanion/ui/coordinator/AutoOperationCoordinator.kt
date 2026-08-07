@@ -127,7 +127,7 @@ class AutoOperationCoordinator(
                         com.aicompanion.screen.AutoOperator.executeAction(action)
                     }
 
-                    if (stepResult) successCount++
+                    if (stepResult.success) successCount++
                     withContext(Dispatchers.IO) { kotlinx.coroutines.delay(800) }
                 }
 

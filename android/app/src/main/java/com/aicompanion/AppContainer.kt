@@ -110,6 +110,8 @@ object AppContainer {
         this.appContext = appContext
         settingsManager = SettingsManager(appContext)
         com.aicompanion.network.ProviderAdapter.init(appContext)
+        // 初始化应用分类器（用户自定义 App 分类的持久化存储）
+        com.aicompanion.screen.AppCategoryClassifier.init(appContext)
         // RagConfig已在CompanionApp.onCreate中初始化,这里只做模型降级检测
         checkOnnxModelDegradation(appContext)
         registerBuiltinPlugins(appContext)

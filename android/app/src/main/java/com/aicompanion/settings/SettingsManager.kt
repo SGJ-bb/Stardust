@@ -48,6 +48,31 @@ class SettingsManager(context: Context) {
 
     fun isSecureStorageAvailable(): Boolean = securePrefsAvailable
 
+    /** AI 操作模式：auto=全程允许 / confirm=用户确认后才执行 */
+    var aiOperationMode: String
+        get() = prefs.getString("ai_operation_mode", "confirm") ?: "confirm"
+        set(value) { prefs.edit().putString("ai_operation_mode", value).apply() }
+
+    /** AI 操作动作间冷却时间（毫秒） */
+    var aiOperationCooldownMs: Int
+        get() = prefs.getInt("ai_operation_cooldown_ms", 200)
+        set(value) { prefs.edit().putInt("ai_operation_cooldown_ms", value.coerceIn(0, 5000)).apply() }
+
+    /** AI 操作最大轮次（复杂任务可调高） */
+    var aiOperationMaxRounds: Int
+        get() = prefs.getInt("ai_operation_max_rounds", 15)
+        set(value) { prefs.edit().putInt("ai_operation_max_rounds", value.coerceIn(1, 50)).apply() }
+
+    /** 异常检测开关（检测到支付/验证码/登录页时暂停） */
+    var abnormalDetectionEnabled: Boolean
+        get() = prefs.getBoolean("abnormal_detection_enabled", true)
+        set(value) { prefs.edit().putBoolean("abnormal_detection_enabled", value).apply() }
+
+    /** 长按手势开关 */
+    var longPressEnabled: Boolean
+        get() = prefs.getBoolean("long_press_enabled", true)
+        set(value) { prefs.edit().putBoolean("long_press_enabled", value).apply() }
+
     var screenRecognitionEnabled: Boolean
         get() = prefs.getBoolean("screen_recognition", false)
         set(value) {
