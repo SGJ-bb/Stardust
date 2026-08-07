@@ -123,6 +123,7 @@ object StradustDestinations {
     const val CHARACTER_CARD_CREATE = "character_card_create"  // 直接进入创建模式
     const val WORLD_BOOK = "world_book"
     const val PIXEL_PET = "pixel_pet"
+    const val ACCESSIBILITY_SETTINGS = "accessibility_settings"
 
     /**
      * MainActivity → Compose UI 的桥接回调接口
@@ -1290,6 +1291,19 @@ fun StradustNavHost(
             popExitTransition = { pageExitTransition },
         ) {
             PixelPetScreen(onBackClick = { navController.popBackStack() })
+        }
+
+        // 无障碍高级设置（AI 操作权限/异常检测/长按手势/App分类自定义）
+        composable(
+            route = StradustDestinations.ACCESSIBILITY_SETTINGS,
+            enterTransition = { pageEnterTransition },
+            exitTransition = { pageExitTransition },
+            popEnterTransition = { pageEnterTransition },
+            popExitTransition = { pageExitTransition },
+        ) {
+            com.aicompanion.ui.settings.AccessibilitySettingsScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
     }
         } // content Box 闭合

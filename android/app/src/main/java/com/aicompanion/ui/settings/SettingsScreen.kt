@@ -1985,6 +1985,28 @@ fun SettingsScreen(
                             size = ButtonSize.SMALL,
                         )
                     }
+                    Spacer(Modifier.height(12.dp))
+                    // 无障碍高级设置入口：AI 操作权限/异常检测/长按手势/App分类自定义
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("无障碍高级设置", color = StradustTheme.colors.textPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Text(
+                                text = "AI 操作权限 / 异常检测 / 长按手势 / App 分类",
+                                color = StradustTheme.colors.textMuted,
+                                fontSize = 12.sp,
+                            )
+                        }
+                        StradustButton(
+                            text = "进入",
+                            onClick = { onNavigate("accessibility_settings") },
+                            variant = ButtonVariant.OUTLINED,
+                            size = ButtonSize.SMALL,
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(20.dp))
