@@ -310,7 +310,7 @@ private fun NumberStepper(
         Text(
             text = label,
             color = StradustTheme.colors.textMuted,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
         )
         Spacer(Modifier.height(4.dp))
         Row(

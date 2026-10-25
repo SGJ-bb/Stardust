@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Bitmap.Config
 import android.graphics.BitmapFactory
+import android.graphics.RectF
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
@@ -43,6 +44,17 @@ class Live2DWebView @JvmOverloads constructor(
     private var modelBasePath: String = ""
     private var onModelInfo: ((Float, Float, Float) -> Unit)? = null
     var touchHandler: ((MotionEvent) -> Boolean)? = null
+
+    /**
+     * 皮套在视图坐标系里的可见范围，用于判断触摸是否落在皮套上。
+     *
+     * 这个 WebView 是全屏的，若不加区分地消费所有触摸事件，它会连聊天列表的滑动一起吞掉。
+     * 因此只在命中皮套时消费，其余一律放行给下层。
+     * null 表示范围未知（模型还没加载完 / JS 取不到 bounds），此时退回旧行为（全部消费），
+     * 宁可多吞一点也不能让皮套点不动。
+     */
+    @Volatile
+    private var modelHitRect: RectF? = null
     private var localServer: NanoHTTPD? = null
     private var serverPort: Int = 0
 
@@ -429,7 +441,56 @@ class Live2DWebView @JvmOverloads constructor(
     
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        return touchHandler?.invoke(event) ?: super.onTouchEvent(event)
+        val handler = touchHandler ?: return super.onTouchEvent(event)
+        // 只消费落在皮套身上的触摸；皮套之外的（聊天列表滑动、输入栏等）放行给下层。
+        // DOWN 放行之后本次手势的后续事件不会再送到这里，正是想要的效果。
+        if (event.actionMasked == MotionEvent.ACTION_DOWN && !isInsideModel(event.x, event.y)) {
+            return false
+        }
+        return handler(event)
+    }
+
+    /** 触摸点是否落在皮套范围内；范围未知时返回 true（宁可多吞，也不能让皮套点不动） */
+    private fun isInsideModel(x: Float, y: Float): Boolean {
+        val r = modelHitRect ?: return true
+        val pad = (r.width() * 0.06f).coerceIn(8f, 48f)
+        return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad
+    }
+
+    /**
+     * 向 JS 询问皮套的可见范围并缓存。模型加载完 / 缩放变化后都要刷新一次。
+     * 拿不到或结果不合理时置为 null，回到「全部消费」的保守行为。
+     */
+    fun refreshModelHitRect() {
+        post {
+            try {
+                evaluateJavascript("(window.getModelHitRect ? window.getModelHitRect() : '')") { raw ->
+                    modelHitRect = parseHitRect(raw)
+                }
+            } catch (e: Exception) {
+                AppLogger.e("Live2D", "refreshModelHitRect: ${e.message}")
+            }
+        }
+    }
+
+    /** 解析 "x,y,w,h"；evaluateJavascript 回传的是 JSON 字符串，需要去掉外层引号 */
+    private fun parseHitRect(raw: String?): RectF? {
+        if (raw.isNullOrBlank() || raw == "null") return null
+        val s = raw.trim().removeSurrounding("\"").replace("\\\"", "\"").trim()
+        if (s.isBlank()) return null
+        val parts = s.split(',')
+        if (parts.size != 4) return null
+        val x = parts[0].trim().toFloatOrNull() ?: return null
+        val y = parts[1].trim().toFloatOrNull() ?: return null
+        val w = parts[2].trim().toFloatOrNull() ?: return null
+        val h = parts[3].trim().toFloatOrNull() ?: return null
+        if (w <= 0f || h <= 0f) return null
+        val r = RectF(x, y, x + w, y + h)
+        // 合理性校验：必须与视图有交集，否则视为取数失败
+        val vw = width.coerceAtLeast(1).toFloat()
+        val vh = height.coerceAtLeast(1).toFloat()
+        if (!RectF.intersects(r, RectF(0f, 0f, vw, vh))) return null
+        return r
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
@@ -1577,6 +1638,46 @@ class Live2DWebView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * 播放帧动画（序列帧）。
+     * name: hearts / zzz / sparkle / greet …（对应 assets/js/petframes/ 下的 xxx.frames.json）
+     * mode: "overlay" 叠在模型上 / "replace" 模型淡出由帧序列接管 / 留空按 manifest 默认
+     * 返回是否已受理（模型未就绪时会排队，加载完后自动补播）
+     */
+    fun playFrameAnimation(name: String, mode: String = "") {
+        if (isDestroyed) return
+        val n = name.replace("'", "")
+        val m = mode.replace("'", "")
+        post {
+            try {
+                evaluateJavascript("window.playPetFrames && window.playPetFrames('$n', '$m')", null)
+            } catch (e: Exception) { AppLogger.e("Live2D", "playFrameAnimation: ${e.message}") }
+        }
+    }
+
+    /** 停止帧动画并复原模型透明度（睡觉时的 ZZZ、摸头的爱心都是 loop，切状态要记得关） */
+    fun stopFrameAnimation() {
+        if (isDestroyed) return
+        post {
+            try {
+                evaluateJavascript("window.stopPetFrames && window.stopPetFrames()", null)
+            } catch (e: Exception) { AppLogger.e("Live2D", "stopFrameAnimation: ${e.message}") }
+        }
+    }
+
+    /** 精确指定落位（CSS 像素，相对 WebView 左上角）：给需要贴着某个 UI 元素播的特效 */
+    fun playFrameAnimationRect(name: String, x: Float, y: Float, w: Float, h: Float) {
+        if (isDestroyed) return
+        val n = name.replace("'", "")
+        post {
+            try {
+                evaluateJavascript(
+                    "window.playPetFramesRect && window.playPetFramesRect('$n', {x:$x, y:$y, w:$w, h:$h})", null
+                )
+            } catch (e: Exception) { AppLogger.e("Live2D", "playFrameAnimationRect: ${e.message}") }
+        }
+    }
+
     fun setAdjustMode(enabled: Boolean) {
         post {
             try {
@@ -1768,6 +1869,9 @@ class Live2DWebView @JvmOverloads constructor(
             <script src="/js/live2d.min.js"></script>
             <script src="/js/pixi.min.js"></script>
             <script src="/js/pixi-live2d-display.min.js"></script>
+            <!-- 帧动画层：Live2D 管微动，序列帧管一次性动作/特效（见 assets/js/petframes/） -->
+            <script src="/js/frameanim.js"></script>
+            <script src="/js/petframes-boot.js"></script>
             <script>
                 var canvas = document.getElementById('live2d-canvas');
                 var app = null, model = null;
@@ -2061,6 +2165,20 @@ class Live2DWebView @JvmOverloads constructor(
                     if (!model) return;
                     try { model.motion('Tap'); } catch(e) {}
                     lookAt(screenX, screenY);
+                };
+
+                // 模型在画布坐标系里的可见范围，返回 "x,y,w,h" 字符串（拿不到返回 ''）。
+                // 用途：Android 侧据此判断一次触摸是否真的落在皮套上 —— 落在皮套外的触摸
+                // 要放行给下层视图，否则这个全屏 WebView 会把聊天列表的滑动也一起吞掉。
+                // 注意：这里不能用模板字符串，本段是 Kotlin raw string，dollar 号有特殊含义。
+                window.getModelHitRect = function() {
+                    try {
+                        if (!model) return '';
+                        var b = null;
+                        if (model.getBounds) b = model.getBounds();
+                        if (!b || !b.width || !b.height) return '';
+                        return b.x + ',' + b.y + ',' + b.width + ',' + b.height;
+                    } catch (e) { return ''; }
                 };
 
                 function lerp(a, b, t) { return a + (b - a) * t; }

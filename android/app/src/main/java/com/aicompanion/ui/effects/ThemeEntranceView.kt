@@ -121,7 +121,14 @@ class ThemeEntranceView @JvmOverloads constructor(
 
     /** Initialize entrance animation for specified theme */
     fun setup(schemeId: String) {
-        config = scenes[schemeId] ?: scenes["midnight"]!!
+        // schemeId 现在来自 ThemeBridge（新 ThemeId.key，如 "sakura"），而 scenes 仍以旧 id
+        // （"sakura_grad"）为键，直接查会全部落到 midnight，这里做一次别名映射。
+        val sceneKey = if (scenes.containsKey(schemeId)) {
+            schemeId
+        } else {
+            com.aicompanion.theme.ThemeBridge.legacySceneKey(schemeId) ?: schemeId
+        }
+        config = scenes[sceneKey] ?: scenes["midnight"]!!
         buildBackground()
         spawnParticles()
         startTitleAnimation()

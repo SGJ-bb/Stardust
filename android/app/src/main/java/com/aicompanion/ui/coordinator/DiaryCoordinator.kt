@@ -114,26 +114,62 @@ class DiaryCoordinator(
 
     fun triggerManualDiary(personaId: String) {
         val dm = DiaryManager(context, personaId)
-        val am = affectionManagerProvider() ?: return
+        val am = affectionManagerProvider()
+        if (am == null) {
+            toast("角色数据未就绪，请稍后再试")
+            return
+        }
+        val sm = settingsManagerProvider()
+        if (sm == null || sm.chatApiUrl.isBlank()) {
+            toast("请先在设置里配置 API 后再写日记")
+            return
+        }
+        if (apiClientProvider() == null) {
+            toast("AI 服务未就绪，请稍后再试")
+            return
+        }
         onSetLoading(true)
         onPetMessage("正在为你写今天的日记...", Emotion.NEUTRAL, Action.IDLE)
-        autoTriggerDiary(dm, am, personaId)
+        autoTriggerDiary(dm, am, personaId, isManual = true)
         memoryScope.launch {
             kotlinx.coroutines.delay(3000)
             withContext(Dispatchers.Main) { onSetLoading(false) }
         }
     }
 
-    private fun autoTriggerDiary(dm: DiaryManager, am: AffectionManager, personaId: String) {
+    /** 任意线程可安全调用的提示（原先手动入口失败时完全静默，用户以为功能坏了） */
+    private fun toast(msg: String) {
+        try {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun autoTriggerDiary(
+        dm: DiaryManager,
+        am: AffectionManager,
+        personaId: String,
+        isManual: Boolean = false,
+    ) {
         val client = apiClientProvider() ?: return
         val sm = settingsManagerProvider() ?: return
         if (sm.chatApiUrl.isBlank()) return
-        if (diaryWriting) return
+        if (diaryWriting) {
+            if (isManual) toast("日记正在生成中，请稍候")
+            return
+        }
 
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val existingDiary = dm.getDiaryByDate(today)
-        if (existingDiary != null && dm.getTodayDiaryAppendCount() >= 3) return
-        if (!dm.canUpdateDiary()) return
+        if (existingDiary != null && dm.getTodayDiaryAppendCount() >= 3) {
+            if (isManual) toast("今天的日记已经写过 3 次啦，明天再聊~")
+            return
+        }
+        if (!dm.canUpdateDiary()) {
+            if (isManual) toast("刚写过不久，请过一会儿再试")
+            return
+        }
 
         diaryWriting = true
         dm.markDiaryUpdated()
@@ -142,7 +178,10 @@ class DiaryCoordinator(
             try {
                 val persona = getPersonaInfo()
                 val chatTexts = getMessages().map { it.text }
-                if (chatTexts.isEmpty()) return@launch
+                if (chatTexts.isEmpty()) {
+                    if (isManual) toast("今天还没有聊天记录，先聊几句再写日记吧")
+                    return@launch
+                }
 
                 val combined = chatTexts.joinToString(" | ")
                 val poolBlock = contextManagerProvider()?.memoryPool?.getPoolBlock() ?: ""
@@ -180,7 +219,7 @@ class DiaryCoordinator(
                         Toast.makeText(context, "📔 日记已更新", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    dm.updateOrGenerateDailyDiary(chatTexts, am.affectionLevel)
+                    dm.updateOrGenerateDailyDiary(chatTexts, am.affectionLevel, force = true)
                     milestoneManagerProvider()?.recordMilestone("first_diary", "第一篇日记", "星尘写的第一篇日记", "diary")
                     withContext(Dispatchers.Main) {
                         Toast.makeText(context, "📔 日记已生成（本地模式）", Toast.LENGTH_SHORT).show()
@@ -205,7 +244,7 @@ class DiaryCoordinator(
             } catch (e: Exception) {
                 android.util.Log.d(TAG, "LLM diary failed, falling back: ${e.message}")
                 val chatTexts = getMessages().map { it.text }
-                dm.updateOrGenerateDailyDiary(chatTexts, am.affectionLevel)
+                dm.updateOrGenerateDailyDiary(chatTexts, am.affectionLevel, force = true)
                 milestoneManagerProvider()?.recordMilestone("first_diary", "第一篇日记", "星尘写的第一篇日记", "diary")
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "📔 日记已生成（本地模式）", Toast.LENGTH_SHORT).show()

@@ -48,8 +48,10 @@ class PersonaRagManager(private val context: Context, private val personaId: Str
             "cloud" -> if (RagConfig.cloudEmbeddingUrl.isNotBlank()
                 && RagConfig.cloudEmbeddingApiKey.isNotBlank()) "cloud" else "tfidf"
             "local" -> {
-                val onnxEmb = embedder as? OnnxEmbedder
-                if (onnxEmb != null && onnxEmb.isModelReady()) "local" else "tfidf"
+                // 以前这里判断的是「当前实例是不是 OnnxEmbedder」，可实例初值是 TfidfEmbedder，
+                // 于是 local 永远回不去。现在直接看模型是否可用（内置 assets 也算）。
+                // 再叠加一个运行时开关：ONNX Runtime 初始化过失败（.so 冲突）就别再试了。
+                if (OnnxModelManager.isModelReady(context) && !OnnxEmbedder.unavailable) "local" else "tfidf"
             }
             else -> "tfidf"
         }

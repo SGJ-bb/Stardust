@@ -31,6 +31,9 @@ class GlobalMemoryPool(
 
     val size: Int get() = synchronized(lock) { entries.size }
 
+    /** 只读快照：给检索用（跨场景记忆不该只出现在注入块里，搜索也要能查到） */
+    fun snapshot(): List<MemoryEntry> = synchronized(lock) { entries.toList() }
+
     fun addFromScene(scene: String, newEntries: List<MemoryEntry>) = synchronized(lock) {
         for (entry in newEntries) {
             if (!entry.isGlobal) continue

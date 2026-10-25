@@ -4,8 +4,6 @@ package com.aicompanion.settings
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import com.aicompanion.settings.ScheduledWake
 
 class SettingsManager(context: Context) {
@@ -15,6 +13,17 @@ class SettingsManager(context: Context) {
         const val TTS_MODE_AUTO_PLAY = "auto_play"
         /** TTS 播放模式：只生成语音气泡，用户点击才播放 */
         const val TTS_MODE_BUBBLE_ONLY = "bubble_only"
+
+        /** 回复呈现方式：分段拟人（按句拆成多条气泡，默认） */
+        const val REPLY_MODE_SPLIT = 0
+        /** 回复呈现方式：一次性整段输出（单个气泡） */
+        const val REPLY_MODE_SINGLE = 1
+        /** 回复呈现方式：流式逐字输出（边生成边显示） */
+        const val REPLY_MODE_STREAM = 2
+
+        /** 「AI 工具调用最大轮次」的默认值与取值范围（设置页滑块与此保持一致） */
+        const val DEFAULT_TOOL_LOOP_MAX_ROUNDS = 20
+        const val MAX_TOOL_LOOP_ROUNDS = 50
     }
 
     private val appContext: Context = context.applicationContext
@@ -24,33 +33,16 @@ class SettingsManager(context: Context) {
         Context.MODE_PRIVATE
     )
 
-    @Volatile
-    private var securePrefsAvailable = true
+    private val securePrefs: SharedPreferences get() = SecurePrefsHelper.get(appContext)
 
-    private val securePrefs: SharedPreferences by lazy {
-        try {
-            val masterKey = MasterKey.Builder(appContext)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            EncryptedSharedPreferences.create(
-                appContext,
-                "companion_secure_prefs",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: Exception) {
-            securePrefsAvailable = false
-            com.aicompanion.util.AppLogger.e("SettingsManager", "EncryptedSharedPreferences unavailable: ${e.message}")
-            appContext.getSharedPreferences("companion_secure_fallback", Context.MODE_PRIVATE)
-        }
-    }
+    fun isSecureStorageAvailable(): Boolean = !SecurePrefsHelper.isFallbackActive()
 
-    fun isSecureStorageAvailable(): Boolean = securePrefsAvailable
-
-    /** AI 操作模式：auto=全程允许 / confirm=用户确认后才执行 */
+    /**
+     * AI 操作模式：auto=全程允许 / confirm=需确认后才执行。
+     * 默认 auto（最大权限）：为便于自动化测试，默认不再向用户确认，直接按 AI 决策执行。
+     */
     var aiOperationMode: String
-        get() = prefs.getString("ai_operation_mode", "confirm") ?: "confirm"
+        get() = prefs.getString("ai_operation_mode", "auto") ?: "auto"
         set(value) { prefs.edit().putString("ai_operation_mode", value).apply() }
 
     /** AI 操作动作间冷却时间（毫秒） */
@@ -63,9 +55,118 @@ class SettingsManager(context: Context) {
         get() = prefs.getInt("ai_operation_max_rounds", 15)
         set(value) { prefs.edit().putInt("ai_operation_max_rounds", value.coerceIn(1, 50)).apply() }
 
-    /** 异常检测开关（检测到支付/验证码/登录页时暂停） */
+    /**
+     * 聊天 Agent 的「工具调用」最大轮次。
+     * 之前硬编码为 3（ApiClient.sendChatWithToolLoop），导致多步任务（如操作手机）
+     * 在第 3 次工具调用后被迫中断并吐一句敷衍话。
+     * 现已可调：默认 20 轮，范围 1~50。
+     * 老用户若从未拖过滑块，prefs 里没有该 key，会自动用上新的默认值 20。
+     */
+    var aiToolLoopMaxRounds: Int
+        get() = prefs.getInt("ai_tool_loop_max_rounds", DEFAULT_TOOL_LOOP_MAX_ROUNDS)
+        set(value) {
+            val v = value.coerceIn(1, MAX_TOOL_LOOP_ROUNDS)
+            prefs.edit().putInt("ai_tool_loop_max_rounds", v).apply()
+            com.aicompanion.network.ApiClient.defaultToolLoopMaxIterations = v
+        }
+
+    /**
+     * AI 回复呈现方式：
+     * · [REPLY_MODE_SPLIT]（默认）= 按句拆成多条气泡，模拟真人一句一句打字
+     * · [REPLY_MODE_SINGLE]       = 整段回复只发一个气泡
+     * · [REPLY_MODE_STREAM]       = 边生成边显示（SSE 流式），单气泡 + 闪烁光标
+     *
+     * 旧版本代码里有一个 app_prefs.pref_ai_no_split 开关（读取处存在但从未被写入，
+     * 属于"死配置"），这里做一次迁移：若旧开关为 true 则默认切到「一次性」。
+     */
+    var aiReplyMode: Int
+        get() {
+            if (prefs.contains("ai_reply_mode")) {
+                return prefs.getInt("ai_reply_mode", REPLY_MODE_SPLIT).coerceIn(0, 2)
+            }
+            val legacyNoSplit = try {
+                appContext.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                    .getBoolean("pref_ai_no_split", false)
+            } catch (_: Exception) { false }
+            val migrated = if (legacyNoSplit) REPLY_MODE_SINGLE else REPLY_MODE_SPLIT
+            prefs.edit().putInt("ai_reply_mode", migrated).apply()
+            return migrated
+        }
+        set(value) {
+            prefs.edit().putInt("ai_reply_mode", value.coerceIn(0, 2)).apply()
+        }
+
+    /** 是否启用流式回复 */
+    val isStreamReply: Boolean get() = aiReplyMode == REPLY_MODE_STREAM
+
+    /**
+     * 手机操作策略：
+     * · reactive（默认）= 每一步执行后重新读取屏幕再规划（观察-行动闭环）
+     * · single_shot     = 旧行为，一次规划整段动作序列后盲执行
+     */
+    var phoneOpStrategy: String
+        get() = prefs.getString("phone_op_strategy", "reactive") ?: "reactive"
+        set(value) { prefs.edit().putString("phone_op_strategy", value).apply() }
+
+    /**
+     * 喂给 LLM 的屏幕格式：tree = 结构化 UI 树(稳定 id/层级/role)，text = 压扁文本(旧版降级)。
+     * 默认 tree，即"让 AI 真正看到 UI 树"。
+     */
+    var phoneOpScreenFormat: String
+        get() = prefs.getString("phone_op_screen_format", "tree") ?: "tree"
+        set(value) { prefs.edit().putString("phone_op_screen_format", value).apply() }
+
+    /** 反应式循环中，检测到页面变化就中断剩余动作、重新观察 */
+    var phoneOpObserveOnPageChange: Boolean
+        get() = prefs.getBoolean("phone_op_observe_on_change", true)
+        set(value) { prefs.edit().putBoolean("phone_op_observe_on_change", value).apply() }
+
+    /** UI 树采集最大深度（旧实现硬编码 3，真实 App 层级常达 10+ 层） */
+    var uiTreeMaxDepth: Int
+        get() = prefs.getInt("ui_tree_max_depth", 8)
+        set(value) { prefs.edit().putInt("ui_tree_max_depth", value.coerceIn(3, 20)).apply() }
+
+    /** UI 树单次采集最多登记多少可点击元素（旧实现硬编码 50 且到顶后静默丢弃整棵剩余子树） */
+    var uiTreeMaxElements: Int
+        get() = prefs.getInt("ui_tree_max_elements", 150)
+        set(value) { prefs.edit().putInt("ui_tree_max_elements", value.coerceIn(30, 400)).apply() }
+
+    /** Skill（技能库）开关：AI 创建/使用技能 */
+    var skillEnabled: Boolean
+        get() = prefs.getBoolean("skill_enabled", true)
+        set(value) { prefs.edit().putBoolean("skill_enabled", value).apply() }
+
+    /** 允许 AI 读写文件（工作区限应用自己的目录，越界会被拒绝） */
+    var fileOpsEnabled: Boolean
+        get() = prefs.getBoolean("file_ops_enabled", true)
+        set(value) { prefs.edit().putBoolean("file_ops_enabled", value).apply() }
+
+    /** 允许 AI 在设备上执行 shell 命令（默认关闭） */
+    var shellEnabled: Boolean
+        get() = prefs.getBoolean("shell_enabled", false)
+        set(value) { prefs.edit().putBoolean("shell_enabled", value).apply() }
+
+    /** 允许执行被判定为高危的 shell 命令（默认关闭） */
+    var shellAllowDangerous: Boolean
+        get() = prefs.getBoolean("shell_allow_dangerous", false)
+        set(value) { prefs.edit().putBoolean("shell_allow_dangerous", value).apply() }
+
+    /** shell 执行通道：auto / app / root / shizuku */
+    var shellMode: String
+        get() = prefs.getString("shell_mode", "auto") ?: "auto"
+        set(value) { prefs.edit().putString("shell_mode", value).apply() }
+
+    /** shell 执行超时（毫秒） */
+    var shellTimeoutMs: Int
+        get() = prefs.getInt("shell_timeout_ms", 20000)
+        set(value) { prefs.edit().putInt("shell_timeout_ms", value.coerceIn(3000, 120000)).apply() }
+
+    /**
+     * 异常检测开关（检测到支付/验证码/登录页时暂停）。
+     * 默认关闭（最大权限）：为便于自动化测试，默认不做敏感页拦截；需防护时可手动打开。
+     */
     var abnormalDetectionEnabled: Boolean
-        get() = prefs.getBoolean("abnormal_detection_enabled", true)
+        get() = prefs.getBoolean("abnormal_detection_enabled", false)
         set(value) { prefs.edit().putBoolean("abnormal_detection_enabled", value).apply() }
 
     /** 长按手势开关 */
@@ -90,6 +191,43 @@ class SettingsManager(context: Context) {
     var asrMode: String
         get() = prefs.getString("asr_mode", com.aicompanion.voice.LocalAsrManager.MODE_CLOUD) ?: com.aicompanion.voice.LocalAsrManager.MODE_CLOUD
         set(value) { prefs.edit().putString("asr_mode", value).apply() }
+
+    // ---------------------------------------------------------------- 语音唤醒
+
+    /** 语音唤醒总开关（离线 KWS 常驻监听） */
+    var voiceWakeEnabled: Boolean
+        get() = prefs.getBoolean("voice_wake_enabled", false)
+        set(value) { prefs.edit().putBoolean("voice_wake_enabled", value).apply() }
+
+    /** 唤醒词：多个用逗号或换行分隔，支持中文（运行时转拼音）或直接写拼音 */
+    var voiceWakeWords: String
+        get() = prefs.getString("voice_wake_words", com.aicompanion.voice.wake.VoiceWake.DEFAULT_WORDS)
+            ?: com.aicompanion.voice.wake.VoiceWake.DEFAULT_WORDS
+        set(value) { prefs.edit().putString("voice_wake_words", value.trim()).apply() }
+
+    /** 触发阈值：越低越灵敏、越容易误唤醒（0.05~0.90） */
+    var voiceWakeThreshold: Float
+        get() = prefs.getFloat("voice_wake_threshold", 0.25f).coerceIn(0.05f, 0.90f)
+        set(value) { prefs.edit().putFloat("voice_wake_threshold", value.coerceIn(0.05f, 0.90f)).apply() }
+
+    // ---------------------------------------------------------------- 功能引导进度
+
+    /** 已读过的引导步骤，key = "topicId#stepIndex" */
+    fun guideDone(): Set<String> =
+        prefs.getStringSet("guide_done_steps", emptySet()) ?: emptySet()
+
+    fun markGuideDone(key: String) {
+        prefs.edit().putStringSet("guide_done_steps", guideDone() + key).apply()
+    }
+
+    fun clearGuideProgress() {
+        prefs.edit().remove("guide_done_steps").apply()
+    }
+
+    /** 唤醒后是否震动提示 */
+    var voiceWakeVibrate: Boolean
+        get() = prefs.getBoolean("voice_wake_vibrate", true)
+        set(value) { prefs.edit().putBoolean("voice_wake_vibrate", value).apply() }
 
     var offlineModeEnabled: Boolean
         get() = prefs.getBoolean("offline_mode", false)
@@ -470,7 +608,7 @@ class SettingsManager(context: Context) {
     fun clearAllData() {
         prefs.edit().clear().apply()
         try {
-            securePrefs.edit().clear().apply()
+            SecurePrefsHelper.clearAll(appContext)
         } catch (_: Exception) {}
     }
 

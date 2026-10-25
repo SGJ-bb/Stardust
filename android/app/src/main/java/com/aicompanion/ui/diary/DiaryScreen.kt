@@ -1,6 +1,7 @@
 package com.aicompanion.ui.diary
 
 import androidx.compose.animation.AnimatedVisibility
+import com.aicompanion.ui.components.StradustEmptyState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -182,40 +183,12 @@ fun DiaryScreen(
 
             Box(modifier = Modifier.fillMaxSize()) {
                 if (diaryEntries.isEmpty()) {
-                    // 空状态：圆形 surfaceContainerLow 底 + EditNote icon(48dp muted)
-                    Column(
+                    StradustEmptyState(
+                        emoji = "📖",
+                        title = "还没有日记哦",
+                        hint = "点击右下角按钮写下第一篇日记吧",
                         modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(CircleShape)
-                                .background(StradustTheme.colors.surfaceContainerLow, CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Default.EditNote,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = StradustTheme.colors.textMuted,
-                            )
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            text = "还没有日记哦",
-                            color = StradustTheme.colors.textPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 17.sp,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "点击右下角按钮写下第一篇日记吧 ✍️",
-                            color = StradustTheme.colors.textMuted,
-                            fontSize = 14.sp,
-                        )
-                    }
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),

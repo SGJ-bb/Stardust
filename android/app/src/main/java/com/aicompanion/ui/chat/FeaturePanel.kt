@@ -92,7 +92,6 @@ fun FeaturePanel(show: Boolean, onDismiss: () -> Unit, onFeatureClick: (Int) -> 
                     FeatureItem("换壁纸", 5, Icons.Default.Image),
                     FeatureItem("运行日志", 6, Icons.Default.Description),
                     FeatureItem("操作教程", 7, Icons.Default.School),
-                    FeatureItem("手机自动化", 8, Icons.Default.PhoneAndroid),
                     FeatureItem("记忆池", 10, Icons.Default.Memory),
                     FeatureItem("新会话", 11, Icons.Default.Refresh),
                     FeatureItem("表情包", 12, Icons.Default.EmojiEmotions),

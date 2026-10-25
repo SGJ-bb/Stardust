@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -67,7 +68,18 @@ fun StradustTopBar(
                     drawRect(brush = colors.themeGradient)
                 }
             } else {
-                Modifier
+                // 非渐变顶栏与内容同色，滚动时标题和正文会糊在一起。
+                // 改样式（阴影/变色）会波及所有页面，所以只补一条 0.75dp 的分隔线：
+                // 结构立刻清楚，又不改变任何页面的配色。
+                Modifier.drawWithContent {
+                    drawContent()
+                    val h = 0.75.dp.toPx()
+                    drawRect(
+                        color = colors.outlineVariant.copy(alpha = 0.55f),
+                        topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - h),
+                        size = androidx.compose.ui.geometry.Size(size.width, h),
+                    )
+                }
             }
         ),
         navigationIcon = {

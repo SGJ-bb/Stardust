@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.graphics.toArgb
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -129,6 +130,8 @@ class MomentsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 用户可能在设置页切换了主题，返回时重新应用
+        applySharedTheme()
         refreshMoments()
         recyclerView.post {
             com.aicompanion.anim.AnimeUtils.staggerFadeInScale(recyclerView)
@@ -140,33 +143,49 @@ class MomentsActivity : AppCompatActivity() {
     }
 
     private fun applySharedTheme() {
+        // 统一从 ThemeBridge 取当前主题（设置页切换的 12 套主题），不再依赖已失效的旧配色查找
+        val colors = com.aicompanion.theme.ThemeBridge.resolveColors(this)
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         val bgPath = prefs.getString("chat_background", "")
 
         val ivBg = findViewById<ImageView>(R.id.iv_moments_bg)
-        if (!bgPath.isNullOrEmpty()) {
-            val file = java.io.File(bgPath)
-            if (file.exists()) {
-                try {
-                    val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    android.graphics.BitmapFactory.decodeFile(bgPath, options)
-                    options.inSampleSize = calculateSampleSize(options.outWidth, options.outHeight, 1080, 1920)
-                    options.inJustDecodeBounds = false
-                    val bmp = android.graphics.BitmapFactory.decodeFile(bgPath, options)
-                    ivBg.setImageBitmap(bmp)
-                    ivBg.alpha = 0.3f
-                } catch (_: Exception) {}
-            }
-        } else {
-            val scheme = com.aicompanion.theme.ThemeManager.getCurrentScheme(this)
+        val customBg = !bgPath.isNullOrEmpty() && java.io.File(bgPath).exists()
+        if (customBg) {
             try {
-                val bgColor = safeParseColor(scheme.primaryColorDark, 0xFF1a1a2e.toInt())
-                ivBg.setBackgroundColor(bgColor)
+                val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeFile(bgPath, options)
+                options.inSampleSize = calculateSampleSize(options.outWidth, options.outHeight, 1080, 1920)
+                options.inJustDecodeBounds = false
+                val bmp = android.graphics.BitmapFactory.decodeFile(bgPath, options)
+                ivBg?.setImageBitmap(bmp)
+                ivBg?.alpha = 0.3f
             } catch (_: Exception) {}
+        } else {
+            // 关键：清掉布局里写死的粉色渐变 drawable，改用当前主题底色
+            ivBg?.setImageDrawable(null)
+            ivBg?.alpha = 1f
+            ivBg?.setBackgroundColor(colors.background.toArgb())
         }
 
+        // 顶栏背景 / 标题色 / 发动态按钮
+        findViewById<View>(R.id.toolbar_moments)?.setBackgroundColor(colors.toolbar.toArgb())
+        findViewById<TextView>(R.id.tv_moments_title)?.setTextColor(colors.textPrimary.toArgb())
+        findViewById<TextView>(R.id.btn_new_moment)?.let { btn ->
+            btn.setTextColor(colors.onPrimary.toArgb())
+            btn.background = roundedBackground(colors.primary.toArgb(), 18f)
+        }
+
+        // 状态栏 / 导航栏 / 窗口底色
         com.aicompanion.theme.ThemeManager.applyTheme(this)
+        // 列表项配色跟随主题（onCreate 阶段 adapter 可能还未初始化）
+        if (::adapter.isInitialized) adapter.applyColors(colors)
     }
+
+    private fun roundedBackground(color: Int, radiusPx: Float): android.graphics.drawable.GradientDrawable =
+        android.graphics.drawable.GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = radiusPx
+        }
 
     private fun calculateSampleSize(width: Int, height: Int, reqWidth: Int, reqHeight: Int): Int {
         var inSampleSize = 1
@@ -188,11 +207,6 @@ class MomentsActivity : AppCompatActivity() {
             options.inJustDecodeBounds = false
             android.graphics.BitmapFactory.decodeFile(path, options)
         } catch (_: Exception) { null }
-    }
-
-    private fun safeParseColor(colorStr: String?, default: Int): Int {
-        if (colorStr.isNullOrEmpty()) return default
-        return try { android.graphics.Color.parseColor(colorStr) } catch (_: Exception) { default }
     }
 
     private fun showNewMomentDialog() {
@@ -320,6 +334,35 @@ class MomentsActivity : AppCompatActivity() {
     }
 
     inner class MomentAdapter(private var items: List<Moment>) : RecyclerView.Adapter<MomentAdapter.VH>() {
+
+        private var colors: com.aicompanion.theme.StradustColors? = null
+
+        /** 主题变化时刷新列表项配色 */
+        fun applyColors(newColors: com.aicompanion.theme.StradustColors) {
+            colors = newColors
+            notifyDataSetChanged()
+        }
+
+        /** 把当前主题应用到列表项各控件 */
+        private fun applyItemColors(holder: VH) {
+            val c = colors ?: return
+            (holder.itemView as? com.google.android.material.card.MaterialCardView)?.apply {
+                setCardBackgroundColor(c.surfaceContainer.toArgb())
+                setStrokeColor(c.outlineVariant.toArgb())
+                strokeWidth = 2
+            }
+            holder.tvAuthor.setTextColor(c.textPrimary.toArgb())
+            holder.tvContent.setTextColor(c.textSecondary.toArgb())
+            holder.tvTime.setTextColor(c.textMuted.toArgb())
+            (holder.btnComment as? TextView)?.setTextColor(c.textSecondary.toArgb())
+            (holder.btnDelete as? TextView)?.setTextColor(c.textMuted.toArgb())
+            // 评论区容器：替换固定色的 bg_comments drawable，改用主题圆角背景
+            holder.commentsContainer.background =
+                roundedBackground(c.surfaceContainerHigh.toArgb(), 12f).apply {
+                    setStroke(1, c.outlineVariant.toArgb())
+                }
+        }
+
         inner class VH(view: View) : RecyclerView.ViewHolder(view) {
             val tvAuthor: TextView = view.findViewById(R.id.tv_moment_author)
             val tvContent: TextView = view.findViewById(R.id.tv_moment_content)
@@ -376,6 +419,8 @@ class MomentsActivity : AppCompatActivity() {
                 }
             }
 
+            applyItemColors(holder)
+
             holder.commentsContainer.removeAllViews()
             for (comment in moment.comments) {
                 try {
@@ -429,10 +474,11 @@ class MomentsActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 24, 48, 0)
         }
+        val colors = com.aicompanion.theme.ThemeBridge.resolveColors(this)
         val input = EditText(this).apply {
             hint = "写评论..."
-            setHintTextColor(0xFF556677.toInt())
-            setTextColor(0xFFe0e0f0.toInt())
+            setHintTextColor(colors.textMuted.toArgb())
+            setTextColor(colors.textPrimary.toArgb())
             textSize = 14f
         }
         container.addView(input)

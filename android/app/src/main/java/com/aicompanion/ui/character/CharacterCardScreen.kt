@@ -431,7 +431,7 @@ private fun CharacterCardItem(
                             Text(
                                 text = "世界书：$matchedWorldName",
                                 color = StradustTheme.colors.onPrimaryContainer,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                             )
                         }

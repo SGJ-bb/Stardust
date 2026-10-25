@@ -95,19 +95,11 @@ class WakeUpReceiver : BroadcastReceiver() {
             val llmMaxTokens = settingsPrefs.getInt("llm_max_tokens", 500)
             val apiProvider = settingsPrefs.getString("api_provider", "custom") ?: "custom"
             val apiKey = try {
-                val masterKey = androidx.security.crypto.MasterKey.Builder(context)
-                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-                val securePrefs = androidx.security.crypto.EncryptedSharedPreferences.create(
-                    context, "companion_secure_prefs", masterKey,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                )
-                securePrefs.getString("chat_api_key", "") ?: ""
-            } catch (e: Exception) {
-                com.aicompanion.util.AppLogger.e("WakeUpReceiver", "EncryptedSharedPreferences unavailable: ${e.message}")
-                context.getSharedPreferences("companion_secure_fallback", Context.MODE_PRIVATE)
+                com.aicompanion.settings.SecurePrefsHelper.get(context)
                     .getString("chat_api_key", "") ?: ""
+            } catch (e: Exception) {
+                com.aicompanion.util.AppLogger.e("WakeUpReceiver", "读取API密钥失败: ${e.javaClass.simpleName}: ${e.message}")
+                ""
             }
 
             if (apiUrl.isNotBlank()) {

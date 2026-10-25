@@ -593,7 +593,7 @@ private fun ModelRow(
                             Text(
                                 text = "● 已加载",
                                 color = StradustTheme.colors.primary,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                             )
                         }
@@ -744,7 +744,7 @@ private fun TierBadge(tier: ModelTier) {
         Text(
             text = tier.label,
             color = textColor,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
         )
     }

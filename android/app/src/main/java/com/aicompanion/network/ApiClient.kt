@@ -86,6 +86,14 @@ class ApiClient(
 
         /** 重置重试计数器（每次新请求开始时调用） */
         fun resetRetryCount() = globalRetryCount.set(0)
+
+        /**
+         * 工具调用循环的默认最大轮次（可由设置页调整，见 SettingsManager.aiToolLoopMaxRounds）。
+         * 注意：这是「LLM 连续调用工具」的轮次上限，与「手机操作的动作步数上限」是两个不同的参数。
+         * 默认 20；AppContainer 启动时会用 SettingsManager 里的用户值覆盖它。
+         */
+        @Volatile
+        var defaultToolLoopMaxIterations: Int = 20
     }
 
     private val client = OkHttpClient.Builder()
@@ -156,13 +164,16 @@ class ApiClient(
         val historyBudget = targetBudget - fixedCost - toolsTokenCost - extraCost
 
         if (historyBudget <= 0) {
-            AppLogger.w(TAG, "smartTrimHistory: 预算已耗尽(固定${fixedCost}+工具${toolsTokenCost}+额外${extraCost})，只保留最后2条")
-            return chatHistory.takeLast(2)
+            // 预算耗尽时仍保留最近10条（5轮对话），防止AI完全失忆。
+            // 现代 API 普遍百万上下文，即使略微超限也能处理。
+            AppLogger.w(TAG, "smartTrimHistory: 预算已耗尽(固定${fixedCost}+工具${toolsTokenCost}+额外${extraCost})，保底保留最后10条")
+            return chatHistory.takeLast(10)
         }
 
         // 从最老的消息开始逐条累加，找到能装下的最大数量
+        // keepFromIndex 默认 0 = 全部保留；只有预算装不下时才从该位置之后保留（丢更老的）
         var accumulated = 0
-        var keepFromIndex = chatHistory.size
+        var keepFromIndex = 0
         for (i in chatHistory.indices.reversed()) {
             val cost = estimateTokens(chatHistory[i].second)
             if (accumulated + cost > historyBudget && (chatHistory.size - i) >= 2) {
@@ -196,13 +207,25 @@ class ApiClient(
         overrideTopP: Float? = null,
         overrideFrequencyPenalty: Float? = null,
         overridePresencePenalty: Float? = null,
-        overrideMaxTokens: Int? = null
+        overrideMaxTokens: Int? = null,
+        /**
+         * 是否走流式（SSE）。
+         * 传入 onDelta 后，模型每生成一段文本就会回调一次；回调参数是「本轮已累计的完整文本」，
+         * 调用方直接覆盖气泡内容即可，不需要自己拼接。
+         * 若服务端不支持流式（4xx/无 SSE 数据帧/IO 异常），会自动降级为非流式请求，不会失败。
+         */
+        stream: Boolean = false,
+        onDelta: ((String) -> Unit)? = null
     ): ChatResponse? {
         // 每次新请求重置计数器，防止多次调用累积计数
         globalRetryCount.set(0)
 
         val useModel = modelName ?: "gpt-4o-mini"
-        AppLogger.w(TAG, "sendChat: model=$useModel, url=${chatApiUrl.take(30)}, history=${chatHistory.size}条")
+        if (chatHistory.isEmpty()) {
+            AppLogger.e(TAG, "[MemoryDiag] sendChat收到的历史为0条! model=$useModel, url=${chatApiUrl.take(30)}")
+        } else {
+            AppLogger.w(TAG, "sendChat: model=$useModel, url=${chatApiUrl.take(30)}, history=${chatHistory.size}条")
+        }
 
         val systemPrompt = buildString {
             append(personaPrompt)
@@ -298,6 +321,8 @@ class ApiClient(
 
         val profile = com.aicompanion.settings.ProviderProfile.getProfile(providerId)
 
+        AppLogger.w(TAG, "[MemoryDiag] 请求组装完成: messages共${messagesArray.length()}条 (system+历史${trimmedHistory.size}+当前1+额外${extraMessages.size})")
+
         val requestBody = JSONObject().apply {
             put("model", useModel)
             put("messages", messagesArray)
@@ -313,12 +338,22 @@ class ApiClient(
             if (tools.isNotEmpty()) {
                 put("tools", buildToolsJson(tools))
             }
+            if (stream) {
+                put("stream", true)
+            }
         }
 
         return try {
             if (chatApiUrl.isBlank()) {
                 AppLogger.e(TAG, "sendChat: API URL is empty!")
                 return ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = "API地址为空，请在设置中配置API地址")
+            }
+            if (stream) {
+                // 流式通道：正常时直接返回；返回 null 表示"流式不可用"，
+                // 继续往下走非流式逻辑（下方有完整的 400/工具降级重试处理）
+                val streamed = executeStream(requestBody, useModel, onDelta)
+                if (streamed != null) return streamed
+                AppLogger.w(TAG, "[Stream] 流式通道不可用，降级为非流式请求")
             }
             val body = requestBody.toString().toRequestBody(jsonMediaType)
             val requestBuilder = Request.Builder()
@@ -457,6 +492,158 @@ class ApiClient(
         }
     }
 
+    /**
+     * 执行流式（SSE）请求。
+     *
+     * 解析 OpenAI 兼容的 `data: {...}` 数据帧，逐段回调文本增量；同时按 index 拼接
+     * 分片下发的 tool_calls（流式下 function.arguments 是按片段返回的，必须累加）。
+     *
+     * @param onDelta 文本增量回调，参数为「本轮已累计的完整文本」（已剥掉 [[emotion:xx]] 标记）
+     * @return 正常完成返回 ChatResponse；返回 null 表示"流式通道不可用，应降级为非流式"
+     */
+    private fun executeStream(
+        requestBody: JSONObject,
+        useModel: String,
+        onDelta: ((String) -> Unit)?
+    ): ChatResponse? {
+        val startedAt = System.currentTimeMillis()
+        return try {
+            val body = requestBody.toString().toRequestBody(jsonMediaType)
+            val rb = Request.Builder()
+                .url(chatApiUrl)
+                .post(body)
+                .header("Content-Type", "application/json")
+                .header("Accept", "text/event-stream")
+                .header("Cache-Control", "no-cache")
+            if (!apiKey.isNullOrEmpty()) {
+                rb.header("Authorization", "Bearer $apiKey")
+            }
+
+            AppLogger.w(TAG, "sendChat[Stream]: POST ${sanitizeUrl(chatApiUrl)} model=$useModel")
+            client.newCall(rb.build()).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    val errBody = resp.body?.string()?.take(300) ?: ""
+                    AppLogger.w(TAG, "[Stream] HTTP ${resp.code} body=$errBody")
+                    return@use when (resp.code) {
+                        401 -> ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = "API密钥无效，请检查设置中的API Key")
+                        402 -> ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = "余额不足，请前往API厂商充值")
+                        429 -> ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = "请求过于频繁或已超出配额")
+                        // 其余错误码交给非流式通道：那边有 400→裁历史→去工具 的完整降级链
+                        else -> null
+                    }
+                }
+
+                val source = resp.body?.source() ?: return@use null
+                val textBuf = StringBuilder()
+                val reasoningBuf = StringBuilder()
+                // index -> { id, name, args(StringBuilder) }：流式 tool_calls 是分片下发的
+                val tcFragments = LinkedHashMap<Int, JSONObject>()
+                var frameCount = 0
+
+                while (true) {
+                    val line = source.readUtf8Line() ?: break
+                    if (line.isEmpty() || line.startsWith(":")) continue   // 空行分隔 / SSE 注释心跳
+                    val payload = when {
+                        line.startsWith("data:") -> line.removePrefix("data:").trim()
+                        line.startsWith("{") -> line.trim()               // 少数网关不带 data: 前缀
+                        else -> continue                                   // event: / id: / retry: 等忽略
+                    }
+                    if (payload.isEmpty()) continue
+                    if (payload == "[DONE]") break
+
+                    val obj = try { JSONObject(payload) } catch (_: Exception) { continue }
+                    frameCount++
+
+                    obj.optJSONObject("error")?.let { err ->
+                        val m = err.optString("message", "").ifBlank { "流式响应返回错误" }
+                        AppLogger.e(TAG, "[Stream] 服务端下发 error 事件: $m")
+                        return@use ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = m)
+                    }
+
+                    val choices = obj.optJSONArray("choices") ?: continue
+                    if (choices.length() == 0) continue
+                    val choice = choices.optJSONObject(0) ?: continue
+                    // 标准是 delta；个别厂商（含非流式回包）用 message
+                    val delta = choice.optJSONObject("delta") ?: choice.optJSONObject("message") ?: continue
+
+                    delta.optString("reasoning_content", "")
+                        .takeIf { it.isNotEmpty() }?.let { reasoningBuf.append(it) }
+
+                    val piece = delta.optString("content", "")
+                    if (piece.isNotEmpty()) {
+                        textBuf.append(piece)
+                        val shown = stripEmotionTagStreaming(textBuf.toString())
+                        if (shown.isNotBlank()) onDelta?.invoke(shown)
+                    }
+
+                    delta.optJSONArray("tool_calls")?.let { arr ->
+                        for (i in 0 until arr.length()) {
+                            val tcd = arr.optJSONObject(i) ?: continue
+                            val idx = tcd.optInt("index", i)
+                            val holder = tcFragments.getOrPut(idx) {
+                                JSONObject().apply { put("args", StringBuilder()) }
+                            }
+                            tcd.optString("id", "").takeIf { it.isNotEmpty() }?.let { holder.put("id", it) }
+                            tcd.optJSONObject("function")?.let { fn ->
+                                fn.optString("name", "").takeIf { it.isNotEmpty() }?.let { holder.put("name", it) }
+                                val argPiece = fn.optString("arguments", "")
+                                if (argPiece.isNotEmpty()) {
+                                    (holder.get("args") as StringBuilder).append(argPiece)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (frameCount == 0) {
+                    AppLogger.w(TAG, "[Stream] 未解析到任何 SSE 数据帧（服务端可能不支持 stream），降级为非流式")
+                    return@use null
+                }
+
+                val toolCalls = tcFragments.entries.sortedBy { it.key }.mapNotNull { (i, h) ->
+                    val name = h.optString("name", "")
+                    if (name.isBlank()) return@mapNotNull null
+                    ToolCall(
+                        id = h.optString("id", "call_$i"),
+                        name = name,
+                        arguments = (h.get("args") as? StringBuilder)?.toString()?.ifBlank { "{}" } ?: "{}"
+                    )
+                }
+
+                val (cleanText, emo, act) = extractEmotionAction(textBuf.toString())
+                AppLogger.w(
+                    TAG,
+                    "[Stream] 完成 用时${System.currentTimeMillis() - startedAt}ms " +
+                        "text=${cleanText.length}字 toolCalls=${toolCalls.size}"
+                )
+                ChatResponse(
+                    text = cleanText,
+                    emotion = emo,
+                    action = act,
+                    audioUrl = null,
+                    toolCalls = toolCalls,
+                    reasoningContent = reasoningBuf.toString().takeIf { it.isNotBlank() }
+                )
+            }
+        } catch (e: java.io.IOException) {
+            AppLogger.w(TAG, "[Stream] 流式 IO 异常，降级为非流式: ${e.javaClass.simpleName}: ${e.message}")
+            null
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "[Stream] 流式异常，降级为非流式: ${e.javaClass.simpleName}: ${e.message}", e)
+            null
+        }
+    }
+
+    /**
+     * 流式显示专用：剥掉情绪标记，避免把 `[[emotion:happy]]` 明晃晃地显示在气泡里。
+     * 除了完整标记，还要处理"标记只收到一半"的中间态（如 `[[emot`、`[[emotion:ha`），
+     * 否则用户会看到标记慢慢长出来。
+     */
+    private fun stripEmotionTagStreaming(raw: String): String {
+        val withoutComplete = raw.replace(Regex("""\[\[emotion:\w+\]\]""", RegexOption.IGNORE_CASE), "")
+        return withoutComplete.replace(Regex("""\[\[[a-zA-Z:_]{0,15}$"""), "")
+    }
+
     suspend fun sendChatWithToolLoop(
         userId: String,
         message: String,
@@ -471,12 +658,19 @@ class ApiClient(
         toolExecutor: suspend (String, String) -> String,
         imageUrls: List<String> = emptyList(),
         overrideTemperature: Float? = null,
-        overrideTopP: Float? = null
+        overrideTopP: Float? = null,
+        /** 工具调用最大轮次；<=0 表示使用 defaultToolLoopMaxIterations（可在设置页调整） */
+        maxIterations: Int = 0,
+        /** 是否流式输出；流式下每一轮回复都会实时回调文本增量（见 sendChat） */
+        stream: Boolean = false,
+        /** 流式文本增量回调，参数为本轮已累计的完整文本 */
+        onDelta: ((String) -> Unit)? = null
     ): ChatResponse? {
         // 重置重试计数器，防止多次调用累积计数
         resetRetryCount()
 
-        val maxIterations = 3
+        val iterationLimit = if (maxIterations > 0) maxIterations else defaultToolLoopMaxIterations
+        val maxIterations = iterationLimit.coerceIn(1, 50)
         var currentHistory = chatHistory.toMutableList()
         val allExtraMessages = mutableListOf<Pair<String, String>>()
 
@@ -486,7 +680,9 @@ class ApiClient(
             systemContext, currentHistory, tools, allExtraMessages,
             imageUrls = imageUrls,
             overrideTemperature = overrideTemperature,
-            overrideTopP = overrideTopP
+            overrideTopP = overrideTopP,
+            stream = stream,
+            onDelta = onDelta
         )
 
         for (iteration in 1..maxIterations) {
@@ -542,11 +738,18 @@ class ApiClient(
                 systemContext, currentHistory, tools, allExtraMessages,
                 imageUrls = imageUrls,
                 overrideTemperature = overrideTemperature,
-                overrideTopP = overrideTopP
+                overrideTopP = overrideTopP,
+                stream = stream,
+                onDelta = onDelta
             )
 
             if (iteration == maxIterations && response?.toolCalls?.isNotEmpty() == true) {
-                return ChatResponse("嗯...工具调用太多了，让我想想怎么回答你比较好～", Emotion.NEUTRAL, Action.IDLE)
+                AppLogger.w(TAG, "sendChatWithToolLoop: 达到工具调用轮次上限 $maxIterations，仍有待执行的 tool_calls")
+                return ChatResponse(
+                    "这一步还没做完（已达工具调用轮次上限 $maxIterations 轮）。可以让我继续，" +
+                        "或者到「设置 → 无障碍 → AI 工具调用轮次」把上限调高一些。",
+                    Emotion.NEUTRAL, Action.IDLE
+                )
             }
         }
 
@@ -1196,29 +1399,83 @@ class ApiClient(
         }
     }
 
+    /**
+     * 分析自动操作：根据用户请求 + 当前屏幕 + 已学过的 UI 知识，规划动作序列。
+     *
+     * 与旧方案的区别：
+     * 旧方案：返回 use_skill 时盲目回放存储的 raw actions —— 脆弱。
+     * 新方案：把已学过的 UI 知识（uiMap + workflow）作为"先验"喂给 LLM，
+     *        LLM 每次都基于知识 + 当前屏幕重新规划动作。这样屏幕变化也能容错。
+     *
+     * @param userRequest 用户指令
+     * @param currentScreenInfo 当前屏幕结构化内容
+     * @param uiKnowledge 已学过的 UI 知识（同 APP 的 uiMap + 匹配任务的 workflow），可为空
+     * @return JSONArray 字符串：[{"action":"click",...}, ...]
+     */
     fun analyzeAutoOperation(
         userRequest: String,
-        currentScreenInfo: String
+        currentScreenInfo: String,
+        uiKnowledge: String = ""
     ): String? {
         val useModel = modelName ?: "gpt-4o-mini"
         if (chatApiUrl.isBlank()) return null
 
+        val knowledgeSection = if (uiKnowledge.isNotBlank()) {
+            """
+【你已学过的 UI 知识（先验，可信赖但需结合当前屏幕校验）】
+$uiKnowledge
+
+使用规则：
+- 这是你之前操作该 APP 时归纳的 UI 结构知识，可作为规划参考
+- 但仍需结合"当前屏幕"实际内容校验，不要盲目按旧路径执行
+- 若当前屏幕与知识描述不符（APP 改版/页面切换异常），以当前屏幕为准并据此更新认知
+"""
+        } else ""
+
         val systemPrompt = """
-你是一个手机自动化操作专家。用户会告诉你"想在手机上做什么"，同时你会获得"当前屏幕内容"。
-请分析并返回一个JSON数组格式的操作步骤。
+你是一个手机自动化操作专家，能根据屏幕内容规划操作步骤。
+用户会告诉你"想在手机上做什么"，同时你会获得"当前屏幕内容"。
 
-每个步骤格式: {"action":"click|back|home|scroll|wait","text":"按钮文字","index":数字,"direction":"forward|backward","ms":等待毫秒}
+【屏幕内容格式说明】
+页面：页面名 (包名)  屏幕 1080x2400
+  [3] 微信 {TextView #tab_title}        ← [数字] 是可点击元素索引，可直接 click index=3
+  [input] 搜索 {EditText #search}        ← [input] 输入框
+  文本内容 ×5                            ← 普通文本，×N 表示同名重复出现
+  (scroll) 可滚动区域                     ← 可滑动容器
+  ‹无文字可点元素› {ImageButton} @540,2100 ← 无文字的图标按钮，用 index 点击
+  — 附加窗口[系统对话框] com.xxx —          ← 弹窗/悬浮窗/输入法里的内容
+⚠ 内容超长已截断                           ← 只看到了一部分，需要 scroll 翻页后再看
+$knowledgeSection
+【返回格式】
+返回 JSON 数组，每个元素是一个动作：
+[{"action":"click","index":3},{"action":"wait","ms":1500},...]
 
-规则:
-- click: 用 text 匹配按钮文字，如果知道准确索引可以用 index
-- back/home: 返回/回到桌面
-- scroll: direction="forward|backward"
-- wait: 等待页面加载，ms=毫秒数
-- 最多10步，做完就停
+【动作类型】
+1. click - {"action":"click","index":3} 或 {"action":"click","text":"微信"}
+2. tap   - {"action":"tap","x":540,"y":2100}  坐标点击（无文字元素/自绘控件兜底）
+3. input - {"action":"input","text":"内容"}，指定输入框：{"action":"input","target":"搜索","text":"内容"}
+4. swipe - {"action":"swipe","direction":"up"}，或自定义 {"action":"swipe","start_x":..,"start_y":..,"end_x":..,"end_y":..}
+5. scroll - {"action":"scroll","direction":"forward"}
+6. long_press - {"action":"long_press","text":"消息"}
+7. back/home - {"action":"back"} / {"action":"home"}
+8. wait - {"action":"wait","ms":1500}
+9. read - {"action":"read"}  强制重新读取屏幕（页面加载慢或内容截断时用）
+10. notifications / recents
 
-场景示例:
-用户说"回桌面" → [{"action":"home"}]
-用户说"打开设置" → 找"设置"文字:[{"action":"click","text":"设置"}]
+【规则】
+- 你能操作90%的日常应用，不要说"做不到"
+- 当前不在目标App时，先 home 回桌面再 click 打开
+- 页面切换后加适当wait（加载慢用2000ms，快用1000ms）
+- 最多30步，复杂任务也要尽量完成
+- 遇到支付/密码/验证码页面，返回 {"error":"原因说明"} 表示拒绝执行
+- 优先用 index 点击（快照里的索引最准确）；没有 index 时再用 text
+- 看到「内容超长已截断」时，先 scroll 翻页，再 {"action":"read"} 重新读取
+- 看到「无文字可点元素」时用它的 index 或 @x,y 坐标 tap
+- 需要进入列表里的某一项但屏幕上看不到完整文字时，可以用 tap 坐标兜底
+- 若有 UI 知识，按知识描述的 workflow 规划，但每个动作都要对照当前屏幕确认元素存在
+
+【示例】
+[{"action":"home"},{"action":"click","text":"微信"},{"action":"wait","ms":1500},{"action":"click","text":"搜索"},{"action":"input","text":"小明"},{"action":"wait","ms":1000},{"action":"click","index":0},{"action":"wait","ms":500},{"action":"input","text":"明天见"},{"action":"click","text":"发送"}]
 """.trimIndent()
 
         val messagesArray = JSONArray()
@@ -1228,14 +1485,13 @@ class ApiClient(
         })
         messagesArray.put(JSONObject().apply {
             put("role", "user")
-            put("content", "用户请求：$userRequest\n\n当前屏幕：\n$currentScreenInfo\n\n请返回JSON操作步骤：")
+            put("content", "用户请求：$userRequest\n\n当前屏幕：\n$currentScreenInfo\n\n请返回动作JSON数组：")
         })
 
         val requestBody = JSONObject().apply {
             put("model", useModel)
             put("messages", messagesArray)
             put("temperature", 0.3)
-            put("max_tokens", 600)
         }
 
         return try {
@@ -1250,18 +1506,336 @@ class ApiClient(
             client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
                     AppLogger.e(TAG, "analyzeAutoOperation HTTP ${response.code}")
-                    return@use "[]"
+                    return@use null
                 }
-                val bodyStr = response.body?.string() ?: return@use "[]"
+                val bodyStr = response.body?.string() ?: return@use null
                 val json = JSONObject(bodyStr)
                 val choices = json.optJSONArray("choices")
                 if (choices != null && choices.length() > 0) {
-                    choices.getJSONObject(0).optJSONObject("message")?.optString("content", "[]")
-                } else "[]"
+                    var content = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")
+                    if (content != null) {
+                        content = content.trim()
+                        if (content.startsWith("```")) {
+                            content = content.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                        }
+                    }
+                    content
+                } else null
             }
         } catch (e: Exception) {
             AppLogger.e(TAG, "[API-Auto] analyzeAutoOperation分析自动操作失败: ${e.javaClass.simpleName}: ${e.message}")
-            "[]"
+            null
+        }
+    }
+
+    /**
+     * 通用的 OpenAI 兼容 chat/completions 调用（无工具、单轮），返回 message.content。
+     */
+    private fun postChatCompletion(
+        systemPrompt: String,
+        userPrompt: String,
+        temperature: Double = 0.3
+    ): String? {
+        val useModel = modelName ?: "gpt-4o-mini"
+        if (chatApiUrl.isBlank()) return null
+        val messagesArray = JSONArray()
+        messagesArray.put(JSONObject().apply {
+            put("role", "system")
+            put("content", systemPrompt)
+        })
+        messagesArray.put(JSONObject().apply {
+            put("role", "user")
+            put("content", userPrompt)
+        })
+        val requestBody = JSONObject().apply {
+            put("model", useModel)
+            put("messages", messagesArray)
+            put("temperature", temperature)
+        }
+        return try {
+            val body = requestBody.toString().toRequestBody(jsonMediaType)
+            val requestBuilder = Request.Builder()
+                .url(chatApiUrl)
+                .post(body)
+                .header("Content-Type", "application/json")
+            if (!apiKey.isNullOrEmpty()) requestBuilder.header("Authorization", "Bearer $apiKey")
+            client.newCall(requestBuilder.build()).execute().use { response ->
+                if (!response.isSuccessful) {
+                    AppLogger.e(TAG, "postChatCompletion HTTP ${response.code}")
+                    return@use null
+                }
+                val bodyStr = response.body?.string() ?: return@use null
+                val json = JSONObject(bodyStr)
+                val choices = json.optJSONArray("choices") ?: return@use null
+                if (choices.length() == 0) return@use null
+                var content = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")
+                if (content != null) {
+                    content = content.trim()
+                    if (content.startsWith("```")) {
+                        content = content.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                    }
+                }
+                content
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "postChatCompletion 失败: ${e.javaClass.simpleName}: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * 反应式单步规划：给定「当前屏幕 + 已执行历史」，决定下一步做什么。
+     *
+     * 与 analyzeAutoOperation（一次性规划整段动作）的区别：
+     * 这是"观察 → 决策 → 行动 → 再观察"闭环中的一环，每次只决策眼前这一步，
+     * 因此进入新页面后 LLM 能真正看到新页面的内容，而不是照着开局那张屏幕盲走。
+     *
+     * @return JSON 对象字符串，三种形态之一：
+     *   {"thought":"...","actions":[{...}]}  继续执行
+     *   {"done":true,"summary":"..."}         任务完成
+     *   {"error":"..."}                       拒绝执行/无法完成
+     */
+    fun analyzePhoneOpStep(
+        userRequest: String,
+        screenInfo: String,
+        history: List<String>,
+        stepIndex: Int,
+        maxSteps: Int,
+        uiKnowledge: String = "",
+        skillsSection: String = ""
+    ): String? {
+        val knowledgeSection = if (uiKnowledge.isNotBlank()) {
+            "【你已学过的该 APP UI 知识（先验，可信赖但必须结合当前屏幕校验）】\n$uiKnowledge\n"
+        } else ""
+
+        val historySection = if (history.isEmpty()) "（尚未执行任何动作）" else history.joinToString("\n")
+
+        val systemPrompt = """
+你是一个手机自动化操作专家，正在以"每一步都重新观察屏幕"的方式操作手机。
+
+【屏幕内容格式】
+页面：页面名 (包名)
+  [3] 微信 {TextView #tab_title}        ← [数字]=可点击元素索引，用 click index=3
+  [input] 搜索 {EditText #search}        ← [input]=输入框
+  文本内容 ×5                            ← 普通文本，×N=同名重复出现
+  (scroll) 可滚动区域
+  ‹无文字可点元素› {ImageButton} @540,2100 ← 无文字图标按钮，用 index 或坐标 tap
+  — 附加窗口[系统对话框] com.xxx —          ← 弹窗/悬浮窗/输入法里的内容
+⚠ 内容超长已截断                           ← 只看到一部分，先 scroll 再 read
+
+【UI 树格式（JSON，优先看懂这个）】
+"当前屏幕 UI 树（JSON）："后面是一棵带层级的树，每个节点有稳定 id 与 pid（父节点 id）：
+- id：形如 "n14"，本快照内唯一且稳定，用 {"action":"click","target":"n14"} 引用最可靠
+- role：button(按钮)/textbox(输入框)/checkbox(开关/复选/单选)/text(文本)/scroll(可滚动区)/node(其它)
+- bounds/center：屏幕像素范围/中心点，元素没文字时用坐标 tap，"center":[x,y]
+- index：该元素在可点击列表中的下标（与文本版 [n] 一致），也可用 click index
+- pid：父节点 id，用它推断归属（如某按钮属于哪张卡片、弹窗盖在哪层）
+- checked：开关/复选当前是否选中；你要改变它用 set_checked
+- src:"a11y" 表示来自无障碍，src:"vision" 表示来自截图识别（同样可点）
+说明：id 在该快照内有效；如果页面刷新后 id 变了，用 target 提示找不到就先把 id 更新一下。
+
+【你每一步必须返回一个 JSON 对象】
+1) 需要继续操作：
+{"thought":"简述你的判断","actions":[{"action":"click","index":3}]}
+2) 任务已完成：
+{"done":true,"summary":"一句话说明做完了什么"}
+3) 无法继续或遇到支付/密码/验证码等敏感页面：
+{"error":"原因说明"}
+
+【动作类型】
+- {"action":"click","index":3} 或 {"action":"click","text":"微信"} 或 {"action":"click","target":"n14"}
+- {"action":"tap","x":540,"y":2100}        坐标点击（无文字元素兜底）
+- {"action":"input","text":"内容"}         指定输入框：再加 "target":"搜索"
+- {"action":"set_checked","target":"n14","checked":true}   开关/复选：设定选中态
+- {"action":"swipe","direction":"up"}  / {"action":"scroll","direction":"forward"}
+- {"action":"long_press","text":"消息"}
+- {"action":"back"} / {"action":"home"} / {"action":"notifications"} / {"action":"recents"}
+- {"action":"wait","ms":1500}
+- {"action":"read"}                        强制重读屏幕
+
+【expect：可选但强烈建议加】
+每个动作都可以附带 "expect" 字段，声明「这一步做完后应该看到什么」。系统会在动作执行后校验，
+不满足就把这一步判为失败、并把实际状况告诉你，这样你能立刻纠正，
+而不会在"以为点成功了"的假前提下越走越远。写法（多个条件用逗号分隔，需全部满足）：
+- "expect":"出现:我的钱包"              动作后屏幕上应出现该文字（最常用）
+- "expect":"消失:正在加载"              该文字应当消失
+- "expect":"包名:com.android.settings"  前台应用应切换到该包名
+- "expect":"变化"                       屏幕内容或前台应用至少有一项变化（点按钮后的通用写法）
+例如：{"action":"click","index":3,"expect":"变化"}
+      {"action":"click","text":"发送","expect":"消失:发送"}
+
+【规则】
+- 一次返回 1~4 个动作即可，页面会变的时候少给几个；页面切换后上层会重新观察
+- 优先用 index（索引来自当前快照，最准）；没有 index 再用 text；都没有就用 tap 坐标
+- 每次都要基于【当前屏幕】判断，不要照抄历史
+- 点按钮、切页面、提交表单时务必加 expect，否则「点了没反应」会被你误判成成功
+- 看到「内容超长已截断」：先 scroll 翻页，再 {"action":"read"}
+- 觉得"已经做完了"就返回 done，不要为了凑步数继续点
+- 不要说"做不到"，你能操作绝大多数日常 App
+$knowledgeSection$skillsSection
+""".trimIndent()
+
+        val userPrompt = """
+用户目标：$userRequest
+
+【当前屏幕】
+$screenInfo
+
+【已执行动作与结果】
+$historySection
+
+【进度】第 $stepIndex 步 / 最多 $maxSteps 步
+
+请返回下一步的 JSON 对象：
+""".trimIndent()
+
+        return postChatCompletion(systemPrompt, userPrompt, temperature = 0.3)
+    }
+
+    /**
+     * 生成技能（Skill Creator）：把用户的一句话需求（可附带当前屏幕内容）写成一条可复用技能。
+     *
+     * @return JSON 字符串：
+     * {"name":"...","description":"...","scope":"app|global","appName":"...","appPackage":"...",
+     *  "triggers":["..."],"content":"Markdown 正文"}
+     */
+    fun generateSkill(
+        requirement: String,
+        screenContext: String = "",
+        packageName: String = "",
+        existingContent: String = ""
+    ): String? {
+        val screenSection = if (screenContext.isNotBlank()) {
+            "\n【当前屏幕内容（可作为编写技能的参考）】\n$screenContext\n"
+        } else ""
+        val packageSection = if (packageName.isNotBlank()) "\n目标包名：$packageName\n" else ""
+        val refineSection = if (existingContent.isNotBlank()) {
+            "\n【已有技能内容（请在此基础上改进，而不是重写无关内容）】\n$existingContent\n"
+        } else ""
+
+        val systemPrompt = """
+你是一位「手机自动化技能」作者。你的任务是把用户的需求整理成一条可复用、可被另一个 AI 直接照着执行的技能。
+
+【输出格式】只返回一个 JSON 对象，不要任何解释文字：
+{
+  "name": "技能名（简短中文，如：微信给好友发消息）",
+  "description": "一句话说明这个技能做什么、什么时候用（给 AI 判断是否加载，尽量具体）",
+  "scope": "app 或 global",
+  "appName": "目标 App 中文名（通用流程留空）",
+  "appPackage": "目标 App 包名（不确定就留空）",
+  "triggers": ["用户可能说出的触发词", "如：发消息", "发微信"],
+  "content": "Markdown 正文"
+}
+
+【正文(content)写作要求】
+- 用「步骤 1/2/3」写清操作路径，每一步说明：在哪个页面、点什么（优先写元素的文字或资源ID/图标含义）
+- 给出失败时的判断与兜底办法（比如找不到元素就下滑找、或用坐标点击）
+- 明确列出「危险/需要用户确认」的环节（支付、删除、发送、转账、验证码）
+- 如果任务需要文字输入，写清输入框怎么找、发送按钮在哪
+- 需要执行系统命令时，注明可用 run_shell 工具，并给出命令示例
+- 不要编造不确定的 UI 细节；不确定的地方写"需现场确认"
+- 控制在 600 字以内，条理清晰
+$packageSection$refineSection
+""".trimIndent()
+
+        val userPrompt = "用户需求：$requirement\n$screenSection\n请返回技能 JSON："
+        return postChatCompletion(systemPrompt, userPrompt, temperature = 0.4)
+    }
+
+    /**
+     * 归纳 UI 知识：执行成功后，把指令+执行轨迹发给 LLM，让其抽象出 UI 结构知识 + 任务 workflow。
+     *
+     * 与旧方案的区别：
+     * 旧方案：直接复制 raw actions + 加几个 keyword —— 屏幕变化即失效。
+     * 新方案：让 LLM 抽象出"页面布局/关键元素/导航路径 + 高层 workflow"（自然语言），
+     *        下次作为先验知识喂给 LLM 重新规划。这样真正"懂"UI，容错性强。
+     *
+     * @return JSON: {"appName":"微信","appPackage":"com.tencent.mm","uiMap":"...","taskName":"发消息","triggerKeywords":[...],"workflow":"..."}
+     */
+    fun summarizeSkill(userRequest: String, actionsJson: String): String? {
+        val useModel = modelName ?: "gpt-4o-mini"
+        if (chatApiUrl.isBlank()) return null
+
+        val systemPrompt = """
+你刚成功执行了一项手机自动化任务。请从执行轨迹中归纳出"UI 结构知识"和"任务 workflow"，供下次相同任务时作为先验参考。
+
+【返回格式（JSON对象）】
+{
+  "appName": "目标APP名（如微信、QQ、淘宝）",
+  "appPackage": "APP 包名（如 com.tencent.mm，若不确定留空）",
+  "uiMap": "UI 结构知识（自然语言，描述本次经过的主要页面布局、关键元素、导航关系）",
+  "taskName": "任务名（简短，如发消息、搜索商品、打开设置）",
+  "triggerKeywords": ["触发关键词", "用户说这些词时可能匹配此任务"],
+  "workflow": "高层 workflow（自然语言步骤描述，不要写 raw click，要写人能看懂的操作流程）"
+}
+
+【uiMap 写法示例】
+"【主界面】底部4个tab：微信|通讯录|发现|我；顶部右上角'+'和搜索图标
+【聊天列表】点击某条聊天进入对话页
+【对话页】顶部返回/对方名字/更多；底部输入框、'+'、麦克风、表情图标
+【发消息】在对话页底部输入框输入文本，点击发送按钮（输入框右侧）"
+
+【workflow 写法示例】
+"1.从主界面点击底部'微信'tab 进入聊天列表
+ 2.在列表中找到目标聊天（可通过顶部搜索）
+ 3.点击进入对话页
+ 4.在底部输入框输入消息内容
+ 5.点击输入框右侧的发送按钮"
+
+【规则】
+- uiMap 要提炼本次经过的页面结构（不是 raw click 序列）
+- workflow 要写高层步骤（人能看懂的），不要写 {"action":"click","text":"xxx"}
+- triggerKeywords 要覆盖用户可能的表述方式（如"发消息""发个""发给""说一下"）
+- 只返回JSON，不要解释
+""".trimIndent()
+
+        val messagesArray = JSONArray()
+        messagesArray.put(JSONObject().apply {
+            put("role", "system")
+            put("content", systemPrompt)
+        })
+        messagesArray.put(JSONObject().apply {
+            put("role", "user")
+            put("content", "用户原始请求：$userRequest\n\n执行成功的动作序列：\n$actionsJson\n\n请归纳为 UI 知识 JSON：")
+        })
+
+        val requestBody = JSONObject().apply {
+            put("model", useModel)
+            put("messages", messagesArray)
+            put("temperature", 0.2)
+        }
+
+        return try {
+            val body = requestBody.toString().toRequestBody(jsonMediaType)
+            val requestBuilder = Request.Builder()
+                .url(chatApiUrl)
+                .post(body)
+                .header("Content-Type", "application/json")
+            if (!apiKey.isNullOrEmpty()) {
+                requestBuilder.header("Authorization", "Bearer $apiKey")
+            }
+            client.newCall(requestBuilder.build()).execute().use { response ->
+                if (!response.isSuccessful) {
+                    AppLogger.e(TAG, "summarizeSkill HTTP ${response.code}")
+                    return@use null
+                }
+                val bodyStr = response.body?.string() ?: return@use null
+                val json = JSONObject(bodyStr)
+                val choices = json.optJSONArray("choices")
+                if (choices != null && choices.length() > 0) {
+                    var content = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")
+                    if (content != null) {
+                        content = content.trim()
+                        if (content.startsWith("```")) {
+                            content = content.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                        }
+                    }
+                    content
+                } else null
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "summarizeSkill failed: ${e.message}")
+            null
         }
     }
 

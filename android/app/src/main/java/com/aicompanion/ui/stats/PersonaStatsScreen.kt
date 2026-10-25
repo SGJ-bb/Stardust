@@ -415,7 +415,7 @@ private fun HourBarChart(hourDistribution: Map<Int, Int>) {
             Text(
                 text = label,
                 color = StradustTheme.colors.textMuted,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
             )
         }
     }

@@ -706,7 +706,7 @@ private fun PetCardItem(
                             Text(
                                 text = "已激活",
                                 color = colors.primary,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                             )
                         }
@@ -765,7 +765,7 @@ private fun ActionCardItem(
                         Text(
                             text = "内置",
                             color = colors.textMuted,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(colors.surfaceContainerHigh, RoundedCornerShape(8.dp))

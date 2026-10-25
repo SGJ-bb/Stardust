@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.AccessTime
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.aicompanion.theme.StradustTheme
 import com.aicompanion.ui.components.StradustCard
+import com.aicompanion.ui.navigation.StradustDestinations
 import com.aicompanion.ui.components.StradustTopBar
 
 /**
@@ -128,7 +130,6 @@ private val virtualWorld = FeatureEntry(Icons.Default.Public, "虚拟世界", "v
 private val checkIn = FeatureEntry(Icons.Default.CheckCircle, "签到", "check_in")
 private val groupChat = FeatureEntry(Icons.Default.Group, "群聊", "group_chat_list")
 private val calendar = FeatureEntry(Icons.Default.CalendarToday, "日历", "calendar")
-private val schedule = FeatureEntry(Icons.Default.Schedule, "日程", "schedule")
 private val timeCapsule = FeatureEntry(Icons.Default.AccessTime, "时光胶囊", "time_capsule")
 private val pixelPet = FeatureEntry(Icons.Default.Pets, "像素宠物", "pixel_pet")
 
@@ -138,7 +139,9 @@ private val pixelPet = FeatureEntry(Icons.Default.Pets, "像素宠物", "pixel_p
  * 将13个功能入口按语义分为3组：日常、角色、探索
  */
 val featureGroups = listOf(
-    FeatureGroup("日常", listOf(moments, diary, album, checkIn, calendar, schedule)),
+    // 「日程」入口已移除：它读写的是 App 私有日程表，和系统日历/系统闹钟是两套数据。
+    // 现在统一——定时提醒走系统闹钟，记事走系统日历（AI 的 system / calendar 工具直接操作真机）。
+    FeatureGroup("日常", listOf(moments, diary, album, checkIn, calendar)),
     FeatureGroup("角色", listOf(archive, worldBook, achievement)),
     FeatureGroup("探索", listOf(virtualWorld, groupChat, timeCapsule, pixelPet)),
 )
@@ -317,6 +320,25 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
+
+                // ===== 快捷入口 =====
+                // 首页原先只有角色卡：一个人设时，卡片下面整片空白（实测首页"空"的主因）。
+                // 补一组常驻入口，把常用去处直接摆在眼前，不必先拉开侧边栏。
+                item {
+                    QuickEntryGrid(
+                        onDiary = {
+                            if (personas.size == 1) onDiaryClick(personas.first().id)
+                            else showPersonaPicker = true
+                        },
+                        onAlbum = onAlbumClick,
+                        onMoments = onMomentsClick,
+                        onAchievement = onAchievementClick,
+                        onCheckIn = onCheckInClick,
+                        onGroupChat = onGroupChatClick,
+                        onPersonality = { onNavigate(StradustDestinations.PERSONALITY) },
+                        onCapsule = { onNavigate(StradustDestinations.TIME_CAPSULE) },
+                    )
                 }
 
                 // 底部留白，避免被 FAB 遮挡
@@ -594,6 +616,92 @@ private fun SidebarFeatureItem(
  *
  * 显示角色头像、名称、描述、最后聊天时间、消息数和好感度等级
  */
+/**
+ * 首页快捷入口：4 列 × 2 行。
+ *
+ * 每个入口 = 圆角图标块 + 一行文字，整格可点（热区约 64dp 高），
+ * 比藏在侧边栏里更适合单手操作。放这里也把首页下半部分的空白填成了有用内容。
+ */
+@Composable
+private fun QuickEntryGrid(
+    onDiary: () -> Unit,
+    onAlbum: () -> Unit,
+    onMoments: () -> Unit,
+    onAchievement: () -> Unit,
+    onCheckIn: () -> Unit,
+    onGroupChat: () -> Unit,
+    onPersonality: () -> Unit,
+    onCapsule: () -> Unit,
+) {
+    val entries = listOf(
+        Triple("日记", Icons.Default.EditNote, onDiary),
+        Triple("相册", Icons.Default.PhotoLibrary, onAlbum),
+        Triple("难忘时刻", Icons.Default.Favorite, onMoments),
+        Triple("成就", Icons.Default.EmojiEvents, onAchievement),
+        Triple("打卡", Icons.Default.CheckCircle, onCheckIn),
+        Triple("群聊", Icons.Default.Group, onGroupChat),
+        Triple("人格", Icons.Default.Psychology, onPersonality),
+        Triple("时光胶囊", Icons.Default.AccessTime, onCapsule),
+    )
+    StradustCard(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp),
+    ) {
+        entries.chunked(4).forEach { row ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                row.forEach { (label, icon, action) ->
+                    QuickEntryCell(
+                        label = label,
+                        icon = icon,
+                        onClick = action,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                // 不足四列时补空位，保证列对齐
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickEntryCell(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = StradustTheme.colors
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .background(colors.surfaceContainerHigh, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = colors.primary,
+                modifier = Modifier.size(19.dp),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = label,
+            color = colors.textSecondary,
+            fontSize = 11.sp,
+            maxLines = 1,
+        )
+    }
+}
+
 @Composable
 private fun PersonaCardItem(
     persona: PersonaCard,

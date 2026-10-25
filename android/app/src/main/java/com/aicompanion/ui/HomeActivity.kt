@@ -97,6 +97,17 @@ class HomeActivity : AppCompatActivity() {
             }
         }
 
+        // 像素小镇入口(独立模块: LLM 大脑像素游戏)
+        val btnGame = findViewById<View>(R.id.btn_game_entry)
+        com.aicompanion.anim.AnimeUtils.setupTouchScale(btnGame)
+        btnGame.setOnClickListener {
+            runCatching {
+                startActivity(Intent(this, com.aicompanion.game.engine.PhaserHostActivity::class.java))
+            }.onFailure { e ->
+                com.aicompanion.util.AppLogger.e("HomeActivity", "openGame failed: ${e.message}")
+            }
+        }
+
         val btnProfile = findViewById<View>(R.id.btn_profile_entry)
         com.aicompanion.anim.AnimeUtils.setupTouchScale(btnProfile)
         btnProfile.setOnClickListener {

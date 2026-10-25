@@ -592,7 +592,7 @@ private fun TemplateCard(
         Text(
             text = template.aspectRatio,
             color = colors.textMuted,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
         )
     }
 }

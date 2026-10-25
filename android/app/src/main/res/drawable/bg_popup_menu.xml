@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 弹窗背景：改用语义资源，随 12 套主题一起变 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <gradient
-        android:startColor="#e61a1a3e"
-        android:endColor="#e61e1e44"
-        android:angle="135" />
+    <solid android:color="@color/surface_card" />
     <corners android:radius="16dp" />
-    <stroke android:width="0.5dp" android:color="#44c4b5fd" />
+    <stroke
+        android:width="0.5dp"
+        android:color="@color/stroke_subtle" />
 </shape>

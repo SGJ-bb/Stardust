@@ -957,7 +957,7 @@ private fun StatePill(
             text = label,
             color = if (highlight) StradustTheme.colors.primary
             else StradustTheme.colors.textSecondary,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1008,7 +1008,7 @@ private fun StoryEventCard(event: StoryEvent) {
                 Text(
                     text = "🖼️ 含场景配图",
                     color = StradustTheme.colors.tertiary,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                 )
             }
             if (event.eventType.isNotBlank()) {
@@ -1016,7 +1016,7 @@ private fun StoryEventCard(event: StoryEvent) {
                 Text(
                     text = eventTypeLabel(event.eventType),
                     color = StradustTheme.colors.textDisabled,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                 )
             }
         }
@@ -1246,7 +1246,7 @@ private fun SyncBadge(synced: Boolean) {
         Text(
             text = if (synced) "✓ 已同步" else "未同步",
             color = if (synced) StradustTheme.colors.tertiary else StradustTheme.colors.textMuted,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
         )
     }

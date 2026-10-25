@@ -23,6 +23,7 @@ class DiaryManager(private val context: Context, private val personaId: String =
         val APP_VERSION = "1.0.0"
         private const val TAG = "DiaryManager"
         private const val MIN_UPDATE_INTERVAL_MS = 30 * 60 * 1000L
+        private const val KEY_LAST_UPDATE = "last_update_ms"
     }
 
     // SQLite-backed storage (shared with chat messages in same DB)
@@ -30,7 +31,18 @@ class DiaryManager(private val context: Context, private val personaId: String =
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     private val fullDateFormat = SimpleDateFormat("yyyy年M月d日 EEEE", Locale.CHINESE)
-    private var lastUpdateTime = 0L
+
+    // 写入节流时间戳 —— 持久化保存。
+    // 原先它是普通内存字段，而触发链上每次都会 new 一个 DiaryManager，
+    // 导致 lastUpdateTime 恒为 0、30 分钟节流形同虚设。
+    private val throttlePrefs by lazy {
+        context.getSharedPreferences("diary_throttle_$personaId", Context.MODE_PRIVATE)
+    }
+    private var lastUpdateTime: Long
+        get() = throttlePrefs.getLong(KEY_LAST_UPDATE, 0L)
+        set(value) {
+            throttlePrefs.edit().putLong(KEY_LAST_UPDATE, value).apply()
+        }
 
     // ─── Read operations (SQLite) ──────────────────────────────
 
@@ -355,8 +367,14 @@ class DiaryManager(private val context: Context, private val personaId: String =
         lastUpdateTime = System.currentTimeMillis()
     }
 
-    fun updateOrGenerateDailyDiary(chatTexts: List<String>, affectionLevel: Int) {
-        if (!canUpdateDiary()) return
+    /**
+     * 生成或追加今日日记。
+     * @param force true 时跳过 30 分钟节流。自动写日记流程会先调用 markDiaryUpdated()，
+     *              之后再回落到本地生成，若仍走节流检查会被直接 return、日记写不进去。
+     *              因此由调用方保证"每日一次"的兜底路径需要传 true。
+     */
+    fun updateOrGenerateDailyDiary(chatTexts: List<String>, affectionLevel: Int, force: Boolean = false) {
+        if (!force && !canUpdateDiary()) return
 
         val today = dateFormat.format(Date())
         val existing = storage.getDiary(personaId, today)

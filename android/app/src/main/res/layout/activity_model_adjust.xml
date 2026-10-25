@@ -5,11 +5,15 @@
     android:layout_height="match_parent"
     android:background="@color/bg_base">
 
+    <!-- 高度必须与聊天页的 Live2D 图层一致：聊天页在 StradustNavHost 中被
+         padding(bottom = bottomBarHeight) 避开底栏，bottomBarHeight 目前是 80dp。
+         两者不一致会导致「在调整页调好的位置回到聊天页发生偏移」。
+         改动 StradustNavHost 的 bottomBarHeight 时，这里要同步。 -->
     <com.aicompanion.live2d.Live2DWebView
         android:id="@+id/live2d_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginBottom="200dp" />
+        android:layout_marginBottom="80dp" />
 
     <LinearLayout
         android:layout_width="match_parent"

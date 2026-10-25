@@ -36,17 +36,27 @@ class ProactiveChatCoordinator(
     private var proactiveRunnable: Runnable? = null
 
     fun schedule() {
-        val sm = settingsManagerProvider() ?: return
-        if (!sm.isNagEnabled) return
+        // 幂等：重复调用不会叠加多个定时器
+        proactiveRunnable?.let { handler.removeCallbacks(it) }
         proactiveRunnable = Runnable {
-            if (!isAtLeast(androidx.lifecycle.Lifecycle.State.CREATED)) return@Runnable
-            val engine = proactiveEngineProvider()
-            if (engine?.shouldTriggerInteraction(sm.nagFrequency.name.lowercase()) == true) {
-                trigger()
+            val sm = settingsManagerProvider()
+            // 开关判断放在 tick 内部：启动时是关的、后来用户打开了，也能生效
+            if (sm != null && sm.isNagEnabled && isAtLeast(androidx.lifecycle.Lifecycle.State.CREATED)) {
+                val engine = proactiveEngineProvider()
+                // 注意用 getNagFrequency()（返回 frequent/normal/infrequent）。
+                // 原来传的是枚举名 low/medium/high，全都落到 else 分支 → 频率设置形同虚设。
+                if (engine?.shouldTriggerInteraction(sm.getNagFrequency()) == true) {
+                    trigger()
+                }
             }
             schedule()
         }
         handler.postDelayed(proactiveRunnable!!, 120000L)
+    }
+
+    override fun onResume() {
+        // 从后台回来要重新排：否则上一轮 onPause 移除后永远不再触发
+        schedule()
     }
 
     private fun trigger() {
@@ -69,11 +79,13 @@ class ProactiveChatCoordinator(
                     } else null
                 }
                 if (response != null && response.text.isNotBlank() && response.errorMessage == null) {
+                    proactiveEngineProvider()?.markNagSent()
                     onPetMessage(response.text, response.emotion, response.action)
                     onUpdatePetDisplay(response)
                 } else {
                     val fallback = proactiveEngineProvider()?.getIdlePhrase()
                     if (fallback != null && isAtLeast(androidx.lifecycle.Lifecycle.State.CREATED)) {
+                        proactiveEngineProvider()?.markNagSent()
                         onPetMessage(fallback.first, fallback.second, fallback.third)
                     }
                 }
@@ -88,7 +100,9 @@ class ProactiveChatCoordinator(
     }
 
     override fun onPause() {
-        proactiveRunnable?.let { handler.removeCallbacks(it) }
+        // 故意不取消：用户切到别的 App 时正是"该主动说句话"的时候。
+        // 原来的写法在 onPause 移除定时器，而 trigger() 又要求"非前台"，
+        // 两个条件互斥 —— 结果是永远不发。
     }
 
     override fun onDestroy() {

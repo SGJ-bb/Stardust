@@ -1,6 +1,7 @@
 package com.aicompanion.ui.album
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import com.aicompanion.ui.components.StradustEmptyState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.LocalIndication
@@ -145,32 +146,12 @@ fun AlbumScreen(
             }
 
             if (photos.isEmpty()) {
-                // 空状态
-                Column(
+                StradustEmptyState(
+                    emoji = "📸",
+                    title = "还没有难忘时刻哦",
+                    hint = "和 AI 的美好瞬间会在这里展示",
                     modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        Icons.Default.PhotoLibrary,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = StradustTheme.colors.textMuted,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        text = "还没有难忘时刻哦",
-                        color = StradustTheme.colors.textPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 17.sp,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "和 AI 的美好瞬间会在这里展示 📸",
-                        color = StradustTheme.colors.textMuted,
-                        fontSize = 14.sp,
-                    )
-                }
+                )
             } else {
                 // 照片网格：LazyVerticalGrid(3列), aspectRatio(1f), 圆角 12dp, shadow 2dp
                 LazyVerticalGrid(

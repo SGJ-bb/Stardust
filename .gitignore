@@ -95,3 +95,14 @@ build_log.txt
 models/
 android/app/src/main/assets/models/bge-*/
 stradust-pc/data/
+
+# 本地工作区：Assistant 的工作记忆、临时探针脚本、调试截图。
+# 这些里面会带个人数据（聊天记录、prefs 导出、会话内容），绝对不能进仓库。
+.workbuddy/
+.trae/
+FishClaw/
+FishOps/
+_*.txt
+_*.py
+_*.xml
+_*.png

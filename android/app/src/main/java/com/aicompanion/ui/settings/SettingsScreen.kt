@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
@@ -276,6 +278,9 @@ fun SettingsScreen(
     var useLocalOcr by rememberSaveable { mutableStateOf(sm.useLocalOcr) }
     var useChatModelForVision by rememberSaveable { mutableStateOf(sm.useChatModelForVision) }
     var simpleScreenMode by rememberSaveable { mutableStateOf(sm.simpleScreenMode) }
+
+    // 回复呈现方式：分段拟人 / 一次性整段 / 流式逐字
+    var replyMode by rememberSaveable { mutableIntStateOf(sm.aiReplyMode) }
 
     // AI 主动消息
     var nagFrequency by rememberSaveable { mutableStateOf(sm.nagFrequency) }
@@ -539,6 +544,14 @@ fun SettingsScreen(
     // 手风琴模式：记录当前展开的分区名，null 表示全部折叠
     var expandedSection by rememberSaveable { mutableStateOf<String?>("外观设置") }
 
+    // AI 工具调用最大轮次（与「无障碍高级设置 → 操作参数」里的同名滑块共用同一个设置项，
+    // 走 SettingsManager.aiToolLoopMaxRounds，改完即时生效、无需重启）
+    var toolLoopRounds by rememberSaveable { mutableFloatStateOf(sm.aiToolLoopMaxRounds.toFloat()) }
+    // 若用户是在无障碍页改的值，回到本页展开「AI 设置」时同步一次，避免 UI 显示旧值
+    LaunchedEffect(expandedSection) {
+        if (expandedSection == "AI 设置") toolLoopRounds = sm.aiToolLoopMaxRounds.toFloat()
+    }
+
     // === 新增：RAG 配置 ===
     var personaRagEnabled by rememberSaveable { mutableStateOf(RagConfig.personaRagEnabled) }
     var embeddingMode by rememberSaveable { mutableStateOf(RagConfig.embeddingMode) }
@@ -601,6 +614,33 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 item {
+                // ===== 功能引导入口 =====
+                StradustCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                        .clickable { onNavigate("guide") },
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.MenuBook, null, tint = StradustTheme.colors.primary)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "功能引导",
+                                color = StradustTheme.colors.textPrimary,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                            )
+                            Text(
+                                "语音唤醒 / 权限 / ADB 通道，三步动画看懂",
+                                color = StradustTheme.colors.textSecondary,
+                                fontSize = 12.sp,
+                            )
+                        }
+                        Icon(Icons.Default.ChevronRight, null, tint = StradustTheme.colors.textSecondary)
+                    }
+                }
+
                 // ===== 外观设置分组 =====
                 SectionTitle(
                     title = "外观设置",
@@ -619,61 +659,64 @@ fun SettingsScreen(
                         fontSize = 14.sp,
                     )
                     Spacer(Modifier.height(12.dp))
-                    // 主题选择器：横向滚动，12个主题圆形色块 + 名称
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        ThemeId.entries.forEach { theme ->
-                            val isSelected = theme == selectedTheme
-                            // 根据当前明暗模式选取对应配色用于预览
-                            val themeColors = if (isDark) {
-                                DarkColorSchemes.fromId(theme)
-                            } else {
-                                LightColorSchemes.fromId(theme)
-                            }
-                            val interactionSource = remember { MutableInteractionSource() }
-                            val isPressed by interactionSource.collectIsPressedAsState()
+                    // 主题选择器：6 列 × 2 行，全部可见。
+                    // 原先是一行横向滚动，第 5 个色块被卡片边缘切掉一半——看着像渲染出错，
+                    // 也看不出还能往右滑。改成自适应网格后 12 个主题一眼全在。
+                    ThemeId.entries.chunked(6).forEach { rowThemes ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            rowThemes.forEach { theme ->
+                                val isSelected = theme == selectedTheme
+                                val themeColors = if (isDark) {
+                                    DarkColorSchemes.fromId(theme)
+                                } else {
+                                    LightColorSchemes.fromId(theme)
+                                }
+                                val interactionSource = remember { MutableInteractionSource() }
+                                val isPressed by interactionSource.collectIsPressedAsState()
 
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .scale(if (isPressed) 0.97f else 1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .then(
-                                        if (isSelected) {
-                                            Modifier.border(
-                                                width = 2.dp,
-                                                color = StradustTheme.colors.primary,
-                                                shape = RoundedCornerShape(12.dp),
-                                            )
-                                        } else Modifier,
-                                    )
-                                    .clickable(
-                                        interactionSource = interactionSource,
-                                        indication = null,
-                                    ) { ThemeState.setTheme(theme) } // 关键：写全局状态
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                            ) {
-                                // 36dp 圆形色块
-                                Box(
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(themeColors.primary, CircleShape),
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = theme.displayName,
-                                    color = if (isSelected) StradustTheme.colors.primary
-                                    else StradustTheme.colors.textSecondary,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                )
+                                        .weight(1f)
+                                        .scale(if (isPressed) 0.97f else 1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .then(
+                                            if (isSelected) {
+                                                Modifier.border(
+                                                    width = 2.dp,
+                                                    color = StradustTheme.colors.primary,
+                                                    shape = RoundedCornerShape(12.dp),
+                                                )
+                                            } else Modifier,
+                                        )
+                                        .clickable(
+                                            interactionSource = interactionSource,
+                                            indication = null,
+                                        ) { ThemeState.setTheme(theme) }
+                                        .padding(vertical = 8.dp),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(themeColors.primary, CircleShape),
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = theme.displayName,
+                                        color = if (isSelected) StradustTheme.colors.primary
+                                        else StradustTheme.colors.textSecondary,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                    )
+                                }
                             }
                         }
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
 
@@ -793,6 +836,74 @@ fun SettingsScreen(
 
                 AnimatedVisibility(visible = expandedSection == "AI 设置") {
                     Column(modifier = Modifier.fillMaxWidth()) {
+                // === 回复呈现方式（分段拟人 / 一次性 / 流式） ===
+                StradustCard {
+                    Text(
+                        text = "回复呈现方式",
+                        color = StradustTheme.colors.textPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = when (replyMode) {
+                            SettingsManager.REPLY_MODE_SINGLE ->
+                                "整段回复只发一个气泡，不再拆成一条一条"
+                            SettingsManager.REPLY_MODE_STREAM ->
+                                "边生成边显示，文字逐字出现、末尾带闪烁光标，首个字出现更快"
+                            else ->
+                                "把回复按句拆成多条气泡，模拟真人一句一句打字（默认）"
+                        },
+                        color = StradustTheme.colors.textMuted,
+                        fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        listOf(
+                            SettingsManager.REPLY_MODE_SPLIT to "分段拟人",
+                            SettingsManager.REPLY_MODE_SINGLE to "一次性",
+                            SettingsManager.REPLY_MODE_STREAM to "流式输出",
+                        ).forEach { (mode, label) ->
+                            val isSelected = replyMode == mode
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isSelected) StradustTheme.colors.primary
+                                        else StradustTheme.colors.surfaceContainerLow
+                                    )
+                                    .clickable(role = Role.Button) {
+                                        replyMode = mode
+                                        sm.aiReplyMode = mode
+                                    }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) StradustTheme.colors.onPrimary
+                                    else StradustTheme.colors.textSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "流式输出需要模型/服务端支持；不支持的第三方中转会自动退回整段回复。" +
+                            "工具调用（如操作手机）期间的进度提示仍按原样显示。",
+                        color = StradustTheme.colors.textMuted,
+                        fontSize = 11.sp,
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+
                 // LLM 提供商选择
                 StradustCard {
                     Text(
@@ -1111,6 +1222,31 @@ fun SettingsScreen(
                             inactiveTrackColor = StradustTheme.colors.surfaceContainerHigh,
                         ),
                     )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "AI 工具调用轮次: ${toolLoopRounds.toInt()}",
+                        color = StradustTheme.colors.textPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                    )
+                    Slider(
+                        value = toolLoopRounds,
+                        onValueChange = { toolLoopRounds = it },
+                        onValueChangeFinished = { sm.aiToolLoopMaxRounds = toolLoopRounds.toInt() },
+                        valueRange = 1f..SettingsManager.MAX_TOOL_LOOP_ROUNDS.toFloat(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = StradustTheme.colors.primary,
+                            activeTrackColor = StradustTheme.colors.primary,
+                            inactiveTrackColor = StradustTheme.colors.surfaceContainerHigh,
+                        ),
+                    )
+                    Text(
+                        text = "一次对话里 AI 最多连着调用几轮工具，默认 ${SettingsManager.DEFAULT_TOOL_LOOP_MAX_ROUNDS} 轮。" +
+                            "「帮我打个电话」这类多步任务会连续调用工具，轮次太小会在中途被硬切断；" +
+                            "调大的代价是耗时与 token 消耗增加。",
+                        color = StradustTheme.colors.textMuted,
+                        fontSize = 12.sp,
+                    )
                 }
 
                 Spacer(Modifier.height(20.dp))
@@ -1215,6 +1351,128 @@ fun SettingsScreen(
                                         callbacks?.onVoiceChange(voice)
                                     },
                                 )
+                            }
+                        }
+                    }
+                }
+
+                // ===== 语音唤醒（离线关键词检测，不联网） =====
+                StradustCard {
+                    var wakeEnabled by remember { mutableStateOf(sm.voiceWakeEnabled) }
+                    var wakeWordsSaved by remember { mutableStateOf(sm.voiceWakeWords) }
+                    var wakeWordsEdit by remember { mutableStateOf(sm.voiceWakeWords) }
+                    var wakeThreshold by remember { mutableFloatStateOf(sm.voiceWakeThreshold) }
+                    var wakePreview by remember { mutableStateOf("") }
+                    var wakeTestMsg by remember { mutableStateOf("") }
+                    var wakeTesting by remember { mutableStateOf(false) }
+
+                    SettingSwitchRow(
+                        icon = Icons.Default.Mic,
+                        title = "语音唤醒（离线）",
+                        subtitle = "常驻听说唤醒词，命中后自动开始对话；模型约 5MB，全程不联网",
+                        checked = wakeEnabled,
+                        onCheckedChange = { on ->
+                            wakeEnabled = on
+                            sm.voiceWakeEnabled = on
+                            if (on) {
+                                val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context, android.Manifest.permission.RECORD_AUDIO
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                if (!granted) {
+                                    (context as? android.app.Activity)?.let { act ->
+                                        androidx.core.app.ActivityCompat.requestPermissions(
+                                            act, arrayOf(android.Manifest.permission.RECORD_AUDIO), 4401
+                                        )
+                                    }
+                                }
+                                com.aicompanion.voice.wake.VoiceWake.start(context)
+                            } else {
+                                com.aicompanion.voice.wake.VoiceWake.stop(context)
+                            }
+                        },
+                    )
+
+                    if (wakeEnabled) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = "唤醒词（多个用逗号分隔；中文会自动转拼音，也可直接写 ni3 hao3）",
+                            color = StradustTheme.colors.textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        androidx.compose.material3.OutlinedTextField(
+                            value = wakeWordsEdit,
+                            onValueChange = { wakeWordsEdit = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedButton(onClick = {
+                                wakeWordsSaved = wakeWordsEdit.trim()
+                                sm.voiceWakeWords = wakeWordsSaved
+                                com.aicompanion.voice.wake.VoiceWake.reload(context)
+                                wakeTestMsg = "已保存，正在用新唤醒词重新监听"
+                            }) { Text("保存唤醒词") }
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedButton(
+                                enabled = !wakeTesting,
+                                onClick = {
+                                    wakeTesting = true
+                                    wakeTestMsg = "录音中…（3 秒，请说唤醒词）"
+                                    val lines = com.aicompanion.voice.wake.VoiceWake
+                                        .keywordLines(context, wakeWordsSaved, wakeThreshold)
+                                    com.aicompanion.voice.wake.VoiceWakeSelfTest
+                                        .recordAndDetect(context, lines, 3) { _, msg ->
+                                            wakeTesting = false
+                                            wakeTestMsg = msg
+                                        }
+                                },
+                            ) { Text(if (wakeTesting) "录音中…" else "录 3 秒试一下") }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "识别用拼音：${wakePreview.ifBlank { "（唤醒词无法转拼音）" }}",
+                            color = StradustTheme.colors.textSecondary,
+                            fontSize = 12.sp,
+                        )
+                        if (wakeTestMsg.isNotBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(wakeTestMsg, color = StradustTheme.colors.primary, fontSize = 12.sp)
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = "灵敏度：${String.format("%.2f", wakeThreshold)}（越小越灵敏，越容易误唤醒）",
+                            color = StradustTheme.colors.textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                        )
+                        Slider(
+                            value = wakeThreshold,
+                            onValueChange = { wakeThreshold = it },
+                            onValueChangeFinished = {
+                                sm.voiceWakeThreshold = wakeThreshold
+                                com.aicompanion.voice.wake.VoiceWake.reload(context)
+                            },
+                            valueRange = 0.05f..0.60f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = StradustTheme.colors.primary,
+                                activeTrackColor = StradustTheme.colors.primary,
+                                inactiveTrackColor = StradustTheme.colors.surfaceContainerHigh,
+                            ),
+                        )
+                        Text(
+                            text = "常驻监听会持续占用麦克风，耗电略高于待机；不用时关掉开关即可。",
+                            color = StradustTheme.colors.textSecondary,
+                            fontSize = 12.sp,
+                        )
+
+                        LaunchedEffect(wakeWordsSaved, wakeThreshold) {
+                            wakePreview = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                com.aicompanion.voice.wake.PinyinConverter
+                                    .toKeywordLines(context, wakeWordsSaved, 3f, wakeThreshold)
+                                    .joinToString("\n")
                             }
                         }
                     }
@@ -2543,7 +2801,7 @@ fun SettingsScreen(
                             Column {
                                 Text("ONNX 本地模型", color = StradustTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                                 Text(
-                                    if (onnxModelReady) "已下载 (${OnnxModelManager.getModelSizeMB(context)}MB)" else "未下载",
+                                    "${OnnxModelManager.describeSource(context)} (${OnnxModelManager.getModelSizeMB(context)}MB)",
                                     color = if (onnxModelReady) StradustTheme.colors.primary else StradustTheme.colors.textMuted,
                                     fontSize = 13.sp,
                                 )
@@ -3068,10 +3326,19 @@ fun SettingsScreen(
                                     ),
                                 )
                                 Text(
-                                    text = "长按模型可拖动位置",
+                                    text = "长按聊天界面里的模型可直接拖动位置",
                                     color = StradustTheme.colors.textMuted,
                                     fontSize = 11.sp,
                                 )
+                                Spacer(Modifier.height(6.dp))
+                                // 实时调整页：拖动定位 + 缩放 + 一键复位，所见即所得。
+                                // 返回后 MainActivity.onResume 会重新读取并应用。
+                                OutlinedButton(
+                                    onClick = { onNavigate("model_adjust") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text("🎯 调整模型位置与大小", fontSize = 13.sp)
+                                }
                             }
                         }
                     }
@@ -3258,6 +3525,56 @@ fun SettingsScreen(
 
                 AnimatedVisibility(visible = expandedSection == "功能入口") {
                     Column(modifier = Modifier.fillMaxWidth()) {
+                // 技能库：所有 App 的 UI 树技能与手写技能的统一入口
+                StradustCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clickable { onNavigate("skills") }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(imageVector = Icons.Default.MenuBook, contentDescription = null, tint = StradustTheme.colors.primary, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "技能库", color = StradustTheme.colors.textPrimary, fontSize = 15.sp)
+                            Text(
+                                text = "各 App 的界面结构（UI 树采集）与手写技能，可查看/编辑/删除",
+                                color = StradustTheme.colors.textMuted,
+                                fontSize = 11.sp,
+                            )
+                        }
+                        Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = StradustTheme.colors.textMuted)
+                    }
+                }
+
+                // 人格画像：看得见的五维 / 行为签名 / 关系状态
+                StradustCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clickable { onNavigate("personality") }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(imageVector = Icons.Default.Psychology, contentDescription = null, tint = StradustTheme.colors.primary, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "人格画像", color = StradustTheme.colors.textPrimary, fontSize = 15.sp)
+                            Text(
+                                text = "五维特质 / 行为签名 / 关系状态",
+                                color = StradustTheme.colors.textMuted,
+                                fontSize = 11.sp,
+                            )
+                        }
+                        Icon(imageVector = Icons.Default.ChevronRight, contentDescription = null, tint = StradustTheme.colors.textMuted)
+                    }
+                }
+
                 // iLink 微信绑定
                 StradustCard(
                     modifier = Modifier
@@ -3724,9 +4041,12 @@ private fun SectionTitle(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(8.dp))
             .clickable(role = Role.Button) { onToggle() }
-            .padding(bottom = 8.dp, top = 8.dp),
+            // 上留白大于下留白：分组之间要"断开"，组内标题与内容要"贴上"，
+            // 这样二十几个分组连续滚动时才不会糊成一片。
+            .padding(top = 16.dp, bottom = 6.dp),
     ) {
         Icon(icon, null, tint = StradustTheme.colors.primary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
@@ -3759,10 +4079,14 @@ private fun SettingSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // 原来没有最小行高也没有上下内边距：行高只由文字撑开（约 36dp），
+            // 一屏塞十几行，标题与副标题紧贴，这就是"太紧凑"的直接来源。
+            .heightIn(min = 56.dp)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-            ) { onCheckedChange(!checked) },
+            ) { onCheckedChange(!checked) }
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = StradustTheme.colors.secondary, modifier = Modifier.size(20.dp))
@@ -3774,12 +4098,15 @@ private fun SettingSwitchRow(
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp,
             )
+            Spacer(Modifier.height(2.dp))
             Text(
                 text = subtitle,
                 color = StradustTheme.colors.textMuted,
                 fontSize = 12.sp,
+                lineHeight = 16.sp,
             )
         }
+        Spacer(Modifier.width(8.dp))
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,

@@ -252,7 +252,7 @@ private fun WakeUpTaskItemCard(
                                 Text(
                                     text = "默认",
                                     color = StradustTheme.colors.tertiary,
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                 )
                             }

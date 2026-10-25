@@ -63,13 +63,83 @@ class AIActionManager(private val context: Context) {
         return PluginRegistry.getEnabledDefinitions()
     }
 
+    /**
+     * 工具执行唯一入口：所有模型发起的工具调用都过这里。
+     *
+     * 在这里串了三件事（顺序有意义）：
+     * 1. 把调用翻成人话并登记到 [AgentBus] —— 用户界面上能看见 AI 在干什么；
+     * 2. [ToolPolicy] 闸门 —— 不可逆的动作要用户点头，自毁动作直接拒；
+     * 3. 记录耗时与结果 —— 失败原因回给模型，让它自己纠正而不是硬编"成功了"。
+     */
     suspend fun executeTool(name: String, arguments: String): String {
+        val summary = com.aicompanion.agent.ToolNarrator.narrate(name, arguments)
         return try {
-            PluginRegistry.executePlugin(name, arguments)
+            when (val decision = com.aicompanion.agent.ToolPolicy.check(name, arguments)) {
+                is com.aicompanion.agent.ToolPolicy.Decision.Deny -> {
+                    val id = com.aicompanion.agent.AgentBus.begin(name, summary)
+                    com.aicompanion.agent.AgentBus.markStatus(
+                        id, com.aicompanion.agent.AgentBus.Status.DENIED, decision.reason
+                    )
+                    AppLogger.w(TAG, "拦截 $name：${decision.reason}")
+                    "已拒绝执行：${decision.reason}。换一个不违反这条限制的做法，或直接告诉用户。"
+                }
+
+                is com.aicompanion.agent.ToolPolicy.Decision.Confirm -> {
+                    val id = com.aicompanion.agent.AgentBus.begin(name, summary)
+                    com.aicompanion.agent.AgentBus.markStatus(
+                        id, com.aicompanion.agent.AgentBus.Status.WAIT_CONFIRM, decision.reason
+                    )
+                    val allow = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        com.aicompanion.agent.AgentBus.requestConfirm(summary, decision.reason)
+                    }
+                    if (!allow) {
+                        AppLogger.w(TAG, "用户未确认 $name：$summary")
+                        "用户没有允许「$summary」（${decision.reason}）。这件事不要重试，" +
+                            "可以问用户要不要换成别的方式，或让他自己动手。"
+                    } else {
+                        runToolInternal(id, name, arguments)
+                    }
+                }
+
+                is com.aicompanion.agent.ToolPolicy.Decision.Allow -> {
+                    val id = com.aicompanion.agent.AgentBus.begin(name, summary)
+                    runToolInternal(id, name, arguments)
+                }
+            }
         } catch (e: Exception) {
             AppLogger.e(TAG, "executeTool $name failed: ${e.message}")
             "工具执行失败: ${e.message}"
         }
+    }
+
+    private suspend fun runToolInternal(id: String, name: String, arguments: String): String {
+        val t0 = System.currentTimeMillis()
+        return try {
+            val out = PluginRegistry.executePlugin(name, arguments)
+            // 工具"正常返回"不等于"做成了"：没有通道、回读不符、目标不存在都是失败，
+            // 但都会以字符串形式返回。活动条如果一律记 OK，用户看到的就是假成功。
+            val failed = looksLikeFailure(out)
+            com.aicompanion.agent.AgentBus.finish(
+                id, !failed, out.lineSequence().firstOrNull().orEmpty(), System.currentTimeMillis() - t0
+            )
+            out
+        } catch (e: Exception) {
+            com.aicompanion.agent.AgentBus.finish(
+                id, false, e.message ?: e.javaClass.simpleName, System.currentTimeMillis() - t0
+            )
+            throw e
+        }
+    }
+
+    /** 结果文本是否表达"没做成"（工具层用字符串表达失败，这里统一识别） */
+    private fun looksLikeFailure(out: String): Boolean {
+        if (out.isBlank()) return false
+        val head = out.lineSequence().firstOrNull().orEmpty()
+        val markers = listOf(
+            "没有 shell 通道", "错误：", "无法确认", "失败", "没找到", "未找到", "不支持",
+            "通道未建立", "网关未连接", "回读值与期望不符", "没有日历权限",
+        )
+        return markers.any { head.contains(it) }
     }
 
     fun setAlarm(info: AlarmInfo): String {

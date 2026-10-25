@@ -2,6 +2,7 @@ package com.aicompanion.search
 
 import android.content.Context
 import com.aicompanion.settings.SettingsManager
+import com.aicompanion.util.AppLogger
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -23,27 +24,55 @@ class WebSearchEngine(context: Context) {
         .readTimeout(5, TimeUnit.SECONDS)
         .build()
 
+    /** DDG 在国内基本不可达：只给 3 秒，超时立刻放弃，别拖慢整次搜索 */
+    private val ddgClient = OkHttpClient.Builder()
+        .connectTimeout(3, TimeUnit.SECONDS)
+        .readTimeout(3, TimeUnit.SECONDS)
+        .build()
+
+    /**
+     * 搜索调度（按“实际可达性”排序，不再按配置项硬排）。
+     *
+     * 实测（国内网络）：DuckDuckGo 的 html 端点直接超时不可达，
+     * 原来把它排在第一位，等于每次查询先白等 5s 再回退。
+     * 现在的顺序：Bing API（有 key）→ Bing 网页（快）→ 百度（全）→ DDG（兜底）。
+     */
     fun search(query: String): SearchResult {
+        val t0 = System.currentTimeMillis()
+        val r = searchInternal(query)
+        AppLogger.i(
+            "WebSearchEngine",
+            "搜索「${query.take(20)}」源=${r.error ?: "ok"} 条数=${r.results.size} 耗时=${System.currentTimeMillis() - t0}ms"
+        )
+        return r
+    }
+
+    private fun searchInternal(query: String): SearchResult {
         val provider = settings.searchProvider
-        val apiEnabled = settings.searchEnabled && provider != "duckduckgo"
-        val hasApiKey = settings.searchApiKey.isNotBlank()
+        val hasApiKey = settings.searchEnabled && settings.searchApiKey.isNotBlank()
 
-        if (apiEnabled && hasApiKey) {
-            return when (provider) {
-                "bing" -> searchBingApi(query)
-                else -> searchDuckDuckGo(query)
-            }
+        // 1) 配了 Bing API：最稳，直接用
+        if (hasApiKey) {
+            val r = searchBingApi(query)
+            if (r.success && r.results.isNotEmpty()) return r
         }
 
+        // 2) 用户显式选了百度：优先它
         if (provider == "baidu") {
-            return searchBaidu(query)
+            val r = searchBaidu(query)
+            if (r.success && r.results.isNotEmpty()) return r
         }
 
-        val result = searchDuckDuckGo(query)
-        if (!result.success || result.results.isEmpty()) {
-            return searchBingFallback(query)
-        }
-        return result
+        // 3) Bing 网页（国内可达、响应快）
+        val bing = searchBingFallback(query)
+        if (bing.success && bing.results.isNotEmpty()) return bing
+
+        // 4) 百度兜底
+        val baidu = searchBaidu(query)
+        if (baidu.success && baidu.results.isNotEmpty()) return baidu
+
+        // 5) DuckDuckGo：国内通常不可达，只做最后兜底
+        return searchDuckDuckGo(query)
     }
 
     fun searchAndSummarize(query: String): String {
@@ -122,7 +151,9 @@ class WebSearchEngine(context: Context) {
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return searchDuckDuckGo(query)
+                if (!response.isSuccessful) {
+                    return SearchResult(success = false, results = emptyList(), error = "Bing API HTTP ${response.code}")
+                }
 
                 val json = JSONObject(response.body?.string() ?: "{}")
                 val webPages = json.optJSONObject("webPages")
@@ -157,14 +188,16 @@ class WebSearchEngine(context: Context) {
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return searchDuckDuckGo(query)
+                if (!response.isSuccessful) {
+                    return SearchResult(success = false, results = emptyList(), error = "Bing API HTTP ${response.code}")
+                }
 
                 val html = response.body?.string() ?: ""
                 val results = parseBaiduResults(html)
-                SearchResult(success = true, results = results)
+                SearchResult(success = results.isNotEmpty(), results = results)
             }
         } catch (e: Exception) {
-            searchDuckDuckGo(query)
+            SearchResult(success = false, results = emptyList(), error = "百度搜索失败: ${e.message}")
         }
     }
 
@@ -179,7 +212,7 @@ class WebSearchEngine(context: Context) {
                 .get()
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            ddgClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     return SearchResult(success = false, results = emptyList(), error = "搜索服务暂时不可用")
                 }
@@ -270,21 +303,40 @@ class WebSearchEngine(context: Context) {
         return results.ifEmpty { parseBingResults(html) }
     }
 
+    /**
+     * 解析 Bing 结果页。
+     *
+     * 原来用全局正则「h2 + 后面的第一个 <p>」，实测一页只能命中 2 条，
+     * 且标题与摘要会错位（标题和摘要取自不同结果）。
+     * 改成按 `class="b_algo"` 分块（每块就是一条结果），块内再取标题/摘要/链接。
+     */
     private fun parseBingResults(html: String): List<SearchResultItem> {
         val results = mutableListOf<SearchResultItem>()
+        val seen = mutableSetOf<String>()
         try {
-            val titlePattern = "<h2[^>]*>.*?<a[^>]*href=\"([^\"]*)\"[^>]*>(.*?)</a>.*?</h2>".toRegex(RegexOption.DOT_MATCHES_ALL)
-            val snippetPattern = "<p[^>]*>(.*?)</p>".toRegex(RegexOption.DOT_MATCHES_ALL)
+            val blocks = html.split("class=\"b_algo").drop(1).take(12)
+            for (block in blocks) {
+                val linkMatch = Regex("<a[^>]*href=\"(https?://[^\"]+)\"", RegexOption.IGNORE_CASE)
+                    .find(block) ?: continue
+                val link = linkMatch.groupValues[1]
+                    .substringBefore("&amp;")
+                    .let { if (it.startsWith("https://www.bing.com/ck/")) "" else it }
+                if (link.isBlank() || !seen.add(link)) continue
 
-            val titles = titlePattern.findAll(html).take(5).toList()
-            val snippets = snippetPattern.findAll(html).take(5).toList()
+                val titleRaw = Regex("<h2[^>]*>(.*?)</h2>", RegexOption.DOT_MATCHES_ALL).find(block)
+                    ?.let { stripHtml(it.groupValues[1]) }
+                    .orEmpty()
+                val snippetRaw = listOf(
+                    "<div[^>]*class=\"b_caption\"[^>]*>(.*?)</div>",
+                    "<p[^>]*>(.*?)</p>",
+                ).firstNotNullOfOrNull { p ->
+                    Regex(p, RegexOption.DOT_MATCHES_ALL).find(block)?.let { stripHtml(it.groupValues[1]) }
+                }.orEmpty()
 
-            for (i in titles.indices) {
-                val titleMatch = titles[i]
-                val link = titleMatch.groupValues[1]
-                val title = stripHtml(titleMatch.groupValues[2])
-                val snippet = if (i < snippets.size) stripHtml(snippets[i].groupValues[1]) else ""
-                results.add(SearchResultItem(title = title, snippet = snippet, link = link))
+                val title = titleRaw.ifBlank { link.substringAfter("//").substringBefore("/") }
+                if (title.isBlank()) continue
+                results.add(SearchResultItem(title = title, snippet = snippetRaw, link = link))
+                if (results.size >= 8) break
             }
         } catch (_: Exception) {}
         return results

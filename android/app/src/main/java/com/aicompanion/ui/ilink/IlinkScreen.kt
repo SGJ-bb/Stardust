@@ -2,6 +2,7 @@ package com.aicompanion.ui.ilink
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,12 +35,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicompanion.ilink.IlinkAuthManager
 import com.aicompanion.ilink.IlinkPollingService
 import com.aicompanion.ilink.QrcodeStatus
+import com.aicompanion.ilink.WechatBindActivity
 import com.aicompanion.theme.StradustTheme
 import com.aicompanion.ui.components.ButtonVariant
 import com.aicompanion.ui.components.StradustButton
@@ -48,6 +52,8 @@ import com.aicompanion.ui.components.StradustTopBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 private const val DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com"
 
@@ -83,6 +89,16 @@ fun IlinkScreen(onBackClick: () -> Unit = {}) {
     var refreshTick by remember { mutableStateOf(0) }
     var tokenInput by remember { mutableStateOf("") }
     var botIdInput by remember { mutableStateOf("") }
+
+    // 从扫码绑定页（WechatBindActivity）返回时刷新绑定状态
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // 监听服务运行状态
     var isListening by remember { mutableStateOf(false) }
@@ -233,11 +249,26 @@ fun IlinkScreen(onBackClick: () -> Unit = {}) {
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "输入微信 iLink Bot Token 与 Bot ID 完成绑定",
+                        text = "推荐使用微信扫码绑定，无需手动填写 Token",
                         color = StradustTheme.colors.textMuted,
                         fontSize = 12.sp,
                     )
                     Spacer(Modifier.height(12.dp))
+                    StradustButton(
+                        text = "扫码绑定",
+                        onClick = {
+                            context.startActivity(Intent(context, WechatBindActivity::class.java))
+                        },
+                        variant = ButtonVariant.OUTLINED,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "或手动输入 Bot 信息：",
+                        color = StradustTheme.colors.textMuted,
+                        fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
                     StradustInput(
                         value = tokenInput,
                         onValueChange = { tokenInput = it },

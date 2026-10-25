@@ -1,6 +1,7 @@
 package com.aicompanion.ui.capsule
 
 import android.content.Context
+import com.aicompanion.ui.components.StradustEmptyState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -225,39 +226,12 @@ fun TimeCapsuleScreen(
 /** 空状态 */
 @Composable
 private fun EmptyCapsuleState() {
-    Column(
+    StradustEmptyState(
+        emoji = "✉️",
+        title = "还没有时光胶囊",
+        hint = "点击右下角按钮给未来的自己写一封信",
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(StradustTheme.colors.surfaceContainerLow, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Default.Email,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = StradustTheme.colors.textMuted,
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = "还没有时光胶囊",
-            color = StradustTheme.colors.textPrimary,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 17.sp,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "点击右下角按钮给未来的自己写一封信 ✉️",
-            color = StradustTheme.colors.textMuted,
-            fontSize = 14.sp,
-        )
-    }
+    )
 }
 
 /** 分组标题 */
