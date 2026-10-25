@@ -3,8 +3,6 @@ package com.aicompanion.virtualworld
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import com.aicompanion.memory.MemoryManager
 import com.aicompanion.memory.MemoryPool
 import com.aicompanion.memory.MemoryEntry
@@ -65,23 +63,8 @@ class VirtualWorldManager(private val context: Context, worldId: String = "") {
     private val globalPrefs: SharedPreferences =
         context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
 
-    private val securePrefs: SharedPreferences by lazy {
-        try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            EncryptedSharedPreferences.create(
-                context,
-                "companion_secure_prefs",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: Exception) {
-            com.aicompanion.util.AppLogger.e(TAG, "EncryptedSharedPreferences unavailable: ${e.message}")
-            context.getSharedPreferences("companion_secure_fallback", Context.MODE_PRIVATE)
-        }
-    }
+    private val securePrefs: SharedPreferences get() =
+        com.aicompanion.settings.SecurePrefsHelper.get(context)
 
     /** 虚拟世界专用记忆池 */
     val vwMemoryPool: VirtualWorldMemoryPool by lazy {

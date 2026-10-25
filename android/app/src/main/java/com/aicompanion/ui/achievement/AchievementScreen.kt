@@ -1,6 +1,7 @@
 package com.aicompanion.ui.achievement
 
 import androidx.compose.foundation.background
+import com.aicompanion.ui.components.StradustEmptyState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -326,23 +327,12 @@ fun AchievementScreen(
                 // 分类筛选后空状态
                 if (filteredAchievements.isEmpty()) {
                     item {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Icon(
-                                Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = StradustTheme.colors.textMuted,
-                                modifier = Modifier.size(48.dp),
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                "该分类暂无成就",
-                                color = StradustTheme.colors.textMuted,
-                                fontSize = 14.sp,
-                            )
-                        }
+                        StradustEmptyState(
+                            emoji = "🔒",
+                            title = "该分类暂无成就",
+                            hint = "换个分类看看，或者继续和 TA 相处来解锁",
+                            compact = true,
+                        )
                     }
                 }
 

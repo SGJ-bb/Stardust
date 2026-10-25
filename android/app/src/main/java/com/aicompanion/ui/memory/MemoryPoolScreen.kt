@@ -47,7 +47,33 @@ import com.aicompanion.ui.components.StradustTopBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private const val PERSONA_ID = "default"
+private fun resolveActivePersonaId(context: android.content.Context): String {
+    val raw = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+        .getString("active_persona_id", null) ?: "default"
+    return if (raw.matches(Regex("^[a-zA-Z0-9_\\-]+$"))) raw else "default"
+}
+
+private data class PersonaOption(val id: String, val name: String)
+
+private fun loadPersonaOptions(context: android.content.Context): List<PersonaOption> {
+    val options = mutableListOf<PersonaOption>()
+    try {
+        val pm = com.aicompanion.persona.PersonaManager(context)
+        pm.load()
+        val personas = pm.getAllPersonas()
+        if (personas.isNotEmpty()) {
+            personas.forEach { p ->
+                options.add(PersonaOption(p.id, p.name.ifBlank { p.id }))
+            }
+        }
+    } catch (_: Exception) {
+    }
+    if (options.isEmpty()) {
+        val active = resolveActivePersonaId(context)
+        options.add(PersonaOption(active, if (active == "default") "默认角色" else active))
+    }
+    return options
+}
 
 private enum class MemoryTab(val label: String) {
     SCENE("场景记忆池"),
@@ -85,14 +111,26 @@ private data class MemoryPoolUiState(
 @Composable
 fun MemoryPoolScreen(onBackClick: () -> Unit = {}) {
     val context = LocalContext.current
-    val scenePool = remember { MemoryPool(context, PERSONA_ID) }
-    val globalPool = remember { GlobalMemoryPool(context, PERSONA_ID) }
+    val personaOptions = remember { loadPersonaOptions(context) }
+    val activeId = remember { resolveActivePersonaId(context) }
+    var selectedPersonaId by remember { mutableStateOf(activeId) }
+    // 记忆池实例必须随选中角色重建，确保数据完全隔离
+    var scenePool by remember { mutableStateOf(MemoryPool(context, selectedPersonaId)) }
+    var globalPool by remember { mutableStateOf(GlobalMemoryPool(context, selectedPersonaId)) }
     val sessionManager = remember { SessionManager(context) }
     var refreshTick by remember { mutableStateOf(0) }
     var selectedTab by remember { mutableStateOf(MemoryTab.SCENE) }
 
+    fun selectPersona(id: String) {
+        if (id == selectedPersonaId) return
+        selectedPersonaId = id
+        scenePool = MemoryPool(context, id)
+        globalPool = GlobalMemoryPool(context, id)
+        refreshTick++
+    }
+
     // 预计算各 Tab 数据（异步加载，避免组合期同步 IO）
-    val uiState by produceState(MemoryPoolUiState(), refreshTick) {
+    val uiState by produceState(MemoryPoolUiState(), refreshTick, selectedPersonaId) {
         value = withContext(Dispatchers.IO) {
             MemoryPoolUiState(
                 sceneEntries = scenePool.getAll(),
@@ -113,6 +151,44 @@ fun MemoryPoolScreen(onBackClick: () -> Unit = {}) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item { StradustTopBar(title = "记忆管理", onBackClick = onBackClick) }
             item { Spacer(Modifier.height(12.dp)) }
+
+            // 角色选择：横向chips，默认选中当前激活角色，各角色记忆池完全隔离
+            if (personaOptions.size > 1) {
+                item {
+                    androidx.compose.foundation.lazy.LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(personaOptions.size, key = { personaOptions[it].id }) { index ->
+                            val option = personaOptions[index]
+                            val isSelected = option.id == selectedPersonaId
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        if (isSelected) StradustTheme.colors.primary
+                                        else StradustTheme.colors.surfaceContainerLow,
+                                        RoundedCornerShape(10.dp),
+                                    )
+                                    .clickable { selectPersona(option.id) }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                            ) {
+                                Text(
+                                    text = option.name + if (option.id == activeId) " (当前)" else "",
+                                    color = if (isSelected) StradustTheme.colors.onPrimary
+                                    else StradustTheme.colors.textSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(12.dp)) }
+            }
 
             // Tab 切换栏
             item {
@@ -225,6 +301,9 @@ private fun LazyListScope.sceneContent(
             StatRow(label = "字符数", value = "$charCount")
             Spacer(Modifier.height(6.dp))
             StatRow(label = "状态", value = stats)
+            Spacer(Modifier.height(6.dp))
+            // 分层统计：让用户看到"近期细节 / 过去要点 / 长期印象"各有多少
+            StatRow(label = "分层", value = com.aicompanion.memory.TieredMemory.stats(entries))
             Spacer(Modifier.height(12.dp))
             StradustButton(
                 text = "清空记忆池",
@@ -256,13 +335,53 @@ private fun LazyListScope.sceneContent(
         }
     }
 
-    items(entries.size, key = { entries[it].id }) { index ->
-        val entry = entries[index]
-        MemoryEntryItem(
-            entry = entry,
-            onDelete = { onDelete(entry.id) },
-        )
-        Spacer(Modifier.height(8.dp))
+    // 按记忆分层分组显示：近的在上（细节多），远的在下（只有结论）
+    val active = entries.filter { !it.archived }
+    val groups = listOf(
+        Triple(
+            com.aicompanion.memory.MemoryTier.EPISODIC,
+            "最近 · 记得细节",
+            "7 天内的事，能具体回忆"
+        ),
+        Triple(
+            com.aicompanion.memory.MemoryTier.CONSOLIDATED,
+            "要点 · 细节已模糊",
+            "7~30 天，只留结论"
+        ),
+        Triple(
+            com.aicompanion.memory.MemoryTier.SEMANTIC,
+            "长期印象 · 稳定事实",
+            "30 天以上，抽象成对人的了解"
+        ),
+    )
+    groups.forEach { (tier, title, hint) ->
+        val list = active.filter { it.tier == tier }.sortedByDescending { it.timestamp }
+        if (list.isEmpty()) return@forEach
+        item(key = "hdr_${tier.name}") {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp)) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "$title · ${list.size}",
+                    color = StradustTheme.colors.textPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = hint,
+                    color = StradustTheme.colors.textMuted,
+                    fontSize = 11.sp,
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+        items(list.size, key = { list[it].id }) { index ->
+            val entry = list[index]
+            MemoryEntryItem(
+                entry = entry,
+                onDelete = { onDelete(entry.id) },
+            )
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
 
@@ -287,6 +406,9 @@ private fun LazyListScope.globalContent(
             StatRow(label = "总条数", value = "$size")
             Spacer(Modifier.height(6.dp))
             StatRow(label = "状态", value = stats)
+            Spacer(Modifier.height(6.dp))
+            // 分层统计：让用户看到"近期细节 / 过去要点 / 长期印象"各有多少
+            StatRow(label = "分层", value = com.aicompanion.memory.TieredMemory.stats(entries))
             Spacer(Modifier.height(12.dp))
             StradustButton(
                 text = "清空全局记忆",
@@ -434,6 +556,14 @@ private fun MemoryEntryItem(entry: MemoryEntry, onDelete: () -> Unit) {
                         color = StradustTheme.colors.textMuted,
                         fontSize = 11.sp,
                     )
+                    Spacer(Modifier.width(12.dp))
+                    // 清晰度：按遗忘曲线算出来的"现在还记得多清楚"
+                    Text(
+                        text = com.aicompanion.memory.TieredMemory.clarityLabel(entry),
+                        color = if (com.aicompanion.memory.TieredMemory.strengthOf(entry) >= 0.5f)
+                            StradustTheme.colors.primary else StradustTheme.colors.textMuted,
+                        fontSize = 11.sp,
+                    )
                 }
                 if (entry.place.isNotBlank() || entry.people.isNotBlank() || entry.event.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
@@ -497,7 +627,7 @@ private fun SessionItem(session: SessionInfo, isCurrent: Boolean) {
                             Text(
                                 text = "当前",
                                 color = StradustTheme.colors.tertiary,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                             )
                         }
@@ -567,7 +697,7 @@ private fun CategoryTag(text: String) {
         Text(
             text = text,
             color = StradustTheme.colors.primary,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
         )
     }

@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="layout_quote_bar" type="id" />
+
+    <!-- 主题绑定器用：记录视图已识别的主题令牌，保证重复上色不漂移、切主题能重算 -->
+    <item name="st_token_bg" type="id" />
+    <item name="st_token_text" type="id" />
+    <item name="st_token_hint" type="id" />
+    <item name="st_token_tint" type="id" />
+    <item name="st_token_tint2" type="id" />
+    <item name="st_token_bgtint" type="id" />
+    <item name="st_token_stroke" type="id" />
+    <!-- 标记 RecyclerView 已挂载子项监听，避免重复挂载 -->
+    <item name="st_rv_hooked" type="id" />
 </resources>

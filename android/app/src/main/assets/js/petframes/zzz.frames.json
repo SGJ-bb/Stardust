@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "name": "zzz",
+  "sheet": "zzz.sheet.png",
+  "fps": 8.0,
+  "loop": true,
+  "frameW": 240,
+  "frameH": 214,
+  "cols": 10,
+  "rows": 1,
+  "count": 10,
+  "space": "zone",
+  "blend": "overlay",
+  "source": "F:\\image2psd2live\\pet\\assets\\frames\\src_zzz",
+  "frames": [
+    "000.png",
+    "001.png",
+    "002.png",
+    "003.png",
+    "004.png",
+    "005.png",
+    "006.png",
+    "007.png",
+    "008.png",
+    "009.png"
+  ],
+  "anchor": [
+    0.5,
+    0.5
+  ],
+  "attach": "head",
+  "scaleK": 0.95,
+  "offset": [
+    0.55,
+    -0.55
+  ],
+  "canvas": [
+    240,
+    214
+  ]
+}

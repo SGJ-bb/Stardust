@@ -323,7 +323,7 @@ private fun MilestoneItemCard(
                             Text(
                                 text = if (isAchieved) "已达成" else "未达成",
                                 color = if (isAchieved) StradustTheme.colors.tertiary else StradustTheme.colors.textMuted,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                             )
                         }

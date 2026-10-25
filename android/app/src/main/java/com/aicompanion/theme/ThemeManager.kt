@@ -182,12 +182,19 @@ object ThemeManager {
     // ===== 配色方案 (原有功能保留) =====
 
     fun getCurrentScheme(context: Context): ColorScheme {
+        // 修复：设置页写入的是 ThemeId.key（sakura/ocean/tea…），而本类 schemes 的 id 是
+        // sakura_grad/blue_grad…，命名不一致会让 find 恒为 null 并回退 schemes[0]（樱花粉），
+        // 表现为"换了主题但 XML 页面不跟随"。改为统一从 ThemeBridge 解析当前主题。
         return try {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val currentId = prefs.getString(KEY_THEME_SCHEME, "sakura_grad") ?: "sakura_grad"
-            schemes.find { it.id == currentId } ?: schemes[0]
+            ThemeBridge.toLegacyScheme(context)
         } catch (e: Exception) {
-            schemes[0]
+            try {
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val currentId = prefs.getString(KEY_THEME_SCHEME, "sakura_grad") ?: "sakura_grad"
+                schemes.find { it.id == currentId } ?: schemes[0]
+            } catch (_: Exception) {
+                schemes[0]
+            }
         }
     }
 
@@ -202,15 +209,9 @@ object ThemeManager {
      * 用于覆盖 DayNight 主题无法控制的区域（状态栏、导航栏、背景）
      */
     fun applyTheme(activity: Activity) {
-        val scheme = getCurrentScheme(activity)
+        // 统一走 ThemeBridge，保证状态栏/导航栏/窗口底色与 Compose 侧当前主题一致
         try {
-            activity.window.statusBarColor = safeColor(scheme.toolbarColor)
-        } catch (_: Exception) {}
-        try {
-            activity.window.navigationBarColor = safeColor(scheme.toolbarColor)
-        } catch (_: Exception) {}
-        try {
-            activity.window.decorView.setBackgroundColor(safeColor(scheme.backgroundDark))
+            ThemeBridge.applyToActivity(activity)
         } catch (_: Exception) {}
     }
 
@@ -277,9 +278,19 @@ object ThemeManager {
                 // 每个 Activity 恢复时自动应用配色方案
                 if (!isThemeActivity(activity)) {
                     applyTheme(activity)
+                    // 视图树重着色：切主题后返回本页即时生效
+                    ViewThemeBinder.bindTree(activity.window.decorView, activity)
                 }
             }
-            override fun onActivityCreated(activity: Activity, savedInstanceState: android.os.Bundle?) {}
+            override fun onActivityCreated(activity: Activity, savedInstanceState: android.os.Bundle?) {
+                if (isThemeActivity(activity)) return
+                // onCreate 结束时视图已 inflate 但尚未绘制 —— 此刻上色可实现「零闪烁」
+                try {
+                    ViewThemeBinder.bindTree(activity.window.decorView, activity)
+                    // 包装 inflater：此后 inflate 的 Dialog / Popup / 动态条目自动跟随主题
+                    ViewThemeBinder.installInflaterHook(activity)
+                } catch (_: Throwable) {}
+            }
             override fun onActivityStarted(activity: Activity) {}
             override fun onActivityPaused(activity: Activity) {}
             override fun onActivityStopped(activity: Activity) {}

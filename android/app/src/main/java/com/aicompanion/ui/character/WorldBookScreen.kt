@@ -318,7 +318,7 @@ private fun WorldBookItem(
                         Text(
                             text = "${worldInfo.entries.size} 条",
                             color = StradustTheme.colors.onPrimaryContainer,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                         )
                     }

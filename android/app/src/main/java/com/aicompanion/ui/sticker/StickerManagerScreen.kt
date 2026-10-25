@@ -460,7 +460,7 @@ private fun StickerGridItem(
                     }
                 },
                 color = StradustTheme.colors.textMuted,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

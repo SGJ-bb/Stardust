@@ -18,6 +18,16 @@ class OnnxEmbedder(private val context: Context) : RagEmbedder {
         private const val ASSETS_MODEL_DIR = "models/bge-small-zh-v1.5"
         const val EMBEDDING_DIM = 512
         private const val MAX_SEQ_LEN = 512
+
+        /**
+         * 本机上 ONNX Runtime 是否彻底不可用（.so 与 sherpa 冲突时会是 Error 而非 Exception）。
+         * 一旦置位就不再尝试，避免每次检索都重启一次 24MB 模型的加载流程。
+         */
+        @Volatile
+        var unavailable: Boolean = false
+            private set
+
+        internal fun markUnavailable() { unavailable = true }
     }
 
     private val inferenceLock = Any()
@@ -141,8 +151,19 @@ class OnnxEmbedder(private val context: Context) : RagEmbedder {
             tokenizer = vocabFile.inputStream().use { BertTokenizer(it) }
             AppLogger.i(TAG, "Tokenizer loaded, vocab size check passed")
 
-            // 创建 ONNX Runtime 环境
-            env = OrtEnvironment.getEnvironment()
+            // 创建 ONNX Runtime 环境。
+            // 这一步可能直接抛 NoClassDefFoundError / UnsatisfiedLinkError：
+            // 本工程里 sherpa-onnx 的 libonnxruntime.so 与 onnxruntime-android 的
+            // libonnxruntime4j_jni.so 是两套构建，pickFirst 保留下来的那份对上 JNI 会失败。
+            // 那是 Error 不是 Exception，不单独兜住就会一路 FATAL 掉整个进程。
+            env = try {
+                OrtEnvironment.getEnvironment()
+            } catch (t: Throwable) {
+                AppLogger.e(TAG, "ONNX Runtime 不可用（${t.javaClass.simpleName}: ${t.message}），本地嵌入将不可用")
+                initFailed = true
+                markUnavailable()
+                return false
+            }
 
             // 创建 Session
             val sessionOptions = OrtSession.SessionOptions().apply {
@@ -168,6 +189,13 @@ class OnnxEmbedder(private val context: Context) : RagEmbedder {
         } catch (e: Exception) {
             AppLogger.e(TAG, "Failed to initialize ONNX embedder: ${e.message}")
             initFailed = true
+            release()
+            return false
+        } catch (t: Throwable) {
+            // Error 也要兜住（NoClassDefFoundError / UnsatisfiedLinkError）
+            AppLogger.e(TAG, "ONNX embedder 初始化失败(${t.javaClass.simpleName}): ${t.message}")
+            initFailed = true
+            markUnavailable()
             release()
             return false
         }

@@ -20,6 +20,27 @@ class BootReceiver : BroadcastReceiver() {
             taskManager.rescheduleOnBoot()
 
             val settingsManager = SettingsManager(context)
+
+            // 语音唤醒：开机自启（受设置开关控制，缺录音权限时服务自己会提示）
+            if (settingsManager.voiceWakeEnabled) {
+                com.aicompanion.voice.wake.VoiceWake.start(context)
+            }
+
+            // 无障碍自愈：正常情况系统会自己恢复，但个别 ROM 在重启/覆盖安装后会关掉开关。
+            // 有 WRITE_SECURE_SETTINGS（一次性授予、重启保留）就自己写回，用户不用再碰电脑。
+            val pending = goAsync()
+            Thread {
+                try {
+                    // 等无障碍管理器初始化完（太早写会被系统覆盖）
+                    Thread.sleep(8_000)
+                    val r = com.aicompanion.screen.A11ySelfHeal.heal(context.applicationContext)
+                    Log.i("BootReceiver", "无障碍自愈: $r (当前=${com.aicompanion.screen.A11ySelfHeal.current(context)})")
+                } catch (_: Exception) {
+                } finally {
+                    pending.finish()
+                }
+            }.start()
+
             if (settingsManager.autoStart && settingsManager.backgroundRunning) {
                 try {
                     val serviceIntent = Intent(context, BackgroundService::class.java)

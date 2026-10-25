@@ -1,11 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  flags 说明：
+
+  基础三件套（此前缺失，是「看不到完整 UI 树」的系统级原因之一）：
+  · flagReportViewIds        → 暴露 viewIdResourceName，才能输出 #资源ID 精确定位元素
+  · flagIncludeNotImportantViews → 把标记为 importantForAccessibility=no 的视图也纳入树；
+    许多 App（自绘控件/Compose/混合 WebView）会把整块内容的容器标记为非重要，
+    框架会直接剪掉整棵子树，导致「页面明明全是可点的却没有元素」
+  · flagRetrieveInteractiveWindows → 允许枚举所有窗口，才能读到对话框/弹窗/悬浮窗/输入法
+    这些独立窗口里的内容（典型「点进 App 后拿不到某个板块」）
+
+  加强伪装（2026-10-25 追加，实测结论）：
+  · flagRequestEnhancedWebAccessibility → 保留：WebView 内容会展开成节点，有用
+  · 🚫 flagRequestTouchExplorationMode 已移除：实测对微信**没有任何收益**（会话行照样是空的），
+       而且会把注入的单点手势变成"选中/悬停"，点击失效，反而更糟
+  · 🚫 flagSendMotionEvents 已移除：同上，无收益
+  · android:isAccessibilityTool="true" → API 31+ 自声明为辅助工具，系统放宽部分限制
+-->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeViewLongClicked|typeViewTextChanged"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked|typeViewLongClicked|typeViewTextChanged|typeViewScrolled|typeViewFocused|typeViewSelected|typeAnnouncement"
     android:accessibilityFeedbackType="feedbackAllMask"
-    android:canRetrieveWindowContent="true"
+    android:accessibilityFlags="flagDefault|flagReportViewIds|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows|flagRequestEnhancedWebAccessibility"
     android:canPerformGestures="true"
     android:canRequestEnhancedWebAccessibility="true"
+    android:canRetrieveWindowContent="true"
     android:canTakeScreenshot="true"
     android:description="@string/accessibility_service_description"
+    android:isAccessibilityTool="true"
     android:notificationTimeout="100"
     android:settingsActivity="com.aicompanion.ui.MainActivity" />

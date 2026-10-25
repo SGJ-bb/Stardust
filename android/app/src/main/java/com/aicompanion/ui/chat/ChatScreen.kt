@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import coil.compose.AsyncImage
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,7 +44,6 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Widgets
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import com.aicompanion.theme.StradustTheme
 import com.aicompanion.ui.ChatMessage
 import com.aicompanion.ui.components.StradustInput
@@ -88,7 +89,6 @@ fun ChatScreen(
     // === 现有参数保持不变 ===
     messages: List<ChatMessage> = emptyList(),
     isTyping: Boolean = false,
-    isLoading: Boolean = false,
     onSendMessage: (String) -> Unit = {},
     onStartVoice: () -> Unit = {},
     onStopVoice: () -> Unit = {},
@@ -151,6 +151,16 @@ fun ChatScreen(
     // 记录 LazyColumn 上一次的高度（px），用于检测键盘弹出（高度变小时滚动到底部）
     var previousListHeight by remember { mutableStateOf(0) }
 
+    // 输入栏实测高度（px）。输入栏已从消息区 Column 中提出来、与 Live2D 图层同级，
+    // 所以消息列表要自己留出这块底部空间，否则最后几条消息会被输入栏挡住。
+    val density = LocalDensity.current
+    var inputBarHeightPx by remember { mutableStateOf(0) }
+
+    // Live2D 图层的高度基准（px）。Activity 是 adjustResize，键盘弹出会让整个内容区
+    // 变矮；而 Live2D 图层是全屏的 WebView，跟着变矮就会触发画布重新适配，模型看起来
+    // 被"压扁"而且位置乱跳。这里记住键盘未弹出时的高度并用它撑住图层。
+    var live2dBaseHeightPx by remember { mutableStateOf(0) }
+
     // 从桥接数据解构真实信息
     val (affectionCurrent, affectionMax, affectionLevel) = affectionInfo
     val (weatherIcon, daysLabel) = weatherInfo
@@ -176,8 +186,23 @@ fun ChatScreen(
             listState.animateScrollToItem(messages.lastIndex)
         }
     }
+    // 流式输出：气泡内容在增长但消息条数不变，需要额外跟随滚动（同样只在用户已在底部时）
+    LaunchedEffect(messageVersion) {
+        val last = messages.lastOrNull()
+        if (last != null && last.isPartial && isAtBottom) {
+            listState.scrollToItem(messages.lastIndex)
+        }
+    }
 
-    Box(modifier = Modifier.fillMaxSize().background(colors.background)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .onSizeChanged { size ->
+                // 键盘弹出只会让内容区变矮，所以"取最大值"就等于键盘收起时的高度。
+                if (size.height > live2dBaseHeightPx) live2dBaseHeightPx = size.height
+            }
+    ) {
         // 壁纸层：有壁纸时全屏覆盖
         if (!wallpaperPath.isNullOrBlank()) {
             AsyncImage(
@@ -261,7 +286,13 @@ fun ChatScreen(
                         previousListHeight = size.height
                     },
                 state = listState,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(
+                    start = 12.dp,
+                    top = 8.dp,
+                    end = 12.dp,
+                    // 输入栏浮在消息之上，底部留出它的实测高度
+                    bottom = maxOf(8.dp, with(density) { inputBarHeightPx.toDp() }),
+                ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (messages.isEmpty()) {
@@ -336,31 +367,46 @@ fun ChatScreen(
                     }
                 }
 
-                item {
-                    AnimatedVisibility(
-                        visible = isLoading,
-                        enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it },
-                        exit = fadeOut(tween(100)),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator(
-                                color = colors.primary,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                    }
-                }
             }
 
-            // ===== 输入工具栏 =====
-            // adjustNothing 模式下，外层 Box 用 imePadding() 处理键盘避让，
-            // 输入栏自然贴着键盘上方；底部菜单叠加在窗口底部，被键盘遮挡（不跟随上移）。
-            Column(modifier = Modifier.fillMaxWidth()) {
+        }
+
+        // ===== Live2D 模型层（在气泡上方，长按可拖动） =====
+        // 默认屏幕中间，长按 100ms 进入拖动模式（Live2DCoordinator.setupTouch 实现）
+        if (live2dEnabled) {
+            // 高度锁定为"键盘未弹出时"的内容区高度，这样键盘弹出时 Live2D 图层的几何
+            // 尺寸完全不变（既不压缩也不位移）。顶部对齐保证尺寸波动时模型原点不漂移。
+            val live2dModifier = if (live2dBaseHeightPx > 0) {
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(with(density) { live2dBaseHeightPx.toDp() })
+            } else {
+                // 首帧尚未测量，先按老行为铺满；测量后立即切到锁定高度（两者此时相等）
+                Modifier
+                    .align(Alignment.Center)
+                    .fillMaxSize()
+            }
+            Live2DLayer(
+                viewProvider = live2dViewProvider,
+                onResume = onLive2dResume,
+                onPause = onLive2dPause,
+                modifier = live2dModifier,
+            )
+        }
+
+        // ===== 输入工具栏（层级最高：必须声明在 Live2D 图层之后） =====
+        // 声明顺序即层级：壁纸 → 消息列表 → Live2D 皮套 → 输入栏。
+        // 注意：Compose 的 zIndex 只在同一父节点的兄弟之间生效。输入栏原先嵌在消息
+        // Column 内部、与 Live2D 不同父，所以那个 zIndex 其实从未起作用 —— 全屏的
+        // Live2D WebView 因此盖住输入框并吞掉它的触摸事件（看着透明却点不动）。
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .zIndex(1f)
+                .onSizeChanged { inputBarHeightPx = it.height }
+        ) {
             // 引用回复预览条（显示在输入栏上方）
             if (replyingTo != null) {
                 val onJumpToMessage: (String) -> Unit = { messageId ->
@@ -391,6 +437,9 @@ fun ChatScreen(
                 )
             }
 
+            // Agent 活动条：AI 正在做什么、需要你确认什么（空闲时不占高度）
+            AgentActivityBar()
+
             QqStyleInputBar(
                 text = text,
                 onTextChange = { text = it },
@@ -412,22 +461,7 @@ fun ChatScreen(
                 onChangeWallpaper = onChangeWallpaper,
                 onMoreClick = { showFeaturePanel = true },
             )
-            }
         }
-
-        // ===== Live2D 模型层（在气泡上方，长按可拖动） =====
-        // 默认屏幕中间，长按 100ms 进入拖动模式（Live2DCoordinator.setupTouch 实现）
-        if (live2dEnabled) {
-            Live2DLayer(
-                viewProvider = live2dViewProvider,
-                onResume = onLive2dResume,
-                onPause = onLive2dPause,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxSize(),
-            )
-        }
-
         FeaturePanel(
             show = showFeaturePanel,
             onDismiss = { showFeaturePanel = false },

@@ -82,6 +82,8 @@ class Live2DCoordinator(
         prefs.edit().putFloat("model_scale", clamped).apply()
         modelBaseScale = clamped
         live2dView?.setModelScale(clamped)
+        // 缩放会改变皮套的可见范围，延迟一帧后重新问一次 JS
+        live2dView?.postDelayed({ live2dView?.refreshModelHitRect() }, 250L)
     }
 
     fun hideView() {
@@ -144,6 +146,9 @@ class Live2DCoordinator(
                     val scale = prefs.getFloat("model_scale", 1f)
                     live2dView?.setModelScale(scale.coerceIn(AppConfig.LIVE2D_MODEL_SCALE_MIN, AppConfig.LIVE2D_MODEL_SCALE_MAX))
                     isModelLoaded = true
+                    // 刷新皮套命中范围：让全屏 WebView 只吃掉落在皮套上的触摸，
+                    // 其余放行给聊天列表和输入栏（见 Live2DWebView.onTouchEvent）
+                    live2dView?.postDelayed({ live2dView?.refreshModelHitRect() }, 250L)
                 }
             }
         }
@@ -197,7 +202,7 @@ class Live2DCoordinator(
                             live2dView?.alpha = 0.85f
                         }
                     }
-                    longPressRunnable?.let { handler.postDelayed(it, 100) }
+                    longPressRunnable?.let { handler.postDelayed(it, 350) }
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -213,7 +218,9 @@ class Live2DCoordinator(
                     if (longPressPending) {
                         val dx = Math.abs(event.x - touchDownX)
                         val dy = Math.abs(event.y - touchDownY)
-                        if (dx > 10 || dy > 10) {
+                        // 阈值给足余量：手指按住时的自然抖动在 3x 屏上很容易超过 10px，
+                        // 过严会导致长按永远无法进入拖动状态（表现为"位置拖不动"）。
+                        if (dx > 24 || dy > 24) {
                             longPressRunnable?.let { handler.removeCallbacks(it) }
                             longPressPending = false
                         }
@@ -231,6 +238,7 @@ class Live2DCoordinator(
                             .putFloat("model_offset_x", offsetX)
                             .putFloat("model_offset_y", offsetY)
                             .apply()
+                        Toast.makeText(context, "模型位置已保存", Toast.LENGTH_SHORT).show()
                         return@lambda true
                     }
                     if (longPressPending) {

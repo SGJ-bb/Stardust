@@ -66,6 +66,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         data class NotifyItemRangeRemoved(val positionStart: Int, val itemCount: Int) : UiEvent()
         data class NotifyItemRemoved(val position: Int) : UiEvent()
         data class NotifyItemChanged(val position: Int, val payload: Any? = null) : UiEvent()
+        /** 流式回复：某个气泡内容在增长，刷新该条（不新增消息） */
+        data class OnStreamDelta(val position: Int) : UiEvent()
+        /** 流式回复完成：收尾（统计/情绪/通知），消息已存在，不重复插入 */
+        data class OnStreamCompleted(
+            val position: Int,
+            val msg: ChatMessage,
+            val emotion: Emotion,
+            val action: Action
+        ) : UiEvent()
         data class OnPetMessageAdded(
             val msg: ChatMessage,
             val position: Int,
@@ -112,7 +121,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     var activePersonaId: String = "default"
     var buildIdentity: (() -> com.aicompanion.prompt.IdentityBlock)? = null
 
-    private val _uiEvents = MutableSharedFlow<UiEvent>(extraBufferCapacity = 64)
+    private val _uiEvents = MutableSharedFlow<UiEvent>(extraBufferCapacity = 256)
     val uiEvents: SharedFlow<UiEvent> = _uiEvents.asSharedFlow()
 
     private fun emitEvent(event: UiEvent) {
@@ -350,48 +359,72 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             com.aicompanion.util.AppLogger.e(TAG, "[Chat-RAG] searchMemory检索角色知识库失败: ${e.javaClass.simpleName}: ${e.message} | query='${query.take(30)}'")
         }
 
-        // 2. 搜索短期记忆池(近期对话关键信息)
-        val poolEntries = contextManager?.memoryPool?.getAll() ?: emptyList()
+        // 2. 收集候选：当前场景池 + 跨场景共享记忆 + 已巩固/语义层
+        //    原先只查"当前场景池"，而那个池子经常只有一两条（换人设、换群聊后更少），
+        //    于是出现"明明记得却说没找到"。
+        val candidates = LinkedHashMap<String, String>()
+        fun addCandidate(id: String, content: String) {
+            if (content.isNotBlank()) candidates[id.ifBlank { content.take(24) }] = content
+        }
+        runCatching { contextManager?.memoryPool?.getAll()?.forEach { addCandidate(it.id, it.content) } }
+        runCatching { contextManager?.globalMemoryPool?.snapshot()?.forEach { addCandidate(it.id, it.content) } }
+        runCatching {
+            contextManager?.memoryPool?.allForTiering()
+                ?.filter { !it.archived && it.tier != com.aicompanion.memory.MemoryTier.EPISODIC }
+                ?.forEach { addCandidate(it.id, it.content) }
+        }
+        val poolEntries = candidates.values.toList()
+
         if (poolEntries.isNotEmpty()) {
-            try {
+            var hits: List<String> = emptyList()
+            var source = ""
+            // a) 向量检索。阈值 0.1 → 0.03：TF-IDF 在中文短句上的余弦普遍偏低，
+            //    0.1 会把"用词不同但确实相关"的结果全部滤掉，表现就是永远搜不到。
+            runCatching {
                 val cache = memorySearchCache ?: com.aicompanion.rag.EmbeddingSearchCache(
                     getApplication<Application>(), "memory_pool"
                 ).also { memorySearchCache = it }
-
-                val entries = poolEntries.mapIndexed { i, e -> i.toString() to e.content }
-                cache.buildIndex(entries)
-
-                val results = cache.search(query, topK, 0.1f)
-                if (results.isNotEmpty()) {
-                    if (sb.isNotEmpty()) sb.appendLine()
-                    sb.appendLine("[短期记忆池]")
-                    results.forEach { r ->
-                        sb.appendLine("- ${r.text}")
-                    }
-                }
-            } catch (e: Exception) {
-                val poolTexts = poolEntries.map { it.content }
-                val embedder = com.aicompanion.rag.TfidfEmbedder()
-                embedder.buildVocabulary(poolTexts)
-                val queryVec = embedder.embedSingleSync(query)
-                val vecs = embedder.embedSync(poolTexts)
-                val scored = vecs.mapIndexed { i, v -> i to com.aicompanion.rag.VectorMath.cosineSimilarity(queryVec, v) }
-                    .sortedByDescending { it.second }
-                    .filter { it.second > 0.1f }
-                if (scored.isNotEmpty()) {
-                    if (sb.isNotEmpty()) sb.appendLine()
-                    sb.appendLine("[短期记忆池]")
-                    scored.take(topK).forEach { (i, _) ->
-                        sb.appendLine("- ${poolEntries[i].content}")
-                    }
-                }
+                cache.buildIndex(poolEntries.mapIndexed { i, e -> i.toString() to e })
+                hits = cache.search(query, topK, 0.03f).map { it.text }
+                source = "向量"
+            }
+            // b) 关键词兜底：中文按 2-gram 命中，避免分词/词序差异导致零召回
+            if (hits.isEmpty()) {
+                hits = keywordHits(poolEntries, query, topK)
+                if (hits.isNotEmpty()) source = "关键词"
+            }
+            // c) 仍然为空：给最近几条让模型自己判断，比直接回答"没找到"有用
+            if (hits.isEmpty()) {
+                hits = poolEntries.takeLast(topK).reversed()
+                source = "最近记忆"
+            }
+            if (hits.isNotEmpty()) {
+                if (sb.isNotEmpty()) sb.appendLine()
+                sb.appendLine(if (source == "最近记忆") "[最近的记忆]（没有直接命中，供参考）" else "[相关记忆]")
+                hits.forEach { sb.appendLine("- $it") }
+                com.aicompanion.util.AppLogger.i(
+                    TAG,
+                    "[Chat-Memory] '$query' → ${hits.size} 条（$source / 候选 ${poolEntries.size} 条）",
+                )
             }
         }
 
         if (sb.isEmpty()) {
-            return@withContext "未找到与「$query」相关的记忆。如需查找日记记录，请使用search_diary工具。"
+            return@withContext "未找到与「$query」相关的记忆。注意：记忆池未收录不代表对话中没提过，请优先结合本次会话的聊天上下文回答用户。如需查找日记记录，请使用search_diary工具。"
         }
         sb.toString().trimEnd()
+    }
+
+    /** 中文 2-gram 命中打分：向量召回不到时的兜底，宁多给几条也别直接说"没找到" */
+    private fun keywordHits(pool: List<String>, query: String, topK: Int): List<String> {
+        val chars = query.filter { it.isLetterOrDigit() }
+        if (chars.length < 2) return emptyList()
+        val grams = (0 until chars.length - 1).map { chars.substring(it, it + 2) }.toSet()
+        return pool.map { text -> text to grams.count { text.contains(it) } }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .take(topK)
+            .map { it.first }
     }
 
     suspend fun searchDiary(query: String, topK: Int): String = withContext(Dispatchers.IO) {
@@ -399,7 +432,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val dm = com.aicompanion.diary.DiaryManager(getApplication<Application>(), activePersonaId)
             val diaryResults = dm.searchDiariesRag(query, topK)
             if (diaryResults.isEmpty()) {
-                return@withContext "未找到与「$query」相关的日记记录。"
+                return@withContext "未找到与「$query」相关的日记记录。注意：日记只收录较久或重要的经历，最近的对话内容在聊天上下文中，请直接结合上下文回答用户。"
             }
             val sb = StringBuilder()
             sb.appendLine("[日记记录]")
@@ -492,8 +525,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // 构建历史上下文和工具定义
         val (_, history, tools) = withContext(Dispatchers.IO) {
             val ctxH = contextManager?.getRecentTurnsAsPairs() ?: emptyList()
+            // 回退路径：末尾的未回复用户消息即本次输入（发送前已加入列表），API 会单独追加当前消息，去掉避免重复
+            val snapshot = getMessagesSnapshot()
+            val historyBase = if (snapshot.lastOrNull()?.isUser == true) snapshot.dropLast(1) else snapshot
             val h = if (ctxH.isNotEmpty()) ctxH
-                    else getMessagesSnapshot().takeLast(settingsManager?.contextTurns ?: 10).filter { it.text.length < 500 }.map { msg ->
+                    else historyBase.takeLast(settingsManager?.contextTurns ?: 10).filter { it.text.length < 500 }.map { msg ->
                         val textWithImages = if (msg.imageUrls.isNotEmpty() && msg.isUser) {
                             msg.text + "\n[图片已发送]"
                         } else {
@@ -504,7 +540,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val t = actionMgr?.getToolDefinitions() ?: emptyList()
             Triple(ctxH, h, t)
         }
-        AppLogger.w(TAG, "prepareRequest: history=${history.size}条, tools=${tools.size}个")
+        val ctxTurns = contextManager?.getRecentTurnsAsPairs() ?: emptyList()
+        if (history.isEmpty()) {
+            AppLogger.e(TAG, "[MemoryDiag] 历史为空! contextManager=${contextManager != null}, 会话轮=${ctxTurns.size}, 消息快照=${getMessagesSnapshot().size}条")
+        } else {
+            val source = if (ctxTurns.isNotEmpty()) "ContextManager会话" else "消息快照回退"
+            AppLogger.w(TAG, "[MemoryDiag] history=${history.size}条, 来源=$source, 首条=${history.first().second.take(20)}")
+        }
 
         // 情绪分析
         var emotionParams = EmotionParams()
@@ -582,12 +624,34 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         val personaPromptWithContext = request.personaPrompt + request.nicknameContext
 
+        // 技能库清单注入（渐进式披露：只给名称+描述，需要时 AI 自己用 skill 工具读取正文）
+        val systemContextWithSkills = withContext(Dispatchers.IO) {
+            val ctx = getApplication<android.app.Application>()
+            var base = request.systemContext
+            // 多步任务的执行纪律（只在带工具时注入，普通闲聊不污染）
+            if (request.tools.isNotEmpty()) {
+                base = base + "\n\n" + com.aicompanion.agent.AgentPrompt.EXECUTION_DISCIPLINE
+            }
+            if (!sm.skillEnabled) return@withContext base
+            try {
+                val index = com.aicompanion.skill.SkillStore(ctx).buildSkillIndexPrompt()
+                if (index.isBlank()) base else "$base\n\n$index"
+            } catch (_: Exception) {
+                base
+            }
+        }
+
+        val streamMode = sm.isStreamReply
+        // 流式模式下：每收到一段文本增量就写进同一个气泡（见 onStreamDelta）
+        val deltaHandler: ((String) -> Unit)? =
+            if (streamMode) { text -> onStreamDelta(text) } else null
+
         return if (request.tools.isNotEmpty()) {
-            AppLogger.w(TAG, "callApi: 调用sendChatWithToolLoop")
+            AppLogger.w(TAG, "callApi: 调用sendChatWithToolLoop stream=$streamMode")
             withContext(Dispatchers.IO) {
                 client.sendChatWithToolLoop(
                     sm.userId, request.message, request.personaName, personaPromptWithContext,
-                    request.currentUserMoodName, "idle", request.memories, request.history, request.systemContext, request.tools,
+                    request.currentUserMoodName, "idle", request.memories, request.history, systemContextWithSkills, request.tools,
                     toolExecutor = { name, args ->
                         if (name == "generate_image") {
                             com.aicompanion.AppContainer.setImagePluginWorldId("")
@@ -597,18 +661,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     },
                     imageUrls = request.imageUrls,
                     overrideTemperature = request.overrideTemperature,
-                    overrideTopP = request.overrideTopP
+                    overrideTopP = request.overrideTopP,
+                    maxIterations = sm.aiToolLoopMaxRounds,
+                    stream = streamMode,
+                    onDelta = deltaHandler
                 )
             }
         } else {
-            AppLogger.w(TAG, "callApi: 调用sendChat")
+            AppLogger.w(TAG, "callApi: 调用sendChat stream=$streamMode")
             withContext(Dispatchers.IO) {
                 client.sendChat(
                     sm.userId, request.message, request.personaName, request.personaPrompt,
-                    request.currentUserMoodName, "idle", request.memories, "", request.systemContext, request.history,
+                    request.currentUserMoodName, "idle", request.memories, "", systemContextWithSkills, request.history,
                     imageUrls = request.imageUrls,
                     overrideTemperature = request.overrideTemperature,
-                    overrideTopP = request.overrideTopP
+                    overrideTopP = request.overrideTopP,
+                    stream = streamMode,
+                    onDelta = deltaHandler
                 )
             }
         }
@@ -630,33 +699,36 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         emitEvent(UiEvent.SetTypingIndicator(false))
 
         if (response == null) {
-            val msg = addPetMessageInternal("呜...连接不上AI,请检查API设置", Emotion.SAD, Action.IDLE)
+            val errorText = "呜...连接不上AI,请检查API设置"
+            val msg = addPetMessageInternal(errorText, Emotion.SAD, Action.IDLE)
             if (msg != null) {
                 emitEvent(UiEvent.OnPetMessageAdded(msg, getMessageCount() - 1, Emotion.SAD, Action.IDLE))
             }
+            // 即使出错也记录对话，防止记忆断层（用户问"刚才让我做什么"AI能回答）
+            contextManager?.addTurn(request.message, errorText)
             return
         }
 
         if (response.errorMessage != null) {
-            val msg = addPetMessageInternal("呜...${response.errorMessage}", Emotion.SAD, Action.IDLE)
+            val errorText = "呜...${response.errorMessage}"
+            val msg = addPetMessageInternal(errorText, Emotion.SAD, Action.IDLE)
             if (msg != null) {
                 emitEvent(UiEvent.OnPetMessageAdded(msg, getMessageCount() - 1, Emotion.SAD, Action.IDLE))
             }
+            // 即使出错也记录对话，防止记忆断层
+            contextManager?.addTurn(request.message, errorText)
             return
         }
 
         val rawText = response.text
         val sm = settingsManager ?: throw IllegalStateException("SettingsManager未初始化")
 
-        // 不分割模式：整段原文作为单一气泡发送
-        val noSplit = getApplication<android.app.Application>()
-            .getSharedPreferences("app_prefs", 0)
-            .getBoolean("pref_ai_no_split", false)
-
-        if (noSplit) {
-            processNoSplitResponse(rawText, response, sm)
-        } else {
-            processSplitResponse(rawText, response, sm, request)
+        // 回复呈现方式：分段拟人 / 一次性整段 / 流式逐字
+        // （设置 → AI 设置 → 回复呈现方式；默认分段）
+        when (sm.aiReplyMode) {
+            SettingsManager.REPLY_MODE_STREAM -> finalizeStreamResponse(rawText, response, sm)
+            SettingsManager.REPLY_MODE_SINGLE -> processNoSplitResponse(rawText, response, sm)
+            else -> processSplitResponse(rawText, response, sm, request)
         }
 
         emitEvent(UiEvent.UpdatePetDisplay(response))
@@ -736,6 +808,123 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             if (fallbackMsg != null) {
                 emitEvent(UiEvent.OnPetMessageAdded(fallbackMsg, getMessageCount() - 1, Emotion.NEUTRAL, Action.IDLE))
             }
+        }
+    }
+
+    // ==================== 流式回复 ====================
+
+    /** 本轮流式回复所在气泡的下标（-1 表示本轮还没有创建气泡） */
+    @Volatile
+    private var streamBubbleIndex = -1
+
+    /** 上次因流式增量刷新 UI 的时间戳，用于节流 */
+    @Volatile
+    private var lastStreamEmitAt = 0L
+
+    /** 流式刷新 UI 的最小间隔（毫秒） */
+    private val streamEmitIntervalMs = 60L
+
+    /** 每轮请求开始前重置流式状态 */
+    private fun resetStreamState() {
+        synchronized(messagesLock) {
+            streamBubbleIndex = -1
+            lastStreamEmitAt = 0L
+        }
+    }
+
+    /**
+     * 流式文本增量回调。
+     *
+     * 注意 text 是「本轮已累计的完整文本」而不是增量片段，直接覆盖气泡内容即可。
+     * 首次回调时创建气泡，之后一直在同一个气泡里增长。
+     *
+     * 性能考虑：内容每次都写进消息列表（不丢字），但最多每 STREAM_EMIT_INTERVAL_MS
+     * 通知一次 UI，避免每个字都触发整列表重组。
+     */
+    private fun onStreamDelta(text: String) {
+        val idx: Int
+        val shouldEmit: Boolean
+        var isNewBubble = false
+        synchronized(messagesLock) {
+            if (streamBubbleIndex < 0) {
+                val msg = ChatMessage(
+                    text = text,
+                    time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                    isUser = false,
+                    emotion = Emotion.NEUTRAL,
+                    isPartial = true
+                )
+                _messages.add(msg)
+                while (_messages.size > MAX_MESSAGES) _messages.removeAt(0)
+                streamBubbleIndex = _messages.size - 1
+                idx = streamBubbleIndex
+                lastStreamEmitAt = System.currentTimeMillis()
+                shouldEmit = true
+                isNewBubble = true
+            } else {
+                idx = streamBubbleIndex
+                if (idx !in _messages.indices) return
+                // 关键：必须替换成新实例。
+                // ChatMessage 是 data class，若原地改字段，Compose 侧拿到的是同一个对象，
+                // equals 判定相等 → 列表不重组 → 界面不刷新（流式会看起来没反应）
+                _messages[idx] = _messages[idx].copy(text = text, isPartial = true)
+                val now = System.currentTimeMillis()
+                shouldEmit = now - lastStreamEmitAt >= streamEmitIntervalMs
+                if (shouldEmit) lastStreamEmitAt = now
+            }
+        }
+        // 首个字已经出来了，"正在输入…"可以收掉了（避免和流式气泡同时出现）
+        if (isNewBubble) emitEvent(UiEvent.SetTypingIndicator(false))
+        if (shouldEmit) emitEvent(UiEvent.OnStreamDelta(idx))
+    }
+
+    /**
+     * 流式回复收尾：用最终文本覆盖气泡（含情绪标记剥离后的结果与最终情绪），
+     * 写入聊天历史，并触发 TTS。
+     */
+    private suspend fun finalizeStreamResponse(rawText: String, response: ChatResponse, sm: SettingsManager) {
+        val idx = synchronized(messagesLock) { streamBubbleIndex }
+        if (idx < 0 || idx !in messages.indices) {
+            // 全程没收到任何增量（空回复 / 整轮只有工具调用）→ 退回常规显示
+            if (rawText.isBlank()) {
+                val msg = addPetMessageInternal("嗯...我好像走神了,能再说一次吗?", Emotion.NEUTRAL, Action.IDLE)
+                if (msg != null) {
+                    emitEvent(UiEvent.OnPetMessageAdded(msg, getMessageCount() - 1, Emotion.NEUTRAL, Action.IDLE))
+                }
+            } else {
+                processNoSplitResponse(rawText, response, sm)
+            }
+            return
+        }
+
+        if (rawText.isBlank()) {
+            // 最终回复为空：把流式气泡删掉，避免留下一个空气泡
+            synchronized(messagesLock) {
+                if (idx in _messages.indices) _messages.removeAt(idx)
+                streamBubbleIndex = -1
+            }
+            val msg = addPetMessageInternal("嗯...我好像走神了,能再说一次吗?", Emotion.NEUTRAL, Action.IDLE)
+            if (msg != null) {
+                emitEvent(UiEvent.OnPetMessageAdded(msg, getMessageCount() - 1, Emotion.NEUTRAL, Action.IDLE))
+            }
+            return
+        }
+
+        val finalMsg = synchronized(messagesLock) {
+            val updated = _messages[idx].copy(
+                text = rawText,
+                emotion = response.emotion,
+                isPartial = false
+            )
+            _messages[idx] = updated
+            updated
+        }
+        saveChatHistory()
+        saveMessageToFile(finalMsg)
+        // 用完成事件而不是 OnPetMessageAdded：消息已经在列表里了，重复插会变成两条
+        emitEvent(UiEvent.OnStreamCompleted(idx, finalMsg, response.emotion, response.action))
+        if (sm.isTTSEnabled) {
+            emitEvent(UiEvent.TriggerTtsAndPlay(rawText, response.emotion, finalMsg))
         }
     }
 
@@ -823,6 +1012,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
                 // === 阶段3: 调用API ===
+                resetStreamState()  // 每轮请求开始前清空流式气泡状态
                 val response = callApi(request)
 
                 // === 阶段4: 处理响应 ===

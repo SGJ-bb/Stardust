@@ -80,6 +80,8 @@ class LocalAsrManager(private val context: Context) {
     fun startListening() {
         if (isListening) return
         isListening = true
+        // 唤醒监听让位：ASR 要独占麦克风，且识别期间不能自己触发唤醒
+        com.aicompanion.voice.wake.VoiceBus.asrActive = true
 
         val currentMode = mode
         if (currentMode == MODE_CLOUD && isCloudAvailable) {
@@ -103,6 +105,7 @@ class LocalAsrManager(private val context: Context) {
     }
 
     fun stopListening() {
+        com.aicompanion.voice.wake.VoiceBus.asrActive = false
         if (!isListening) return
         if (isRecording) {
             isRecording = false
@@ -121,6 +124,7 @@ class LocalAsrManager(private val context: Context) {
     fun cancel() {
         isListening = false
         isRecording = false
+        com.aicompanion.voice.wake.VoiceBus.asrActive = false
         try {
             audioRecord?.stop()
             audioRecord?.release()
@@ -134,6 +138,7 @@ class LocalAsrManager(private val context: Context) {
     fun cleanup() {
         isListening = false
         isRecording = false
+        com.aicompanion.voice.wake.VoiceBus.asrActive = false
         scope.cancel()
         try {
             audioRecord?.stop()

@@ -71,7 +71,7 @@ class ProactiveInteractionEngine(private val settingsManager: SettingsManager) {
     private val ACTION_COOLDOWN_MS = 60 * 1000L  // 60秒冷却
 
     fun shouldTriggerInteraction(nagFrequency: String): Boolean {
-        if (!settingsManager.shouldTriggerNag()) return false
+        if (!settingsManager.isNagEnabled) return false
         val now = System.currentTimeMillis()
         val interval = when (nagFrequency) {
             "frequent" -> 3 * 60 * 1000L
@@ -79,7 +79,14 @@ class ProactiveInteractionEngine(private val settingsManager: SettingsManager) {
             "infrequent" -> 30 * 60 * 1000L
             else -> 10 * 60 * 1000L
         }
-        return (now - lastNagTime) > interval
+        // 原实现是"到点 且 按频率随机 10/30/60%"——两道门相乘，实际触发率低到
+        // 用户以为这功能坏了。现在只由间隔决定，到点后 85% 命中（留一点随机避免整点感）。
+        return (now - lastNagTime) > interval && Math.random() < 0.85
+    }
+
+    /** 真正发出后记录时间：不记录的话，LLM 路径会每 2 分钟重复触发 */
+    fun markNagSent() {
+        lastNagTime = System.currentTimeMillis()
     }
 
     /**

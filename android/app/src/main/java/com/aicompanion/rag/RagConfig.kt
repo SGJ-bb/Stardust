@@ -24,6 +24,9 @@ object RagConfig {
     private const val DEFAULT_CHUNK_MAX_CHARS = 300
     private const val DEFAULT_CHUNK_OVERLAP_CHARS = 60
     private const val DEFAULT_MIN_SIMILARITY = 0.12f
+    // 默认仍用 TF-IDF：内置的 bge 模型虽然随 APK 一起发出去（assets 里 24MB），
+    // 但 onnxruntime 的 .so 和 sherpa-onnx 的同名库冲突，部分设备上 ORT 初始化会失败。
+    // 想要语义检索可以到设置里手动切「ONNX 本地模型」，失败会自动回落，不会崩。
     private const val DEFAULT_EMBEDDING_MODE = "tfidf"
     private const val DEFAULT_CLOUD_MODEL = "text-embedding-3-small"
     private const val DEFAULT_RERANKER_ENABLED = false

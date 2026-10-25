@@ -36,6 +36,39 @@ object PromptBuilder {
         return rules
     }
 
+    /**
+     * 构建世界书注入块：基于用户消息触发关键词命中的世界书条目。
+     *
+     * 流程：personaId → 找对应的 CharacterCard → 取关联的 WorldInfo →
+     *      按 chatMessage 关键词命中过滤 → 拼成 [世界信息] 块。
+     *
+     * 命中规则（与 CharacterCardManager.getActivatedWorldInfoEntries 一致）：
+     * - enabled=false 跳过
+     * - constant=true 永久注入
+     * - key 按逗号分隔，任一关键词在 chatMessage 中出现即命中
+     *
+     * @return 拼好的世界信息块（含换行）；空命中返回 ""
+     */
+    fun buildWorldInfoBlock(context: Context, personaId: String, chatMessage: String): String {
+        if (chatMessage.isBlank()) return ""
+        return try {
+            val cm = com.aicompanion.character.CharacterCardManager(context)
+            val card = cm.getAllCards().find { it.id == personaId } ?: return ""
+            val entries = cm.getActivatedWorldInfoEntries(card, chatMessage)
+            if (entries.isEmpty()) return ""
+            buildString {
+                append("\n\n[世界信息]")
+                entries.forEach { entry ->
+                    if (entry.comment.isNotBlank()) append("\n## ${entry.comment}")
+                    append("\n${entry.content}")
+                }
+            }
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.w("PromptBuilder", "buildWorldInfoBlock: ${e.message}")
+            ""
+        }
+    }
+
     fun buildIdentity(context: Context, personaId: String): IdentityBlock {
         if (cachedIdentity != null && cachedIdentityPersonaId == personaId) {
             return cachedIdentity!!
@@ -72,6 +105,13 @@ object PromptBuilder {
         val userBirthday = sm.userBirthday
         val userAppearance = sm.userAppearance
 
+        // 结构化人格：有就用（含从旧字段一次性迁移），没有则 profile=null 走旧路径。
+        // 迁移是幂等的：首次读取会落盘，之后不再重复生成。
+        val profile = runCatching {
+            com.aicompanion.personality.PersonalityStore(context)
+                .loadOrMigrate(personaId, name, personality, speechStyle)
+        }.getOrNull()
+
         val result = IdentityBlock(
             name = name,
             personality = personality,
@@ -84,7 +124,8 @@ object PromptBuilder {
             aiSummarizedPersonality = aiSummarizedPersonality,
             userGenderLabel = userGenderLabel,
             userBirthday = userBirthday,
-            userAppearance = userAppearance
+            userAppearance = userAppearance,
+            profile = profile,
         )
         cachedIdentity = result
         cachedIdentityPersonaId = personaId
@@ -99,10 +140,18 @@ object PromptBuilder {
     }
 
     fun buildPersonaBase(identity: IdentityBlock): String {
+        val profile = identity.profile
+        val structured = profile != null && profile.hasContent()
         return buildString {
-            append("你是「${identity.name}」。")
-            if (identity.personality.isNotBlank()) append(" 性格${identity.personality}。")
-            if (identity.speechStyle.isNotBlank()) append(" ${identity.speechStyle}。")
+            if (structured) {
+                // 结构化人格：只注入锚点（≤140 字），把"她是个什么人"压到最短
+                append(com.aicompanion.personality.PersonalityPrompt.anchor(profile!!))
+            } else {
+                append("你是「${identity.name}」。")
+                if (identity.personality.isNotBlank()) append(" 性格${identity.personality}。")
+                if (identity.speechStyle.isNotBlank()) append(" ${identity.speechStyle}。")
+            }
+            if (identity.customPrompt.isNotBlank()) append(" ${identity.customPrompt}")
             if (identity.userNickname.isNotBlank()) append(" 叫用户「${identity.userNickname}」。")
             if (identity.userIdentity.isNotBlank()) append(" 用户身份：${identity.userIdentity}。你必须认知并尊重用户的身份。")
             if (identity.userAbilities.isNotBlank()) append(" 用户能力/技能：${identity.userAbilities}。用户拥有这些能力，你的反应和互动必须完全体现这些能力带来的影响，100%承认并围绕这些能力展开互动。")
@@ -113,10 +162,20 @@ object PromptBuilder {
     }
 
     fun buildPersonaFull(identity: IdentityBlock): String {
+        val profile = identity.profile
+        val structured = profile != null && profile.hasContent()
         return buildString {
-            append("你是「${identity.name}」。")
-            if (identity.personality.isNotBlank()) append("\n性格：${identity.personality}")
-            if (identity.speechStyle.isNotBlank()) append("\n说话风格：${identity.speechStyle}")
+            if (structured) {
+                // 完整画像（≤700 字）+ 锚点收尾：
+                // 画像负责"她是谁"，锚点负责"此刻按哪三条行为签名说话"
+                append(com.aicompanion.personality.PersonalityPrompt.portrait(profile!!))
+                append("\n")
+                append(com.aicompanion.personality.PersonalityPrompt.anchor(profile))
+            } else {
+                append("你是「${identity.name}」。")
+                if (identity.personality.isNotBlank()) append("\n性格：${identity.personality}")
+                if (identity.speechStyle.isNotBlank()) append("\n说话风格：${identity.speechStyle}")
+            }
             if (identity.customPrompt.isNotBlank()) append("\n${identity.customPrompt}")
             if (identity.userNickname.isNotBlank()) append("\n叫用户「${identity.userNickname}」。")
             if (identity.userIdentity.isNotBlank()) append("\n用户身份：${identity.userIdentity}。你必须认知并尊重用户的身份。")
@@ -370,5 +429,10 @@ data class IdentityBlock(
     val aiSummarizedPersonality: String = "",
     val userGenderLabel: String = "",
     val userBirthday: String = "",
-    val userAppearance: String = ""
+    val userAppearance: String = "",
+    /**
+     * 结构化人格画像。为 null 或没有实质内容时，注入逻辑回退到旧的
+     * "性格：<自由文本>" 路径，保证旧角色卡不受影响。
+     */
+    val profile: com.aicompanion.personality.PersonalityProfile? = null,
 )

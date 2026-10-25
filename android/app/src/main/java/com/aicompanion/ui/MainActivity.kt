@@ -69,7 +69,7 @@ import com.aicompanion.settings.SettingsManager
 import com.aicompanion.theme.ThemeManager
 import com.aicompanion.voice.VoiceManager
 import com.aicompanion.predict.ChatPredictor
-import com.aicompanion.ui.coordinator.AutoOperationCoordinator
+
 import com.aicompanion.ui.coordinator.DiaryCoordinator
 import com.aicompanion.ui.coordinator.FocusTimerCoordinator
 import com.aicompanion.ui.coordinator.Live2DCoordinator
@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
     private var proactiveChatCoordinator: ProactiveChatCoordinator? = null
     private var virtualWorldCoordinator: VirtualWorldCoordinator? = null
     private var onboardingCoordinator: OnboardingCoordinator? = null
-    private var autoOperationCoordinator: AutoOperationCoordinator? = null
+
     private var themeEntranceView: com.aicompanion.ui.effects.ThemeEntranceView? = null
 
     private var recyclerChat: RecyclerView? = null
@@ -202,9 +202,6 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
     private var _isTyping: Boolean by _isTypingState
     /** 群聊打字状态（按 groupId 区分，AI 回复链路期间为 true） */
     private val _groupTypingStates = mutableStateMapOf<String, Boolean>()
-    /** 当前是否正在加载中（Compose 可观察） */
-    private val _isLoadingState = mutableStateOf(false)
-    private var _isLoading: Boolean by _isLoadingState
     /** 天气数据（Compose 模式独立于 XML View） */
     private var _weatherText = "☀️"
     /** 天数标签（Compose 模式独立于 XML View） */
@@ -425,6 +422,14 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
 
     private var activePersonaId: String = "default"
 
+    /**
+     * 距上次人格锚点已过的对话轮数。
+     *
+     * 到达 [com.aicompanion.personality.PersonalityPrompt.REANCHOR_EVERY_TURNS] 后
+     * 重新注入完整画像并归零——人设会在长对话里逐渐走样，必须周期性重锚。
+     */
+    private var personalityTurns: Int = 0
+
     private fun refreshActivePersonaId() {
         // 优先使用 SharedPreferences 的值（角色切换后最新值）
         // Intent 中的 persona_id 仅作为首次启动来源
@@ -443,6 +448,270 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
         // adjustResize 会把窗口缩小到键盘上方，输入栏自然贴合键盘（与群聊 Activity 一致）
         _savedInstanceState = savedInstanceState
 
+        // 语音唤醒：服务拉起界面时带过来的标记 / 自测 wav
+        pendingVoiceWake = intent?.getBooleanExtra(com.aicompanion.voice.wake.VoiceWake.EXTRA_VOICE_WAKE, false) == true
+        if (pendingVoiceWake) intent?.removeExtra(com.aicompanion.voice.wake.VoiceWake.EXTRA_VOICE_WAKE)
+        intent?.getStringExtra(com.aicompanion.voice.wake.VoiceWake.EXTRA_TEST_ASSET)?.let { asset ->
+            intent.removeExtra(com.aicompanion.voice.wake.VoiceWake.EXTRA_TEST_ASSET)
+            runWakeSelfTest(asset)
+        }
+
+        // UI 树体检：adb shell am start ... --es ui_probe 1
+        intent?.getStringExtra("ui_probe")?.let {
+            intent.removeExtra("ui_probe")
+            Thread {
+                try { Thread.sleep(1500) } catch (_: Exception) {}
+                val svc = com.aicompanion.screen.ScreenRecognitionService.getInstance()
+                if (svc == null) {
+                    Log.e("UiProbe", "无障碍服务未运行")
+                } else {
+                    Log.i("UiProbe", com.aicompanion.screen.UiTreeProbe.probe(svc).toText())
+                }
+            }.start()
+        }
+
+        // 导入电脑上已信任的 adb 私钥：--es adb_import_key /sdcard/Download/adbkey.txt
+        intent?.getStringExtra("adb_import_key")?.let { path ->
+            intent.removeExtra("adb_import_key")
+            Thread {
+                val pem = runCatching { java.io.File(path).readText() }.getOrNull()
+                if (pem == null) {
+                    Log.e("AdbSelfTest", "读不到 $path")
+                } else {
+                    val ok = com.aicompanion.adb.AdbKey.importPem(this, pem)
+                    Log.i("AdbSelfTest", "import=$ok line=${com.aicompanion.adb.AdbKey.get(this).adbKeyLine().take(32)}…")
+                }
+            }.start()
+        }
+
+        // 自建 ADB 通道自测：adb shell am start ... --es adb_test 5555
+        intent?.getStringExtra("adb_test")?.let { portStr ->
+            intent.removeExtra("adb_test")
+            Thread {
+                com.aicompanion.adb.AdbSelf.exportPubkey(this)
+                Log.i("AdbSelfTest", "keyLine=" + com.aicompanion.adb.AdbSelf.keyLine(this))
+                val port = portStr.toIntOrNull() ?: 5555
+                val st = com.aicompanion.adb.AdbSelf.connect(this, "127.0.0.1", port)
+                Log.i("AdbSelfTest", "state=$st")
+                if (st.connected) {
+                    // 能力自检：settings 读写删 / 截图 / input 全跑一遍
+                    com.aicompanion.adb.AdbSelf.selfTest(this, port).forEach {
+                        Log.i("AdbSelfTest", "cap $it")
+                    }
+                    Log.i("AdbSelfTest", "audit=" + com.aicompanion.adb.AdbSelf.auditLog())
+                }
+                com.aicompanion.adb.AdbSelf.disconnect()
+            }.start()
+        }
+
+        // 无线调试 TLS 通道自检：adb shell am start ... --es adb_tls auto
+        intent?.getStringExtra("adb_tls")?.let { arg ->
+            intent.removeExtra("adb_tls")
+            Thread {
+                val st = if (arg == "auto" || arg.isBlank()) {
+                    com.aicompanion.adb.AdbSelf.autoConnect(this) {
+                        Log.i("AdbTlsTest", "progress: $it")
+                    }
+                } else {
+                    com.aicompanion.adb.AdbSelf.connectTls(this, arg.toIntOrNull() ?: 0)
+                }
+                Log.i("AdbTlsTest", "state connected=${st.connected} uid=${st.uid} err=${st.error}")
+                if (st.connected) {
+                    val r = com.aicompanion.adb.AdbSelf.execRaw(this, "id; getprop ro.build.version.release; ls /data/local/tmp | head -3", 8000)
+                    Log.i("AdbTlsTest", "exec exit=${r.exitCode} out=${r.stdout.replace("\n", " ⏎ ").take(300)} err=${r.stderr.take(120)}")
+                    com.aicompanion.adb.AdbSelf.selfTest(this).forEach {
+                        Log.i("AdbTlsTest", "cap $it")
+                    }
+                    Log.i("AdbTlsTest", "audit=" + com.aicompanion.adb.AdbSelf.auditLog())
+                }
+            }.start()
+        }
+
+        // 分层记忆自检（纯逻辑，不需要设备/AI/网络）：--es mem_test 1
+        intent?.getStringExtra("mem_test")?.let {
+            intent.removeExtra("mem_test")
+            Thread {
+                val r = com.aicompanion.memory.TieredMemorySelfTest.run()
+                com.aicompanion.memory.TieredMemorySelfTest.summary(r).lines()
+                    .forEach { line -> android.util.Log.i("MemTest", line) }
+                android.util.Log.i("MemTest", "PASS=${r.count { it.pass }}/${r.size}")
+            }.start()
+        }
+
+        // 通用工具调用（调试/自检用）：--es tool_call '{"name":"device","args":"{\"action\":\"info\"}"}'
+        // 走完整的 executeTool（含闸门 + 活动记录），所以验证结果与真实调用一致。
+        intent?.getStringExtra("tool_call")?.let { spec ->
+            intent.removeExtra("tool_call")
+            Thread {
+                try {
+                    val o = org.json.JSONObject(spec)
+                    val name = o.optString("name")
+                    val args = o.optString("args", "{}")
+                    val mgr = aiActionManager ?: com.aicompanion.action.AIActionManager(this)
+                    val r = kotlinx.coroutines.runBlocking { mgr.executeTool(name, args) }
+                    Log.i("ToolCall", "[$name] ${r.replace("\n", " ⏎ ").take(600)}")
+                } catch (e: Exception) {
+                    Log.e("ToolCall", "失败: ${e.message}", e)
+                }
+            }.start()
+        }
+
+        // 人格闭环自检：--es persona_probe "你真厉害"
+        // 验证三件事：本轮注入块长什么样、情境识别对不对、一轮之后特质有没有动
+        intent?.getStringExtra("persona_probe")?.let { probe ->
+            intent.removeExtra("persona_probe")
+            Thread {
+                try {
+                    val pm = com.aicompanion.persona.PersonaManager(this).also { it.load() }
+                    val persona = runCatching { pm.getActivePersona() }.getOrNull()
+                    if (persona == null) {
+                        Log.i("PersonaProbe", "没有激活角色")
+                        return@Thread
+                    }
+                    val store = com.aicompanion.personality.PersonalityStore(this)
+                    val before = store.loadOrMigrate(
+                        persona.id, persona.name, persona.personality, persona.speechStyle,
+                    )
+                    Log.i(
+                        "PersonaProbe",
+                        "BEFORE traits: " + before.traits.bigFive().entries.joinToString { "${it.key}=${"%.3f".format(it.value)}" } +
+                            " | warmth=${"%.3f".format(before.traits.warmth)} humor=${"%.3f".format(before.traits.humor)}",
+                    )
+                    val block = com.aicompanion.personality.PersonalityPrompt.block(
+                        before, probe, sessionStart = true,
+                    )
+                    Log.i("PersonaProbe", "INJECT(${block.length}字):\n$block")
+                    val sit = com.aicompanion.personality.PersonalityRuntime.observeTurn(this, persona.id, probe)
+                    val after = store.load(persona.id)
+                    Log.i(
+                        "PersonaProbe",
+                        "situation=$sit | AFTER warmth=${"%.3f".format(after?.traits?.warmth ?: -1f)} " +
+                            "humor=${"%.3f".format(after?.traits?.humor ?: -1f)} " +
+                            "mood=${"%.3f".format(after?.mood?.valence ?: 0f)} " +
+                            "rel=${"%.3f".format(after?.relationship?.trust ?: 0f)}/${"%.3f".format(after?.relationship?.intimacy ?: 0f)} " +
+                            "stage=${after?.relationship?.stage} " +
+                            "sigEvidence=${after?.signatures?.firstOrNull { it.situation.name == sit }?.evidence}",
+                    )
+                    Log.i("PersonaProbe", "DONE")
+                } catch (e: Exception) {
+                    Log.e("PersonaProbe", "失败: ${e.message}", e)
+                }
+            }.start()
+        }
+
+        // 清理测试写入的日历事件：--es cal_clean 1
+        intent?.getStringExtra("cal_clean")?.let {
+            intent.removeExtra("cal_clean")
+            Thread {
+                val mgr = com.aicompanion.action.AIActionManager(this)
+                val r = kotlinx.coroutines.runBlocking {
+                    mgr.executeTool("calendar", """{"action":"delete","title":"星尘测试日程","time":"20:30"}""")
+                }
+                android.util.Log.i("CalClean", r)
+            }.start()
+        }
+
+        // Agent 活动条 UI 演示（触发一张「需要你确认」卡片，用于截图核对）：--es agent_demo 1
+        intent?.getStringExtra("agent_demo")?.let {
+            intent.removeExtra("agent_demo")
+            Thread {
+                val allow = com.aicompanion.agent.AgentBus.requestConfirm(
+                    "清除「测试应用」的全部数据",
+                    "登录状态、聊天记录都会没",
+                    timeoutMs = 90_000,
+                )
+                android.util.Log.i("AgentDemo", "确认结果 allow=$allow")
+            }.start()
+        }
+
+        // Agent 闭环自检：搜索 / 系统日历 / 工具闸门与活动记录
+        // adb shell am start -n com.aicompanion/.ui.MainActivity --es agent_test 1
+        intent?.getStringExtra("agent_test")?.let {
+            intent.removeExtra("agent_test")
+            Thread {
+                val mgr = com.aicompanion.action.AIActionManager(this)
+                fun run(tag: String, name: String, args: String) {
+                    val t0 = System.currentTimeMillis()
+                    // 走 executeTool（而不是 PluginRegistry）：这样才覆盖闸门 + 活动记录
+                    val r = runCatching {
+                        kotlinx.coroutines.runBlocking { mgr.executeTool(name, args) }
+                    }.getOrElse { "异常: ${it.javaClass.simpleName}: ${it.message}" }
+                    Log.i("AgentTest", "[$tag] ${System.currentTimeMillis() - t0}ms\n  -> ${r.replace("\n", " ⏎ ").take(400)}")
+                }
+                run("search", "search_web", """{"query":"北京今天天气"}""")
+                run("cal-agenda", "calendar", """{"action":"agenda","days":3}""")
+                run("cal-add", "calendar", """{"action":"add","title":"星尘测试日程","time":"20:30","duration_min":30}""")
+                run("cal-agenda2", "calendar", """{"action":"agenda","days":1}""")
+                run("policy-deny", "run_shell", """{"command":"rm -rf /sdcard/test"}""")
+                run("cal-clean", "calendar", """{"action":"delete","title":"星尘测试日程","time":"20:30"}""")
+                run("sys-catalog", "system", """{"action":"catalog"}""")
+                run("sys-brightness", "system", """{"action":"run","op":"brightness.set","params":{"value":120}}""")
+                run("sys-alarm", "system", """{"action":"run","op":"alarm.set","params":{"hour":7,"minute":30,"label":"起床"}}""")
+                Log.i("AgentTest", "活动记录：\n" + com.aicompanion.agent.AgentBus.events.value.joinToString("\n") {
+                    "  ${it.status} ${it.summary} ${it.costMs}ms ${it.detail.take(60)}"
+                })
+                Log.i("AgentTest", "DONE")
+            }.start()
+        }
+
+        // 设备工具自检（不依赖 adb 通道，可验证常驻服务）：--es dev_test 1
+        intent?.getStringExtra("dev_test")?.let {
+            intent.removeExtra("dev_test")
+            Thread {
+                fun run(args: String) {
+                    val r = runCatching {
+                        kotlinx.coroutines.runBlocking {
+                            com.aicompanion.plugin.PluginRegistry.executePlugin("device", args)
+                        }
+                    }.getOrElse { "异常: ${it.javaClass.simpleName}: ${it.message}" }
+                    Log.i("DevTest", "device $args\n  -> ${r.replace("\n", " ⏎ ").take(300)}")
+                }
+                run("""{"action":"info"}""")
+                run("""{"action":"settings_get","ns":"global","key":"adb_wifi_enabled"}""")
+                run("""{"action":"app_list","filter":"aicompanion"}""")
+                Log.i("DevTest", "DONE")
+            }.start()
+        }
+
+        // 工具（增删查改）自检：adb shell am start ... --es tool_test 1
+        intent?.getStringExtra("tool_test")?.let {
+            intent.removeExtra("tool_test")
+            Thread {
+                fun run(name: String, args: String): String {
+                    val r = runCatching {
+                        kotlinx.coroutines.runBlocking {
+                            com.aicompanion.plugin.PluginRegistry.executePlugin(name, args)
+                        }
+                    }.getOrElse { "异常: ${it.javaClass.simpleName}: ${it.message}" }
+                    Log.i("ToolTest", "$name $args\n  -> ${r.replace("\n", " ⏎ ").take(400)}")
+                    return r
+                }
+                run("file", """{"action":"roots"}""")
+                run("file", """{"action":"write","path":"agent_test/a.txt","content":"第一行\n第二行 hello codex"}""")
+                run("file", """{"action":"read","path":"agent_test/a.txt"}""")
+                run("file", """{"action":"append","path":"agent_test/a.txt","content":"\n追加一行"}""")
+                run("file", """{"action":"search","path":"agent_test","query":"codex"}""")
+                run("file", """{"action":"list","path":"agent_test"}""")
+                run("file", """{"action":"info","path":"agent_test/a.txt"}""")
+                run("run_shell", """{"action":"capabilities"}""")
+                run("run_shell", """{"action":"exec","command":"id; getprop ro.build.version.release"}""")
+                run("file", """{"action":"delete","path":"agent_test/a.txt"}""")
+                run("file", """{"action":"list","path":"agent_test"}""")
+                run("plan", """{"action":"set","goal":"建一个待办文件并验证","steps":["建目录","写文件","读回验证"]}""")
+                run("plan", """{"action":"update","index":1,"status":"done"}""")
+                run("plan", """{"action":"update","index":2,"status":"done","note":"agent_test/a.txt"}""")
+                run("plan", """{"action":"get"}""")
+                run("device", """{"action":"info"}""")
+                run("device", """{"action":"settings_get","ns":"global","key":"adb_wifi_enabled"}""")
+                run("device", """{"action":"settings_put","ns":"global","key":"adb_enabled","value":"1"}""")
+                run("device", """{"action":"app_list","filter":"aicompanion"}""")
+                run("device", """{"action":"settings_put","ns":"system","key":"screen_off_timeout","value":"60000"}""")
+                run("device", """{"action":"tap","x":540,"y":1200}""")
+                run("device", """{"action":"screenshot"}""")
+                Log.i("ToolTest", "DONE")
+            }.start()
+        }
+
         // 激活检查：未激活则跳转激活页面
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         if (!prefs.getBoolean("is_activated", false)) {
@@ -452,6 +721,7 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
         }
 
         refreshActivePersonaId()
+        ensureCalendarPermission()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 notificationPermissionLauncher.launch(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS))
@@ -1077,7 +1347,6 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
                     }
                     is ChatViewModel.UiEvent.SetLoading -> {
                         setLoading(event.isLoading)
-                        _isLoading = event.isLoading
                         _messageVersion++
                     }
                     is ChatViewModel.UiEvent.OnPetMessageAdded -> handlePetMessageUi(event.msg, event.emotion, event.action)
@@ -1096,6 +1365,23 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
                     is ChatViewModel.UiEvent.NotifyItemRangeRemoved -> chatAdapter?.notifyItemRangeRemoved(event.positionStart, event.itemCount)
                     is ChatViewModel.UiEvent.NotifyItemRemoved -> chatAdapter?.notifyItemRemoved(event.position)
                     is ChatViewModel.UiEvent.NotifyItemChanged -> chatAdapter?.notifyItemChanged(event.position, event.payload ?: "")
+                    // === 流式回复 ===
+                    is ChatViewModel.UiEvent.OnStreamDelta -> {
+                        // 气泡内容在增长（条数不变），Compose 聊天页靠 messageVersion 触发重组刷新
+                        if (event.position >= 0) chatAdapter?.notifyItemChanged(event.position)
+                        _messageVersion++
+                    }
+                    is ChatViewModel.UiEvent.OnStreamCompleted -> {
+                        _messageVersion++
+                        statsManager?.recordAiMessage(event.msg.text)
+                        statsManager?.recordEmotion(event.emotion.name)
+                        live2DCoordinator?.setEmotion(event.emotion)
+                        live2DCoordinator?.setAction(event.action)
+                        if (settingsManager?.live2dEnabled != true) live2DCoordinator?.hideView()
+                        if (!hasWindowFocus()) {
+                            systemMonitor?.showAiMessageNotification(currentAiName(), event.msg.text)
+                        }
+                    }
                 }
             }
         }
@@ -1392,7 +1678,7 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
                             5 -> changeWallpaper()
                             6 -> showLogViewer()
                             7 -> showTutorial()
-                            8 -> showAutoOperationDialog()
+                            8 -> { /* 手机自动化已改为 LLM 工具调用，无需手动入口 */ }
                             9 -> triggerManualDiary()
                             10 -> try {
                                 val intent = Intent(this@MainActivity, MemoryPoolActivity::class.java)
@@ -1441,6 +1727,98 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
         bottomSheet.setContentView(contentView)
         bottomSheet.behavior.peekHeight = (280 * resources.displayMetrics.density).toInt()
         bottomSheet.show()
+    }
+
+    // ---------------------------------------------------------------- 语音唤醒
+    /** 由唤醒服务置位：界面就绪后自动开麦 */
+    private var pendingVoiceWake = false
+    private var wakeReceiverRegistered = false
+    private val audioPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) settingsManager?.let { com.aicompanion.voice.wake.VoiceWake.sync(this, it) }
+    }
+
+    /**
+     * 日历权限：AI 读「你明天有什么安排」、把日程写进手机日历都要它。
+     * 有 shell 通道时可以用 `pm grant` 自授权（零弹窗），没有通道才走这里问一次。
+     */
+    private val calendarPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        android.util.Log.i("CalendarPerm", "日历权限结果：$result")
+    }
+
+    private fun ensureCalendarPermission() {
+        if (com.aicompanion.adb.AdbSelf.isReady()) return   // 有 shell 通道，稍后自动授予
+        val need = listOf(
+            android.Manifest.permission.READ_CALENDAR,
+            android.Manifest.permission.WRITE_CALENDAR,
+        ).filter {
+            androidx.core.content.ContextCompat.checkSelfPermission(this, it) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        if (need.isEmpty()) return
+        val p = getSharedPreferences("perm_prompt", MODE_PRIVATE)
+        if (p.getBoolean("calendar_asked", false)) return
+        p.edit().putBoolean("calendar_asked", true).apply()
+        runCatching { calendarPermissionLauncher.launch(need.toTypedArray()) }
+    }
+    private val wakeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            if (intent?.action == com.aicompanion.voice.wake.VoiceWake.ACTION_WAKE) {
+                handleVoiceWake()
+            }
+        }
+    }
+
+    /** 唤醒命中后开麦；应用在前台时走这里 */
+    private fun handleVoiceWake() {
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    this, android.Manifest.permission.RECORD_AUDIO
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                return@runOnUiThread
+            }
+            if (!isVoiceRecording) startVoiceRecording()
+        }
+    }
+
+    /** onCreate 里拿到的唤醒标记，等界面就绪再开麦 */
+    private fun maybeHandlePendingVoiceWake() {
+        if (!pendingVoiceWake) return
+        pendingVoiceWake = false
+        window.decorView.postDelayed({ handleVoiceWake() }, 600)
+    }
+
+    /**
+     * 调试自测：用 assets 里的 wav 跑一遍唤醒模型（adb:
+     * am start -n com.aicompanion/.ui.MainActivity --es voice_wake_test_asset kws/selftest.wav）
+     */
+    private fun runWakeSelfTest(assetPath: String) {
+        Thread {
+            val sm = settingsManager ?: SettingsManager(this)
+            val lines = com.aicompanion.voice.wake.VoiceWake.keywordLines(this, sm.voiceWakeWords, sm.voiceWakeThreshold)
+            val eng = com.aicompanion.voice.wake.WakeWordEngine(this, {}, {})
+            val t0 = System.currentTimeMillis()
+            val hit = eng.detectAsset(assetPath, lines)
+            val cost = System.currentTimeMillis() - t0
+            Log.i(
+                "VoiceWakeTest",
+                "asset=$assetPath words=${sm.voiceWakeWords} lines=$lines hit=$hit cost=${cost}ms err=${eng.lastError}"
+            )
+            runCatching { eng.release() }
+            runOnUiThread {
+                Toast.makeText(
+                    this,
+                    "唤醒自测：${if (!hit.isNullOrEmpty()) "命中 $hit" else "未命中"}（${cost}ms）",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }.start()
     }
 
     private fun startVoiceRecording() {
@@ -1949,17 +2327,17 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
             live2DCoordinator?.hideView()
         }
 
-        val aiName = cachedAiName ?: getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
+        if (!hasWindowFocus()) {
+            systemMonitor?.showAiMessageNotification(currentAiName(), msg.text)
+        }
+    }
+
+    /** 当前角色的显示名（带缓存，避免每次取 SharedPreferences） */
+    private fun currentAiName(): String =
+        cachedAiName ?: getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
             .getString("persona_name",
                 getSharedPreferences("app_prefs", MODE_PRIVATE).getString("ai_name", "星尘"))
             .also { cachedAiName = it } ?: "星尘"
-        val avatarPath = cachedAiAvatarPath ?: getSharedPreferences("persona_data_$activePersonaId", MODE_PRIVATE)
-            .getString("persona_avatar_path", "").also { cachedAiAvatarPath = it } ?: ""
-
-        if (!hasWindowFocus()) {
-            systemMonitor?.showAiMessageNotification(aiName, msg.text)
-        }
-    }
 
     private fun triggerTtsAndPlay(text: String, emotion: Emotion, message: ChatMessage) {
         val tm = ttsManager ?: run {
@@ -2162,6 +2540,14 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
             val ctxBlock = contextManager?.getContextBlock() ?: ""
             if (ctxBlock.isNotBlank()) {
                 append("\n\n[上下文]\n$ctxBlock")
+            }
+
+            // 世界书：按用户消息关键词触发注入（与微信流程一致）
+            if (query.isNotBlank()) {
+                val worldInfoBlock = com.aicompanion.prompt.PromptBuilder.buildWorldInfoBlock(this@MainActivity, activePersonaId, query)
+                if (worldInfoBlock.isNotBlank()) {
+                    append(worldInfoBlock)
+                }
             }
 
             // 注入主体性状态 (情绪+驱动力+疲劳+风格指令)
@@ -2514,6 +2900,37 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
             } catch (e: Exception) { com.aicompanion.util.AppLogger.e("MainActivity", "buildSystemContext: ${e.message}") }
         }
 
+        // ===== 人格锚点（每轮注入，并驱动人格演化）=====
+        // 依据 ContextEcho：长对话人设会漂移，压缩也不会修复，
+        // 只有"定期重注锚点"能恢复语气。这里按轮计：首轮给完整画像，之后每 20 轮重注一次。
+        try {
+            val pid = activePersonaId
+            if (pid.isNotBlank()) {
+                val profile = com.aicompanion.personality.PersonalityRuntime.load(this, pid)
+                if (profile != null && profile.hasContent()) {
+                    val turns = personalityTurns
+                    val block = com.aicompanion.personality.PersonalityPrompt.block(
+                        profile = profile,
+                        userText = message,
+                        sessionStart = turns == 0,
+                        turnsSinceAnchor = turns,
+                    )
+                    if (block.isNotBlank()) {
+                        if (sb.isNotEmpty()) sb.append("\n")
+                        sb.append(block)
+                    }
+                    personalityTurns = if (turns + 1 >= com.aicompanion.personality.PersonalityPrompt.REANCHOR_EVERY_TURNS) 0 else turns + 1
+
+                    // 演化放到后台：磁盘读写不能拖慢回复
+                    messageScope.launch(Dispatchers.IO) {
+                        com.aicompanion.personality.PersonalityRuntime.observeTurn(this@MainActivity, pid, message)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.w("MainActivity", "人格注入失败: ${e.message}")
+        }
+
         return sb.toString()
     }
 
@@ -2653,21 +3070,6 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
             com.aicompanion.util.AppLogger.w(TAG, "入场动画异常: ${e.message}")
         }
     }
-
-    private fun showAutoOperationDialog() {
-        if (autoOperationCoordinator == null) {
-            autoOperationCoordinator = AutoOperationCoordinator(
-                this, this,
-                messageScope = messageScope,
-                settingsManagerProvider = { settingsManager },
-                apiClientProvider = { apiClient },
-                onPetMessage = { text, emotion, action -> addPetMessage(text, emotion, action) }
-            )
-        }
-        autoOperationCoordinator?.showAutoOperationDialog()
-    }
-
-    // executeAutoOperation 已移至 AutoOperationCoordinator
 
     /** 选择背景图片（Compose 换壁纸用） */
     override fun changeWallpaper() {
@@ -3048,6 +3450,23 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
         isInForeground = true
         if (isFinishing || isDestroyed) return
 
+        // 语音唤醒：登记前台状态（决定唤醒时原地开麦还是拉起界面）+ 同步服务开关
+        com.aicompanion.voice.wake.AppState.mainVisible = true
+        if (!wakeReceiverRegistered) {
+            runCatching {
+                registerReceiver(
+                    wakeReceiver,
+                    android.content.IntentFilter(com.aicompanion.voice.wake.VoiceWake.ACTION_WAKE)
+                )
+                wakeReceiverRegistered = true
+            }
+        }
+        (settingsManager ?: SettingsManager(this)).let { sm ->
+            settingsManager = sm
+            com.aicompanion.voice.wake.VoiceWake.sync(this, sm)
+        }
+        maybeHandlePendingVoiceWake()
+
         // 刷新角色ID（可能从设置页切换了角色）
         val oldPersonaId = activePersonaId
         refreshActivePersonaId()
@@ -3142,10 +3561,19 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
     override fun onPause() {
         super.onPause()
         isInForeground = false
+        com.aicompanion.voice.wake.AppState.mainVisible = false
+        if (wakeReceiverRegistered) {
+            runCatching { unregisterReceiver(wakeReceiver) }
+            wakeReceiverRegistered = false
+        }
         proactiveChatCoordinator?.onPause()
         virtualWorldCoordinator?.onPause()
         diaryCoordinator?.onPause()
         focusTimerCoordinator?.onPause()
+
+        // 离开时把这几轮对话整理进记忆。
+        // 用户很少一口气聊满评估间隔，不在这里收尾的话，聊三句就退出等于白聊。
+        flushMemoryOnLeave()
 
         if (settingsManager?.backgroundRunning == true) {
             try {
@@ -3159,12 +3587,28 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
         }
     }
 
+    /**
+     * 切后台/退出时整理一次记忆。
+     *
+     * 只在「有 3 轮以上待评估」且「距上次整理超过 5 分钟」时触发，
+     * 不是每次 onPause 都打一次 AI 请求。
+     */
+    private fun flushMemoryOnLeave() {
+        val cm = contextManager ?: return
+        if (!runCatching { cm.shouldFlushOnLeave() }.getOrDefault(false)) return
+        val client = runCatching { com.aicompanion.AppContainer.apiClient }.getOrNull() ?: return
+        AppLogger.i(TAG, "[Memory-Flush] 离开应用，整理 ${cm.pendingTurns()} 轮对话")
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching { cm.evaluateAndUpdateMemory(client, force = true) }
+                .onFailure { AppLogger.w(TAG, "[Memory-Flush] 整理失败: ${it.javaClass.simpleName}: ${it.message}") }
+        }
+    }
+
     override fun onDestroy() {
         // === 清理所有 Coordinator ===
         listOf(
             live2DCoordinator, focusTimerCoordinator, diaryCoordinator,
-            proactiveChatCoordinator, virtualWorldCoordinator, onboardingCoordinator,
-            autoOperationCoordinator
+            proactiveChatCoordinator, virtualWorldCoordinator, onboardingCoordinator
         ).forEach { coordinator ->
             try { coordinator?.onDestroy() } catch (e: Exception) {
                 AppLogger.e(TAG, "Coordinator cleanup failed: ${e.message}")
@@ -3319,7 +3763,7 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
             5 -> changeWallpaper()
             6 -> showLogViewer()
             7 -> showTutorial()
-            8 -> showAutoOperationDialog()
+            8 -> { /* 手机自动化已改为 LLM 工具调用，无需手动入口 */ }
             9 -> triggerManualDiary()
             10 -> try {
                 val intent = Intent(this, MemoryPoolActivity::class.java)
@@ -3468,8 +3912,6 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
     override val messageVersionState: androidx.compose.runtime.State<Int> get() = _messageVersionState
     override fun isTyping(): Boolean = _isTyping
     override val isTypingState: androidx.compose.runtime.State<Boolean> get() = _isTypingState
-    override fun isLoading(): Boolean = _isLoading
-    override val isLoadingState: androidx.compose.runtime.State<Boolean> get() = _isLoadingState
     override val dataVersionState: androidx.compose.runtime.State<Int> get() = _dataVersionState
 
     /** 切换消息收藏 */

@@ -10,6 +10,17 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
+/**
+ * 记忆分层（仿人脑记忆巩固模型）
+ *
+ * - [EPISODIC]     情景记忆：最近 7 天，保留细节，能逐字回忆（"昨天你说……"）
+ * - [CONSOLIDATED] 巩固记忆：7~30 天，压成要点（记得做了什么、结论是什么，细节模糊）
+ * - [SEMANTIC]     语义记忆：30 天以上，抽象成稳定事实（偏好、习惯、关系、禁忌），不带具体时间
+ *
+ * 三层的差别不是"存哪儿"，而是"还留多少细节"——这跟人记东西的方式一致。
+ */
+enum class MemoryTier { EPISODIC, CONSOLIDATED, SEMANTIC }
+
 data class MemoryEntry(
     val id: String = UUID.randomUUID().toString().take(8),
     val content: String,
@@ -24,7 +35,17 @@ data class MemoryEntry(
     val details: String = "",
     val relationships: String = "",
     val isGlobal: Boolean = false,
-    val importance: Float = 1.0f  // 重要性评分 0.0-1.0，默认1.0
+    val importance: Float = 1.0f,  // 重要性评分 0.0-1.0，默认1.0
+    // ---- 时间分层相关（旧数据自动落到 EPISODIC / 强度 1.0）----
+    val tier: MemoryTier = MemoryTier.EPISODIC,
+    /** 记忆强度：随遗忘曲线衰减，被回忆时回升（间隔重复） */
+    val strength: Float = 1.0f,
+    val recallCount: Int = 0,
+    val lastRecallAt: Long = 0L,
+    /** 已被更高层吸收：保留做溯源，但不再注入上下文 */
+    val archived: Boolean = false,
+    /** 由哪些条目巩固而来（保留来源，可追溯） */
+    val derivedFrom: List<String> = emptyList(),
 ) {
     fun toStructuredText(): String {
         val parts = mutableListOf<String>()
@@ -53,6 +74,12 @@ data class MemoryEntry(
         put("relationships", relationships)
         put("isGlobal", isGlobal)
         put("importance", importance)
+        put("tier", tier.name)
+        put("strength", strength.toDouble())
+        put("recallCount", recallCount)
+        put("lastRecallAt", lastRecallAt)
+        put("archived", archived)
+        if (derivedFrom.isNotEmpty()) put("derivedFrom", JSONArray(derivedFrom))
     }
 
     companion object {
@@ -70,7 +97,16 @@ data class MemoryEntry(
             details = obj.optString("details", ""),
             relationships = obj.optString("relationships", ""),
             isGlobal = obj.optBoolean("isGlobal", false),
-            importance = obj.optDouble("importance", 1.0).toFloat()
+            importance = obj.optDouble("importance", 1.0).toFloat(),
+            tier = runCatching { MemoryTier.valueOf(obj.optString("tier", "EPISODIC")) }
+                .getOrDefault(MemoryTier.EPISODIC),
+            strength = obj.optDouble("strength", 1.0).toFloat(),
+            recallCount = obj.optInt("recallCount", 0),
+            lastRecallAt = obj.optLong("lastRecallAt", 0L),
+            archived = obj.optBoolean("archived", false),
+            derivedFrom = obj.optJSONArray("derivedFrom")?.let { a ->
+                (0 until a.length()).map { a.optString(it) }
+            } ?: emptyList(),
         )
     }
 }
@@ -483,32 +519,16 @@ suspend fun consolidate(client: ApiClient): String = withContext(Dispatchers.IO)
 
         val nick = userNickname.ifBlank { "用户" }
         val systemPrompt = buildString {
-            append("你是记忆整理助手。你的任务是将对话内容按【场景】和【事件】进行归纳总结。\n\n")
-            append("【核心原则】\n")
-            append("- 不要逐句记录对话！要将对话内容抽象为「场景→发生了什么」的结构化记忆\n")
-            append("- 将同一场景下发生的多轮对话合并为一条完整的场景记忆\n")
-            append("- 每条记忆应该像小说的章节摘要，而不是对话记录\n\n")
-
-            append("【输出格式】只输出JSON数组，不要Markdown包裹\n")
-            append("每条JSON格式：\n")
-            append("{\"action\":\"add\",\"content\":\"场景摘要(一句话概括这个场景发生了什么)\",\"eventTime\":\"时间\",\"place\":\"地点/场景名\",\"people\":\"涉及人物\",\"event\":\"具体事件经过(起因→经过→结果)\",\"scene\":\"场景类型(如:日常闲聊/情感交流/计划讨论/分享经历/游戏娱乐/学习工作等)\",\"details\":\"关键细节(具体数字、名称、承诺、决定等)\",\"relationships\":\"关系变化(如有)\"}\n\n")
-
-            append("【action类型】\n")
-            append("- add: 新增场景/事件记忆\n")
-            append("- update: 更新已有记忆(需加old_content_fragment字段)\n")
-            append("- delete: 删除过时记忆(需加old_content_fragment字段)\n")
-            append("- detail: 重要事实细节(单独保存，防止遗忘)\n\n")
-
-            append("【重要规则】\n")
-            append("- 场景描述要具体：「在咖啡馆聊了项目进度」而不是「聊了一些事情」\n")
-            append("- 事件要有完整脉络：「用户提到最近压力大→AI安慰并建议休息→用户表示会试试」而不是零散的三句话\n")
-            append("- 同一话题的多轮对话合并为一条：如果用户和AI连续5轮都在讨论旅行计划，只输出1条记忆概括整个讨论\n")
-            append("- 只跳过纯寒暄（如「你好」「嗯」「好的」）\n")
-            append("- 用户的具体偏好、承诺、决定、数据必须记入details字段\n")
-            append("- 跨场景有价值的信息(喜好、习惯、重要事实)加 \"global\":true\n")
-            append("- detail类型的记忆用于保存容易遗忘的具体细节\n")
-            append("- 结构化字段可以为空字符串但必须存在\n")
-            append("- 提到$nick 时用「$nick」称呼\n")
+            append("你是记忆整理助手。把对话归纳成「场景→发生了什么」的结构化记忆。\n\n")
+            append("【必须输出】只要对话里有用户的陈述、偏好、习惯、情绪、计划、承诺、人物关系或发生的事，")
+            append("就必须输出至少 1 条记忆。不要因为内容平淡就返回空数组——只有整段全是「你好/嗯/哈哈」这类寒暄才允许输出 []。\n\n")
+            append("【合并原则】同一话题的多轮对话合并成 1 条，不要逐句记录；每条像章节摘要。\n\n")
+            append("【输出格式】只输出 JSON 数组，不要 Markdown 代码块，不要解释文字。\n")
+            append("{\"action\":\"add\",\"content\":\"一句话场景摘要\",\"place\":\"地点/场景\",\"people\":\"涉及人物\",")
+            append("\"event\":\"事件经过(起因→经过→结果)\",\"details\":\"关键细节(数字/名称/承诺/决定)\",\"global\":false}\n\n")
+            append("【action 取值】add=新增 / update=更新(带 old_content_fragment) / detail=易忘的具体事实 / delete=删除过时(带 old_content_fragment)\n")
+            append("【global】跨场景长期有用（喜好、习惯、重要事实）填 true，其余 false\n")
+            append("【称呼】提到$nick 时用「$nick」\n")
         }
 
         val userContent = buildString {
@@ -553,7 +573,16 @@ suspend fun consolidate(client: ApiClient): String = withContext(Dispatchers.IO)
 
             if (cleaned == "[]") return emptyList()
 
-            val arr = try { JSONArray(cleaned) } catch (e: Exception) { AppLogger.e(TAG, "记忆评估结果解析失败: ${e.message}", e); return emptyList() }
+            val arr = try {
+                JSONArray(cleaned)
+            } catch (e: Exception) {
+                // 模型经常输出被截断/夹带说明的 JSON。整体解析失败时逐个对象抢救，
+                // 能捞一条是一条——记忆宁可粗糙也不能整段丢。
+                AppLogger.w(TAG, "记忆评估结果整体解析失败，尝试逐对象抢救: ${e.message}")
+                val salvaged = salvageObjects(cleaned, turnNumber)
+                if (salvaged.isNotEmpty()) return salvaged
+                return emptyList()
+            }
             if (arr.length() == 0) return emptyList()
 
             for (i in 0 until arr.length()) {
@@ -651,6 +680,100 @@ suspend fun consolidate(client: ApiClient): String = withContext(Dispatchers.IO)
         }
         return results
     }
+
+    /**
+     * 从残缺的 JSON 文本里抢救记忆条目。
+     *
+     * 两种常见故障：① 输出被 max_tokens 截断，数组没闭合；② 模型在 JSON 前后加了解释。
+     * 做法是先按 `{` 分段，能单独解析的就解析，剩下解析不了的按 content 正则兜底。
+     */
+    private fun salvageObjects(text: String, turnNumber: Int): List<MemoryEntry> {
+        val out = mutableListOf<MemoryEntry>()
+
+        // 1) 尝试逐个 JSONObject 解析
+        var depth = 0
+        var start = -1
+        val chunks = mutableListOf<String>()
+        for ((i, c) in text.withIndex()) {
+            when (c) {
+                '{' -> { if (depth == 0) start = i; depth++ }
+                '}' -> { depth--; if (depth == 0 && start >= 0) chunks.add(text.substring(start, i + 1)) }
+            }
+        }
+        for (chunk in chunks) {
+            val obj = runCatching { JSONObject(chunk) }.getOrNull() ?: continue
+            val content = obj.optString("content", "").trim()
+            if (content.isBlank()) continue
+            out.add(
+                MemoryEntry(
+                    content = content,
+                    category = if (obj.optString("action", "add") == "detail") "细节" else "总结",
+                    sourceTurn = turnNumber,
+                    place = obj.optString("place", ""),
+                    people = obj.optString("people", ""),
+                    event = obj.optString("event", ""),
+                    details = obj.optString("details", ""),
+                    isGlobal = obj.optBoolean("global", false)
+                )
+            )
+        }
+        if (out.isNotEmpty()) return out
+
+        // 2) 连对象都不完整：直接抓 "content":"..."
+        val regex = Regex("\"content\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.){4,400})\"")
+        for (m in regex.findAll(text)) {
+            val content = m.groupValues[1]
+                .replace("\\n", " ")
+                .replace("\\\"", "\"")
+                .trim()
+            if (content.length < 4) continue
+            out.add(MemoryEntry(content = content.take(200), category = "总结", sourceTurn = turnNumber))
+        }
+        return out
+    }
+
+    // ==================== 分层记忆支持 ====================
+
+    /** 全部条目（含归档），供巩固器和 UI 使用 */
+    fun allForTiering(): List<MemoryEntry> = entries.toList()
+
+    /**
+     * 应用一次巩固结果：把被吸收的旧条目归档，追加新生成的层条目。
+     *
+     * 归档而不是删除——原文还要能被检索和溯源（"这句话是哪天说的"）。
+     */
+    fun applyConsolidation(
+        archiveIds: Collection<String>,
+        newEntries: List<MemoryEntry>,
+    ) {
+        if (archiveIds.isNotEmpty()) {
+            val ids = archiveIds.toHashSet()
+            for (i in entries.indices) {
+                if (entries[i].id in ids) entries[i] = entries[i].copy(archived = true)
+            }
+        }
+        newEntries.forEach { if (it.content.isNotBlank()) entries.add(it) }
+        recalcCharCount()
+        saveToStorage()
+    }
+
+    /** 某条被回忆到：强度回升 */
+    fun markRecalled(id: String) {
+        val i = entries.indexOfFirst { it.id == id }
+        if (i >= 0) {
+            entries[i] = TieredMemory.onRecalled(entries[i])
+            saveToStorage()
+        }
+    }
+
+    /** 分层注入块（替代原来平铺的 getPoolBlock + getDetailBlock） */
+    fun getTieredBlock(maxChars: Int = config.maxChars): String =
+        TieredMemory.buildTieredBlock(entries, maxChars)
+
+    /** 是否有需要按时间巩固的条目（用于决定要不要调 AI） */
+    fun needsTierConsolidation(): Boolean =
+        TieredMemory.pendingEpisodic(entries).isNotEmpty() ||
+            TieredMemory.pendingConsolidated(entries).isNotEmpty()
 
     fun saveToStorage() {
         try {

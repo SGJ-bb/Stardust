@@ -1,6 +1,7 @@
 package com.aicompanion.ui.favorites
 
 import android.graphics.BitmapFactory
+import com.aicompanion.ui.components.StradustEmptyState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -91,20 +92,12 @@ fun FavoritesScreen(
                             .padding(top = 80.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.Bookmark,
-                                contentDescription = null,
-                                tint = StradustTheme.colors.textMuted,
-                                modifier = Modifier.size(48.dp),
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                text = "还没有收藏的消息",
-                                color = StradustTheme.colors.textMuted,
-                                fontSize = 14.sp,
-                            )
-                        }
+                        StradustEmptyState(
+                            emoji = "🔖",
+                            title = "还没有收藏的消息",
+                            hint = "长按任意一条消息即可收藏，之后在这里回看",
+                            compact = true,
+                        )
                     }
                 }
             } else {

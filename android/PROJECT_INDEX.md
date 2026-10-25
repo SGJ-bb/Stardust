@@ -19,7 +19,7 @@ AI伴侣Android应用，支持多模态交互（文字/语音/图片），虚拟
 
 | 文件 | 用途 | 关键方法 |
 |------|------|---------|
-| `ApiClient.kt` | AI后端API客户端，聊天/工具调用/图片/TTS | `sendChat()`, `sendSimplePrompt()`, `sendChatWithToolLoop()`, `buildToolsJson()` |
+| `ApiClient.kt` | AI后端API客户端，聊天/工具调用/图片/TTS/UI 知识归纳 | `sendChat()`, `sendSimplePrompt()`, `sendChatWithToolLoop()`, `buildToolsJson()`, `analyzeAutoOperation(userRequest, screenInfo, uiKnowledge)`, `summarizeSkill(userRequest, actionsJson)` |
 | `ProviderAdapter.kt` | 多厂商API适配，统一请求/响应格式 | `buildImageRequest()`, `buildImageHeaders()`, `parseImageResponse()`, `buildTtsRequest()`, `parseTtsResponse()`, `callCloudAsr()`, `pollAliyunTask()` |
 
 ### 设置 (settings/)
@@ -63,6 +63,7 @@ AI伴侣Android应用，支持多模态交互（文字/语音/图片），虚拟
 | `ActivationActivity.kt` | 激活页Activity | `ActivationActivity` |
 | `FavoriteManager.kt` | 收藏管理器 | `FavoriteManager` |
 | `NicknameManager.kt` | 昵称管理器 | `NicknameManager` |
+| `settings/AccessibilitySettingsScreen.kt` | 无障碍设置页(Compose)：服务状态/AI操作权限/功能开关/操作参数/App分类自定义 | `AccessibilitySettingsScreen` |
 
 ### 语音 (voice/)
 
@@ -89,6 +90,7 @@ AI伴侣Android应用，支持多模态交互（文字/语音/图片），虚拟
 | `ToolPlugin.kt` | 插件接口定义 | `ToolPlugin` → `name`, `description`, `getDefinition()`, `execute()`, `isEnabled()` |
 | `PluginRegistry.kt` | 插件注册中心，管理插件生命周期 | `PluginRegistry` → `register()`, `unregister()`, `executePlugin()`, `getEnabledDefinitions()` |
 | `BuiltinPlugins.kt` | 内置插件实现 | `AlarmPlugin`(set_alarm), `AlarmAtTimePlugin`(set_alarm_at_time), `SchedulePlugin`(add_schedule), `WebSearchPlugin`(search_web), `SearchMemoryPlugin`(search_memory), `SearchDiaryPlugin`(search_diary), `CurrentTimePlugin`(get_current_time), `NicknamePlugin`(summarize_nicknames), `SendStickerPlugin`(send_sticker), `GenerateImagePlugin`(generate_image) |
+| `PhoneOperationPlugin.kt` | 手机操作工具插件（LLM 工具调用形式操作手机，含异常检测+步数上限+UI 知识先验注入+执行后归纳） | `PhoneOperationPlugin`(operate_phone) → `execute()`; `guessAppNameFromInstruction()`, `formatUiKnowledgeForLLM()` |
 
 ### 情感 (emotion/)
 
@@ -142,7 +144,7 @@ AI伴侣Android应用，支持多模态交互（文字/语音/图片），虚拟
 
 | 文件 | 用途 | 关键方法 |
 |------|------|---------|
-| `PromptBuilder.kt` | 系统提示词构建，身份/规则/记忆注入 | `buildIdentity()`, `getCoreRules()`, `IdentityBlock` |
+| `PromptBuilder.kt` | 系统提示词构建，身份/规则/记忆/世界书注入 | `buildIdentity()`, `buildChatPrompt()`, `buildWorldInfoBlock()`, `getCoreRules()`, `IdentityBlock` |
 
 ### 动作 (action/)
 
@@ -199,9 +201,12 @@ AI伴侣Android应用，支持多模态交互（文字/语音/图片），虚拟
 
 | 文件 | 用途 | 关键类/方法 |
 |------|------|------------|
-| `ScreenRecognitionService.kt` | 无障碍服务，屏幕内容识别 | `ScreenRecognitionService` → `getLastScreenText()`, `getClickableData()`, `performClick()`, `performScroll()` |
-| `AutoOperator.kt` | 自动操作器（点击/滑动/输入） | `AutoOperator` → `readScreenText()`, `executeAction()`, `AutoAction` |
-| `AppCategoryClassifier.kt` | 应用分类器 | `AppCategoryClassifier.classify()` |
+| `ScreenRecognitionService.kt` | 无障碍服务，屏幕内容识别+手势执行 | `ScreenRecognitionService` → `getInstance()`, `getLastScreenText()`, `getClickableData()`, `findClickCandidates()`, `refreshScreenData()`, `performClick()`, `performClickByIndex()`, `performSwipe()`, `performLongPress()`, `performInput()`, `performScroll()`, `performGlobalAction()`; `ClickableData` |
+| `AutoOperator.kt` | 自动操作器（动作解析/执行/事件驱动等待） | `AutoOperator` → `isServiceReady()`, `readScreenText()`, `executeAction()`, `parseActionsFromLLM()`, `formatScreenForLLM()`; `AutoAction`; `ActionResult` |
+| `AppSkillManager.kt` | APP UI 知识库管理器（学习型框架核心）：存储/查询/合并 UI 知识 skill | `AppSkillManager` → `getAllSkills()`, `getSkillForApp()`, `saveSkill()`, `incrementUseCount()`, `deleteSkill()`; `Skill`(appName/appPackage/uiMap/knownTasks); `KnownTask`(taskName/triggerKeywords/workflow) |
+| `SkillBuilder.kt` | UI 知识构建器：操作成功后调用 LLM 归纳 UI 结构知识 + 任务 workflow，存为可复用 skill | `SkillBuilder.buildAndSave(apiClient, context, userRequest, actionsJson)` |
+| `AppCategoryClassifier.kt` | 应用分类器（三级查询：缓存/内置/自定义/兜底） | `AppCategoryClassifier` → `classify()`, `init()`, `setUserOverride()`, `getAllUserOverrides()` |
+| `AppCategoryMapping.kt` | 内置 App 包名→类别映射表（80+ App，15 类） | `AppCategoryMapping` → `BUILTIN`, `ALL_CATEGORIES`, `DISPLAY_NAMES` |
 
 ### 本地模型 (localmodel/)
 
@@ -241,7 +246,7 @@ AI伴侣Android应用，支持多模态交互（文字/语音/图片），虚拟
 |------|------|--------|
 | `IlinkApi.kt` | 微信iLink API接口 | `IlinkApi` → `sendMessage()`, `generateQRCode()` |
 | `IlinkAuthManager.kt` | iLink认证管理 | `IlinkAuthManager` → `isBound`, `botToken`, `bindBot()`, `unbindBot()` |
-| `IlinkPollingService.kt` | iLink消息轮询服务，自动保存聊天记录 | `IlinkPollingService` |
+| `IlinkPollingService.kt` | iLink消息轮询服务，复用主聊天prompt构造（人格/用户画像/记忆/日历/世界书）+ 微信专属emoji规则 | `IlinkPollingService`, `generateAiReply()` |
 | `WechatBindActivity.kt` | 微信绑定Activity | `WechatBindActivity` |
 | `WechatChatActivity.kt` | 微信聊天记录查看Activity | `WechatChatActivity` |
 | `WechatChatAdapter.kt` | 微信风格聊天气泡适配器 | `WechatChatAdapter` |
@@ -362,6 +367,45 @@ AI伴侣Android应用，支持多模态交互（文字/语音/图片），虚拟
 | siliconflow | 0~2 | ❌ | ❌ | ✅ | 8192 |
 | openrouter | 0~2 | ✅(-2~2) | ✅(-2~2) | ✅ | 131072 |
 | n1n | 0~2 | ✅ | ✅ | ✅ | 32768 |
+
+## game子系统（独立模块：LLM 大脑像素小镇，M0 骨架）
+
+> 定位：世界书驱动的像素生活模拟游戏，嵌入 App 的独立 WebView(Phaser)模块，**不影响**其他聊天/虚拟世界等既有功能。
+
+| 目录/文件 | 用途 | 关键类/方法 |
+|-----------|------|------------|
+| `game/engine/PhaserHostActivity.kt` | Phaser 游戏宿主 Activity，纯代码构建 WebView 加载 `assets/game/index.html` | `createWebView()`, `bindBridge()`, `loadGame()`, `onGameReady()`, `startGameLoop()`, `sendToJs(type,payload)` |
+| `game/engine/JsBridge.kt` | JS↔Kotlin 双向桥（JavaScriptInterface），统一 JSON 事件 `{type, payload}` | `postToNative(msg)` |
+| `game/engine/GameLoop.kt` | M1 确定性游戏循环：时钟推进 + NPC 按日程移动，每 tick 经 bridge 下发位置**[M1闭环]** | `NpcMovePacket`, `GameLoop` → `start()`, `stop()`, `tick()` |
+| `game-frontend/`（android 下） | 前端源码（Vite + Phaser 3 + TS）：`src/main.ts`、`src/bridge.ts`、`src/pixelAssets.ts`（AI预烘焙资产加载/抠白）、`src/characters.ts`（程序化像素角色兜底）、`src/tileset.ts`（多地貌 tilemap+实体建筑）、`src/scenes/BootScene.ts`、`src/scenes/GameScene.ts` | 构建产物拷贝至 `app/src/main/assets/game/` |
+| `game-frontend/public/assets/` | AI 预烘焙美术资产原图(白底 jpg)，Phaser 加载后经 `pixelAssets.keyImageToTransparent` 抠白成透明纹理 | `emily_sheet.jpg` 等 |
+| `assets/game/` | Phaser 静态产物（index.html + 单 bundle），`node_modules` 不入 APK | — |
+| Manifest `com.aicompanion.game.engine.PhaserHostActivity` | 游戏 Activity 注册（landscape） | — |
+| 首页 `ui/HomeActivity.kt` `btn_game_entry` | "小镇"入口卡片 → 启动游戏 | — |
+| `game/logic/TimeSystem.kt` | 游戏时钟(确定性推进日/时刻/阶段)**[M1骨架]** | `tick()`, `phase`, `restore()`, `DayPhase` |
+| `game/world/MapModels.kt` | 地图坐标模型(格子↔像素双向换算)**[M1骨架]** | `MapCell`, `PixelPos` |
+| `game/npc/NpcModels.kt` | NPC 确定性状态(位置/行为/朝向)**[M1骨架]** | `NpcState`, `NpcBehavior` |
+| `game/npc/FsmReflexLayer.kt` | 反射层决策(FSM,纯本地零LLM)**[M1骨架]** | `decide(time,state)` |
+| `game/npc/NpcScheduleSystem.kt` | 日程表:时段→目标格子+行为**[M1骨架]** | `ScheduleEntry`, `targetFor()` |
+| `game/logic/SaveManager.kt` | 本地JSON存档(只存确定性结果)**[M1骨架]** | `save()`, `load()` |
+
+> 前端构建：`cd android/game-frontend && npm install && npm run build`，产物拷到 `assets/game`。
+> 注意：改造 `activity_home.xml`/`HomeActivity.kt` 时只允许**新增 btn_game_entry**，不改动其他入口逻辑。
+
+### 美术资产分层（路线A：AI 预烘焙）
+
+```
+内置角色/物品(星露谷级观感, 用户零API):
+  AI 生成白底 jpg → public/assets/ → 打包进 assets/game/assets/
+    → 运行时 Phaser 加载 → pixelAssets.keyImageToTransparent 抠白成透明纹理 → 挂到 sprite
+  (抠白阈值 127; 已实测保角色完整、白底透明、无红边)
+
+用户自定义世界观(用户自费图片API):
+  M3 起: 用户提供/生成自定义角色图 → 复用同一抠白+加载管线, 传任意图片 URL
+  → 与内置资产共用 pixelAssets, 运行时零额外成本
+```
+
+> 注：`keyImageToTransparent` 抠白采用 RGB≥127 阈值，适用于白底像素资产；深色底图需另配（M3 预留）。
 
 ## 数据流
 

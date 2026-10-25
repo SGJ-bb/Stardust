@@ -124,6 +124,12 @@ object StradustDestinations {
     const val WORLD_BOOK = "world_book"
     const val PIXEL_PET = "pixel_pet"
     const val ACCESSIBILITY_SETTINGS = "accessibility_settings"
+    /** 功能引导（互动教程） */
+    const val GUIDE = "guide"
+    /** 技能库（跨 App 自动化技能） */
+    const val SKILLS = "skills"
+    /** 人格画像面板 */
+    const val PERSONALITY = "personality"
 
     /**
      * MainActivity → Compose UI 的桥接回调接口
@@ -168,10 +174,6 @@ object StradustDestinations {
         fun isTyping(): Boolean
         /** 打字状态的 Compose State */
         val isTypingState: State<Boolean> get() = mutableStateOf(false)
-        /** 当前是否正在加载中（显示加载圈） */
-        fun isLoading(): Boolean
-        /** 加载状态的 Compose State */
-        val isLoadingState: State<Boolean> get() = mutableStateOf(false)
         /** 全局数据版本号（任何页面数据变化时递增，触发所有 Composable 重组） */
         val dataVersionState: State<Int> get() = mutableStateOf(0)
         /** 切换消息收藏 */
@@ -517,7 +519,6 @@ fun StradustNavHost(
             // 关键：通过 State 读取触发 Compose 自动重组
             val messageVersion = host?.messageVersionState?.value ?: 0
             val isTyping = host?.isTypingState?.value ?: false
-            val isLoading = host?.isLoadingState?.value ?: false
             val dataVersion = host?.dataVersionState?.value ?: 0
 
             // 缓存 host 数据调用，避免每次重组创建新列表/对象引用
@@ -532,7 +533,6 @@ fun StradustNavHost(
             ChatScreen(
                 messages = chatMessages,
                 isTyping = isTyping,
-                isLoading = isLoading,
                 onSendMessage = { text -> host?.sendMessage(text) },
                 onStartVoice = { host?.startVoice() },
                 onStopVoice = { host?.stopVoice() },
@@ -625,6 +625,18 @@ fun StradustNavHost(
                             val intent = android.content.Intent(ctx, com.aicompanion.ui.ModelManagerActivity::class.java)
                             intent.putExtra("action", route)
                             ctx.startActivity(intent)
+                        }
+                        "model_adjust" -> {
+                            // 模型实时调整页：长按拖动定位 + 缩放滑块 + 一键复位。
+                            // 它直接读写 app_prefs，返回聊天页时 MainActivity.onResume
+                            // 会自动 loadSettings + updatePositionAndScale 应用新值。
+                            // 调整页会另开一个 Live2D 视图，先把聊天页的暂停掉，
+                            // 避免两份 WebView 同时渲染（低端机容易卡顿）。
+                            host?.pauseLive2D()
+                            val ctx = navController.context
+                            ctx.startActivity(
+                                android.content.Intent(ctx, com.aicompanion.ui.ModelAdjustActivity::class.java)
+                            )
                         }
                         else -> navController.navigate(route) { launchSingleTop = true }
                     }
@@ -1229,6 +1241,19 @@ fun StradustNavHost(
             LocalModelScreen(onBackClick = { navController.popBackStack() })
         }
 
+        // 人格画像
+        composable(
+            route = StradustDestinations.PERSONALITY,
+            enterTransition = { pageEnterTransition },
+            exitTransition = { pageExitTransition },
+            popEnterTransition = { pageEnterTransition },
+            popExitTransition = { pageExitTransition },
+        ) {
+            com.aicompanion.ui.personality.PersonalityScreen(
+                onBackClick = { navController.popBackStack() },
+            )
+        }
+
         // 记忆池
         composable(
             route = StradustDestinations.MEMORY_POOL,
@@ -1302,6 +1327,36 @@ fun StradustNavHost(
             popExitTransition = { pageExitTransition },
         ) {
             com.aicompanion.ui.settings.AccessibilitySettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSkills = { navController.navigate(StradustDestinations.SKILLS) },
+                onOpenGuide = { navController.navigate(StradustDestinations.GUIDE) }
+            )
+        }
+
+        composable(
+            route = StradustDestinations.GUIDE,
+            enterTransition = { pageEnterTransition },
+            exitTransition = { pageExitTransition },
+            popEnterTransition = { pageEnterTransition },
+            popExitTransition = { pageExitTransition },
+        ) {
+            com.aicompanion.ui.guide.GuideScreen(
+                onBack = { navController.popBackStack() },
+                onNavigate = { route ->
+                    navController.navigate(route) { launchSingleTop = true }
+                }
+            )
+        }
+
+        // 技能库：跨 App 自动化技能的管理与 AI 生成
+        composable(
+            route = StradustDestinations.SKILLS,
+            enterTransition = { pageEnterTransition },
+            exitTransition = { pageExitTransition },
+            popEnterTransition = { pageEnterTransition },
+            popExitTransition = { pageExitTransition },
+        ) {
+            com.aicompanion.ui.skill.SkillScreen(
                 onBack = { navController.popBackStack() }
             )
         }

@@ -72,17 +72,43 @@ class BackgroundService : android.app.Service() {
         val dm = DiaryManager(this, activePersonaId)
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
         val today = sdf.format(java.util.Date())
-        if (today != lastDiaryCheckDay) {
-            lastDiaryCheckDay = today
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
-                .putString(KEY_LAST_DIARY_DAY, today).apply()
-            val mode = sm.diaryTriggerMode
-            if (mode != null && mode != DiaryTriggerMode.MANUAL && mode != DiaryTriggerMode.DAILY_10PM) {
-                dm.updateOrGenerateDailyDiary(emptyList(), 50)
-            } else {
-                AppLogger.w("BgService", "checkDailyDiary: skipped, mode=$mode")
+        if (today == lastDiaryCheckDay) return
+
+        lastDiaryCheckDay = today
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+            .putString(KEY_LAST_DIARY_DAY, today).apply()
+
+        val mode = sm.diaryTriggerMode
+        if (mode == DiaryTriggerMode.MANUAL) {
+            AppLogger.w("BgService", "checkDailyDiary: 手动模式，跳过")
+            return
+        }
+        if (mode == DiaryTriggerMode.DAILY_10PM) {
+            // 22:00 的自动写日记依赖前台 Handler 定时器，App 进程不在时不会执行；
+            // 这里补一条后台兜底：到点且今天还没有日记时才生成。
+            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+            if (hour < 22 || dm.getDiaryByDate(today) != null) {
+                AppLogger.w("BgService", "checkDailyDiary: DAILY_10PM 未到点或已有日记，跳过")
+                return
             }
         }
+
+        // 用今天的真实聊天记录生成；没有聊天就跳过，避免写出空洞内容
+        val texts = try {
+            com.aicompanion.storage.ChatHistoryStorage(this)
+                .getMessages("persona", activePersonaId, today)
+                .map { it.text }
+                .filter { it.isNotBlank() }
+        } catch (e: Exception) {
+            AppLogger.e("BgService", "checkDailyDiary 读取聊天记录失败: ${e.message}")
+            emptyList()
+        }
+        if (texts.isEmpty()) {
+            AppLogger.w("BgService", "checkDailyDiary: 今天没有聊天记录，跳过")
+            return
+        }
+
+        dm.updateOrGenerateDailyDiary(texts, 50, force = true)
     }
 
     private fun createNotificationChannel() {

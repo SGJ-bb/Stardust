@@ -13,10 +13,33 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- 系统日历读写：让 AI 能看「明天有什么安排」、也能直接写进手机日历 -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- 语音唤醒常驻监听：息屏后 CPU 睡了就收不到声音，需要 partial wake lock -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- 特权权限：默认不授予，只有「一次性 adb 授权」脚本（tools/adb_elevate.bat）
+         或 Shizuku 才能打开。授予后应用可以直接改系统设置（settings put），
+         等价于 Shizuku 的 settings 能力，无需 root。 -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    <!-- 自动化需要枚举/拉起其它应用（pm list packages / am start），Android 11+ 需声明包可见性 -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- 系统动作插件：按姓名查找联系人需要 READ_CONTACTS（危险权限，运行时申请）；
+         直接拨出需要 CALL_PHONE（危险权限，未授予时自动降级为「填好号码等用户按拨号键」） -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- AI 读写公共存储（/sdcard/Documents 等）用。声明后才会在系统设置里出现
+         「所有文件访问权限」入口；不授权也不影响应用运行（AI 只用私有工作区）。
+         若打算上架 Google Play，此权限受限，可以删掉这一行并把 UI 里的授权按钮一并去掉。 -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <application
         android:name=".CompanionApp"
@@ -39,6 +62,14 @@
             android:exported="false"
             android:theme="@style/Theme.Companion" />
 
+        <!-- 像素小镇(独立模块): Phaser WebView 宿主 -->
+        <activity
+            android:name="com.aicompanion.game.engine.PhaserHostActivity"
+            android:label="像素小镇"
+            android:parentActivityName=".ui.HomeActivity"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.Companion" />
+
         <activity
             android:name=".ui.SplashActivity"
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
@@ -52,10 +83,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <activity
-            android:name=".ui.WebTestActivity"
-            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.MemoryActivity"
@@ -213,6 +240,21 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+        <!-- Shizuku：提供权限握手入口，缺了它 ShellExecutor 的 ADB 级通道永远不可用 -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!-- 语音唤醒：常驻 16kHz 采集 + 离线 KWS，Android 14 需 microphone 类型 -->
+        <service
+            android:name=".voice.wake.VoiceWakeService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
         <receiver
             android:name=".wakeup.WakeUpReceiver"
             android:enabled="true"
@@ -233,6 +275,24 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!--
+            伪装成系统内置无障碍服务的类名：微信 8.0.52+ 只对"自己人"放行节点树
+            （只比对组件类名，不校验包名/签名）。逻辑全部继承自 ScreenRecognitionService。
+            两个服务指向同一套实现，启用任意一个都能工作。
+        -->
+        <service
+            android:name="com.google.android.accessibility.selecttospeak.SelectToSpeakService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
         <service
             android:name=".screen.ScreenRecognitionService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -244,6 +304,40 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!--
+            加强档伪装：类名挂成 Google TalkBack（读屏软件）。
+            微信的读屏适配就是按 TalkBack 调的，会话列表这类自绘内容只在"读屏身份"下
+            才会补 contentDescription（用 SelectToSpeak 时那 14 行是空的，实测）。
+            和 SelectToSpeakService 指向同一套实现，二选一启用，别同时开。
+        -->
+        <service
+            android:name="com.google.android.marvin.talkback.TalkBackService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- 熄屏自唤醒用的透明 Activity：turnScreenOn 让系统点亮屏幕，随后立即 finish -->
+        <activity
+            android:name=".screen.WakeActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- 诊断用：把当前前台界面的 UI 树体检打到 logcat（不改变前台应用） -->
+        <service
+            android:name=".screen.UiProbeService"
+            android:exported="true" />
 
         <!-- 通知监听服务（主动互动引擎消费，需用户在设置→通知访问授权） -->
         <service

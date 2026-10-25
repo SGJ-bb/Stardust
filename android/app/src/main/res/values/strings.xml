@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">星尘</string>
-    <string name="accessibility_service_description">用于识别当前前台应用的类别（社交、视频、办公等），以便桌宠做出合适的互动。我们不会读取或传输任何界面文字内容，仅获取应用包名进行本地分类。</string>
+    <string name="accessibility_service_description">用于识别前台应用类别以驱动桌宠互动，并支持 AI 自动操作手机：服务会读取当前屏幕的文字与可点击元素，并按用户指令将屏幕内容发送给所配置的 AI 接口生成操作步骤（点击/滑动/输入等）。请在设置中开启「异常检测」以在支付、验证码、登录等敏感页面自动暂停操作。</string>
 
     <string-array name="bedtime_timer_options">
         <item>15分钟</item>

@@ -13,7 +13,12 @@ object OnnxModelManager {
 
     private const val TAG = "OnnxModelManager"
 
-    // 默认下载地址
+    // 内置在 APK assets 里的模型（bge-small-zh-v1.5 量化版，约 24MB）
+    private const val ASSET_DIR = "models/bge-small-zh-v1.5"
+    private const val ASSET_MODEL = "model.onnx"
+    private const val ASSET_VOCAB = "vocab.txt"
+
+    // 默认下载地址（仅在 APK 未内置模型时才会用到）
     private const val DEFAULT_MODEL_URL = "https://huggingface.co/BAAI/bge-small-zh-v1.5/resolve/main/onnx/model.onnx"
     private const val DEFAULT_VOCAB_URL = "https://huggingface.co/BAAI/bge-small-zh-v1.5/resolve/main/vocab.txt"
 
@@ -35,16 +40,44 @@ object OnnxModelManager {
 
     fun getVocabFile(context: Context): File = File(getModelDir(context), "vocab.txt")
 
+    /** APK 里是否内置了模型（内置就不该再要求用户下载） */
+    fun isBundled(context: Context): Boolean {
+        return try {
+            val files = context.assets.list(ASSET_DIR) ?: emptyArray()
+            files.contains(ASSET_MODEL) && files.contains(ASSET_VOCAB)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     fun isModelReady(context: Context): Boolean {
         val model = getModelFile(context)
         val vocab = getVocabFile(context)
-        return model.exists() && model.length() >= MIN_MODEL_SIZE &&
-               vocab.exists() && vocab.length() >= MIN_VOCAB_SIZE
+        if (model.exists() && model.length() >= MIN_MODEL_SIZE &&
+            vocab.exists() && vocab.length() >= MIN_VOCAB_SIZE
+        ) return true
+        // 内置模型同样算「已就绪」——OnnxEmbedder 会自己从 assets 拷到 cache
+        return isBundled(context)
     }
 
     fun getModelSizeMB(context: Context): Long {
         val model = getModelFile(context)
-        return if (model.exists()) model.length() / (1024 * 1024) else 0L
+        if (model.exists()) return model.length() / (1024 * 1024)
+        if (isBundled(context)) {
+            return try {
+                context.assets.openFd("$ASSET_DIR/$ASSET_MODEL").use { it.length / (1024 * 1024) }
+            } catch (e: Exception) {
+                24L
+            }
+        }
+        return 0L
+    }
+
+    /** 模型来源描述，给设置界面显示 */
+    fun describeSource(context: Context): String = when {
+        isBundled(context) -> "内置（无需下载）"
+        getModelFile(context).exists() -> "已下载"
+        else -> "未就绪"
     }
 
     fun getDownloading(): Boolean = isDownloading

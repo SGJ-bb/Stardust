@@ -313,7 +313,7 @@ private fun GrowthTreeNodeRow(
                         Text(
                             text = "当前",
                             color = StradustTheme.colors.onPrimary,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                         )
                     }

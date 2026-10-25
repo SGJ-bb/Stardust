@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "name": "hearts",
+  "sheet": "hearts.sheet.png",
+  "fps": 12.0,
+  "loop": true,
+  "frameW": 250,
+  "frameH": 449,
+  "cols": 12,
+  "rows": 1,
+  "count": 12,
+  "space": "zone",
+  "blend": "overlay",
+  "source": "F:\\image2psd2live\\pet\\assets\\frames\\src_hearts",
+  "frames": [
+    "000.png",
+    "001.png",
+    "002.png",
+    "003.png",
+    "004.png",
+    "005.png",
+    "006.png",
+    "007.png",
+    "008.png",
+    "009.png",
+    "010.png",
+    "011.png"
+  ],
+  "anchor": [
+    0.5,
+    0.5
+  ],
+  "attach": "head",
+  "scaleK": 1.5,
+  "canvas": [
+    250,
+    449
+  ]
+}

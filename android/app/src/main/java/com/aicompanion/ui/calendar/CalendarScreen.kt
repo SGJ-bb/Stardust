@@ -343,9 +343,9 @@ fun CalendarScreen(
                         LegendDot(color = colors.tertiary, label = "班")
                         // 生日
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("🎂", fontSize = 10.sp)
+                            Text("🎂", fontSize = 11.sp)
                             Spacer(Modifier.width(3.dp))
-                            Text("生日", color = colors.textSecondary, fontSize = 10.sp)
+                            Text("生日", color = colors.textSecondary, fontSize = 11.sp)
                         }
                         // 事件圆点
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -356,7 +356,7 @@ fun CalendarScreen(
                                     .background(colors.primary, CircleShape),
                             )
                             Spacer(Modifier.width(3.dp))
-                            Text("事件", color = colors.textSecondary, fontSize = 10.sp)
+                            Text("事件", color = colors.textSecondary, fontSize = 11.sp)
                         }
                     }
                 }
@@ -647,7 +647,7 @@ private fun UserEventItem(
             Text(
                 text = if (isAiCreated) "AI添加" else "用户添加",
                 color = if (isAiCreated) colors.tertiary else colors.primary,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
             )
         }
         Spacer(Modifier.width(4.dp))
@@ -768,6 +768,6 @@ private fun LegendDot(color: Color, label: String) {
                 .background(color, RoundedCornerShape(2.dp)),
         )
         Spacer(Modifier.width(3.dp))
-        Text(label, color = color, fontSize = 10.sp)
+        Text(label, color = color, fontSize = 11.sp)
     }
 }
