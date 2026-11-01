@@ -1,0 +1,68 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+ html,body{margin:0;background:#20232c;overflow:hidden;font:12px Consolas}
+ #c{position:absolute;left:0;top:0;width:420px;height:700px;display:block}
+ #log{position:absolute;left:430px;top:8px;width:340px;color:#8ad;white-space:pre-wrap}
+</style></head><body>
+<canvas id="c"></canvas><pre id="log">boot…</pre>
+<script src="/js/live2dcubismcore.min.js"></script>
+<script src="/js/live2d.min.js"></script>
+<script src="/js/pixi.min.js"></script>
+<script src="/js/pixi-live2d-display.min.js"></script>
+<script src="/js/frameanim.js"></script>
+<script src="/js/petframes-boot.js"></script>
+<script>
+var L = document.getElementById('log');
+function log(m){ L.textContent += '\n' + m; }
+window.addEventListener('error', function(e){ log('ERR ' + e.message); });
+var app = new PIXI.Application({ view: document.getElementById('c'), width: 420, height: 700,
+  backgroundAlpha: 0, antialias: true, resolution: 1 });
+PIXI.live2d.Live2DModel.from('vtuber/Haru/haru_greeter_t03.model3.json', { autoInteract: false, autoUpdate: true })
+  .then(function (m) {
+    window.__m = m;
+    m.scale.set(0.38); m.x = 40; m.y = 20;
+    app.stage.addChild(m);
+    log('PIXI ' + PIXI.VERSION + ' | model ' + Math.round(m.width) + 'x' + Math.round(m.height));
+    var t0 = Date.now();
+    (function wait(){
+      if (window.petFramesInfo && window.petFramesInfo().ready) return drive();
+      if (Date.now() - t0 > 12000) { log('TIMEOUT ' + JSON.stringify(window.petFramesInfo && window.petFramesInfo())); return; }
+      setTimeout(wait, 200);
+    })();
+  });
+
+function drive(){
+  var info = window.petFramesInfo();
+  log('frames ready: ' + info.list.join(','));
+  var ok1 = window.playPetFramesRect('hearts', {x: 70, y: 20, w: 280, h: 500});
+  log('play overlay hearts -> ' + ok1);
+  // headless 下 rAF 会被节流：手动推进 12 帧再渲染，保证截图里能看到
+  var fx = window.__fx;
+  if (fx) { for (var i = 0; i < 14; i++) fx.tick(100); }
+  app.render();
+  log('alpha=' + fx.alpha.toFixed(2) + ' frame=' + fx.frame);
+  var c = fx.container;
+  log('ct visible=' + c.visible + ' a=' + c.alpha.toFixed(2) + ' pos=' + Math.round(c.x) + ',' + Math.round(c.y) +
+      ' scale=' + c.scale.x.toFixed(2) + ' kids=' + c.children.length +
+      ' tex=' + (fx.sprite.texture ? fx.sprite.texture.width + 'x' + fx.sprite.texture.height : 'null') +
+      ' stageKids=' + app.stage.children.length + ' rect=' + JSON.stringify(fx.rect));
+  setTimeout(function(){
+    var ok2 = window.playPetFramesRect('zzz', {x: 210, y: 20, w: 160, h: 143});
+    log('play zzz -> ' + ok2);
+    if (fx) { for (var j = 0; j < 8; j++) fx.tick(100); }
+    app.render();
+    setTimeout(function(){
+      app.render();
+      // headless 下合成器不会再出帧：把当前画布拷成 <img>，保证截图能看到真实像素
+      try {
+        var im = new Image();
+        im.src = document.getElementById('c').toDataURL('image/png');
+        im.style.cssText = 'position:absolute;left:0;top:0;width:420px;height:700px;';
+        document.body.appendChild(im);
+        log('snapshot ok');
+      } catch (e) { log('snapshot fail ' + e.message); }
+      log('RESULT ' + (ok1 && ok2 ? 'PASS' : 'FAIL'));
+    }, 120);
+  }, 150);
+}
+</script></body></html>

@@ -123,7 +123,7 @@ function createAdapter(config: ImageGenConfig): GenAdapter {
     case 'openai':
       return new OpenAIAdapter(
         config.apiUrl || 'https://api.openai.com/v1/images/generations',
-        config.apiKey,
+        config.apiKey ?? '',
         config.model || 'dall-e-3'
       );
     case 'stability':
@@ -131,7 +131,7 @@ function createAdapter(config: ImageGenConfig): GenAdapter {
     case 'local_sd':
     case 'custom':
     default:
-      return new GenericSDAdapter(config.apiUrl, config.apiKey);
+      return new GenericSDAdapter(config.apiUrl ?? '', config.apiKey ?? '');
   }
 }
 

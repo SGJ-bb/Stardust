@@ -1,9 +1,2 @@
-allprojects {
-    repositories {
-        maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://maven.aliyun.com/repository/google' }
-        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
-        google()
-        mavenCentral()
-    }
-}
+// 国内镜像已迁移至 settings.gradle（pluginManagement / dependencyResolutionManagement）。
+// Gradle 8.x 严格模式下初始化脚本不得向项目添加仓库，此处保留空脚本以兼容 build-apk.bat 的 --init-script 参数。

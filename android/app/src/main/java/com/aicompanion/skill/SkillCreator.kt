@@ -15,6 +15,12 @@ object SkillCreator {
 
     private const val TAG = "SkillCreator"
 
+    /** 自动归纳技能最多保留几个「任务」小节（超出丢最老的） */
+    private const val MAX_TASKS = 6
+
+    /** 自动归纳技能正文上限：技能会整段塞进系统提示词，太长挤占上下文 */
+    private const val MAX_CHARS = 4000
+
     /** 一句话（可附当前屏幕）生成技能 */
     suspend fun createFromDescription(
         context: Context,
@@ -75,22 +81,15 @@ object SkillCreator {
             val existing = store.getById(id)
 
             val sb = StringBuilder()
-            if (existing != null && existing.content.isNotBlank()) {
-                sb.appendLine(existing.content)
-                sb.appendLine()
-                sb.appendLine("---")
-                sb.appendLine()
-            }
-            if (uiMap.isNotBlank()) {
-                sb.appendLine("## UI 结构知识（自动归纳，以当前屏幕为准）")
-                sb.appendLine(uiMap)
-                sb.appendLine()
-            }
-            if (taskName.isNotBlank() && workflow.isNotBlank()) {
-                sb.appendLine("## 任务：$taskName")
-                sb.appendLine(workflow)
-                if (triggers.isNotEmpty()) sb.appendLine("触发词：${triggers.joinToString("、")}")
-            }
+            val merged = mergeContent(
+                existing = existing?.content.orEmpty(),
+                uiMap = uiMap,
+                taskName = taskName,
+                workflow = workflow,
+                triggers = triggers
+            )
+            if (merged.isBlank()) return null
+            sb.append(merged)
 
             val skill = Skill(
                 id = id,
@@ -108,6 +107,91 @@ object SkillCreator {
             AppLogger.e(TAG, "createFromOperationTrace 失败: ${e.message}")
             null
         }
+    }
+
+    /**
+     * 把新的一次操作归纳**合并**进已有技能，而不是无脑往后追加。
+     *
+     * 老实现是 `existing + "---" + 新内容`，同一个 App 每跑一次任务就多贴一段，
+     * 实测「哔哩哔哩 操作技能」十几次之后就变成 rev 13、正文里**同样的 UI 描述重复七八遍**，
+     * 既占满上下文（模型读到一大坨重复内容，反而抓不住重点），也没法维护。
+     *
+     * 现在的规则：
+     * - 按 `## 标题` 切块，同标题**只保留最新一份**（UI 结构知识、同名任务自动覆盖）
+     * - 不同任务各自一节，互不覆盖
+     * - 体积超了就丢最老的几节（`MAX_SECTIONS`），永远保留 UI 结构 + 最近的任务
+     */
+    private fun mergeContent(
+        existing: String,
+        uiMap: String,
+        taskName: String,
+        workflow: String,
+        triggers: List<String>
+    ): String {
+        val uiBlocks = LinkedHashMap<String, String>()      // 只留一份
+        val taskBlocks = LinkedHashMap<String, String>()     // 按任务名去重，后来的覆盖先前的
+        val otherBlocks = LinkedHashMap<String, String>()
+
+        fun put(title: String, body: String) {
+            val t = title.trim()
+            if (t.isEmpty()) return
+            when {
+                t.startsWith("UI 结构知识") -> uiBlocks["UI 结构知识"] = body
+                t.startsWith("任务：") -> taskBlocks[t] = body
+                else -> if (!otherBlocks.containsKey(t)) otherBlocks[t] = body
+            }
+        }
+
+        if (existing.isNotBlank()) {
+            existing.split(Regex("(?m)^## ")).forEach { part ->
+                val trimmed = part.trim()
+                if (trimmed.isEmpty()) return@forEach
+                val nl = trimmed.indexOf('\n')
+                val title = if (nl < 0) trimmed else trimmed.substring(0, nl)
+                var body = if (nl < 0) "" else trimmed.substring(nl + 1).trim()
+                // 清掉上一版遗留的分隔线和空节
+                body = body.lines()
+                    .filterNot { it.trim() == "---" }
+                    .joinToString("\n").trim()
+                put(title, body)
+            }
+        }
+
+        if (uiMap.isNotBlank()) uiBlocks["UI 结构知识"] = uiMap.trim()
+        if (taskName.isNotBlank() && workflow.isNotBlank()) {
+            val body = buildString {
+                appendLine(workflow.trim())
+                if (triggers.isNotEmpty()) append("触发词：${triggers.joinToString("、")}")
+            }.trim()
+            taskBlocks["任务：$taskName"] = body
+        }
+
+        // 体积控制：只保留最近 MAX_TASKS 个任务
+        val keptTasks = if (taskBlocks.size > MAX_TASKS) {
+            taskBlocks.entries.toList().takeLast(MAX_TASKS)
+        } else {
+            taskBlocks.entries.toList()
+        }
+
+        val out = StringBuilder()
+        uiBlocks["UI 结构知识"]?.takeIf { it.isNotBlank() }?.let {
+            out.appendLine("## UI 结构知识（自动归纳，以当前屏幕为准）")
+            out.appendLine(it)
+            out.appendLine()
+        }
+        otherBlocks.forEach { (t, b) ->
+            if (b.isNotBlank()) {
+                out.appendLine("## $t")
+                out.appendLine(b)
+                out.appendLine()
+            }
+        }
+        keptTasks.forEach { (t, b) ->
+            out.appendLine("## $t")
+            out.appendLine(b)
+            out.appendLine()
+        }
+        return out.toString().trim().take(MAX_CHARS)
     }
 
     /** 手动创建空模板，用户可在 App 内编辑 */

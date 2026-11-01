@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Users } from "lucide-react";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import { formatTime } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * 群聊列表页面
@@ -16,8 +16,13 @@ import { useState } from "react";
  */
 export function GroupChatListPage() {
   const navigate = useNavigate();
-  const { groups } = useGroupChatStore();
+  const { groups, load } = useGroupChatStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  /** 进入页面时从引擎加载真实群聊列表 */
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return (
     <PageContainer>

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Camera, Plus, Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * 纪念相册页面
@@ -23,14 +23,19 @@ export function MemorialAlbumPage() {
   const { currentPersonaId } = useChatStore();
   const personaId = urlPersonaId ?? currentPersonaId ?? "";
   const navigate = useNavigate();
-  const { entries, addEntry, deleteEntry } = useAlbumStore();
+  const { entries, load, addEntry, deleteEntry } = useAlbumStore();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
 
+  /** 进入页面 / 切换角色时加载真实相册 */
+  useEffect(() => {
+    if (personaId) void load(personaId);
+  }, [personaId, load]);
+
   const handleAdd = () => {
     if (!personaId || !title.trim()) return;
-    addEntry(personaId, title.trim(), "", description.trim());
+    void addEntry(personaId, title.trim(), "", description.trim());
     setTitle("");
     setDescription("");
     setShowAddDialog(false);
@@ -63,8 +68,12 @@ export function MemorialAlbumPage() {
             {entries.map((entry) => (
               <Card key={entry.id} className="group cursor-pointer relative">
                 <CardContent className="p-2">
-                  <div className="aspect-square rounded bg-[var(--color-muted)] mb-2 flex items-center justify-center text-3xl">
-                    📷
+                  <div className="aspect-square rounded bg-[var(--color-muted)] mb-2 flex items-center justify-center text-3xl overflow-hidden">
+                    {entry.imagePath ? (
+                      <img src={entry.imagePath} alt={entry.title} className="w-full h-full object-cover" />
+                    ) : (
+                      "📷"
+                    )}
                   </div>
                   <h4 className="text-sm font-medium text-[var(--color-card-foreground)] truncate">{entry.title}</h4>
                   <p className="text-[10px] text-[var(--color-muted-foreground)]">{formatDate(entry.date)}</p>
@@ -72,7 +81,7 @@ export function MemorialAlbumPage() {
                     variant="ghost"
                     size="icon"
                     className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6"
-                    onClick={() => deleteEntry(entry.id)}
+                    onClick={() => void deleteEntry(entry.id)}
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>

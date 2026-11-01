@@ -17,7 +17,7 @@ import {
   Award,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 /** 分类筛选类型 */
 type CategoryFilter = "all" | "unlocked" | "locked";
@@ -31,9 +31,21 @@ export function AchievementPage() {
   const { currentPersonaId } = useChatStore();
   const personaId = urlPersonaId ?? currentPersonaId ?? "";
   const navigate = useNavigate();
-  const { achievements, checkIn, growth, doCheckIn } = useAchievementStore();
+  const { achievements, checkIn, growth, doCheckIn, load, notice, clearNotice } = useAchievementStore();
   const [activeTab, setActiveTab] = useState("achievements");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+
+  /** 进入页面 / 切换角色时从引擎加载真实数据 */
+  useEffect(() => {
+    if (personaId) void load(personaId);
+  }, [personaId, load]);
+
+  /** 解锁/签到提示 toast：4 秒后自动消失 */
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(clearNotice, 4000);
+    return () => clearTimeout(t);
+  }, [notice, clearNotice]);
 
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
   const totalCount = achievements.length;
@@ -166,6 +178,13 @@ export function AchievementPage() {
 
   return (
     <PageContainer>
+      {/* 成就解锁 / 签到提示 toast */}
+      {notice && (
+        <div className="fixed bottom-6 right-6 z-[100] max-w-sm rounded-xl border border-[var(--theme-accent-gold,#fbbf24)] bg-[var(--color-card)] p-4 text-[var(--color-card-foreground)] shadow-lg animate-slide-in-right">
+          <p className="text-sm font-semibold">{notice}</p>
+        </div>
+      )}
+
       <div className="page-content space-y-6">
         {/* ====== 页面头部 ====== */}
         <div className="flex items-center justify-between">
@@ -315,7 +334,7 @@ export function AchievementPage() {
               </p>
               {!checkIn?.todayCheckedIn && (
                 <Button
-                  onClick={() => personaId && doCheckIn(personaId)}
+                  onClick={() => personaId && void doCheckIn(personaId)}
                   disabled={!personaId}
                   className="min-w-[120px]"
                 >

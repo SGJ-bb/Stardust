@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, CalendarDays
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { CalendarEvent } from "@/types/calendar";
 
 /** 获取今日日期字符串 YYYY-MM-DD */
@@ -32,11 +32,16 @@ export function CalendarPage() {
   const { currentPersonaId } = useChatStore();
   const personaId = urlPersonaId ?? currentPersonaId ?? "";
   const navigate = useNavigate();
-  const { events, selectedDate, setSelectedDate, addEvent, deleteEvent } = useCalendarStore();
+  const { events, selectedDate, setSelectedDate, addEvent, deleteEvent, load, todayInfo } = useCalendarStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [eventType, setEventType] = useState<CalendarEvent["type"]>("custom");
+
+  /** 进入页面时从引擎加载事件与今日节日/节气 */
+  useEffect(() => {
+    void load(personaId || undefined);
+  }, [personaId, load]);
 
   /** 当前月份的天数 */
   const currentDate = useMemo(() => new Date(selectedDate), [selectedDate]);
@@ -48,13 +53,28 @@ export function CalendarPage() {
   /** 今日标记 */
   const todayStr = getTodayStr();
 
-  /** 当月事件 */
+  /** 循环事件命中当月的展开（生日/纪念日每年重复，按 MM-DD 匹配） */
+  const recurringMonthEvents = useMemo(() => {
+    const out: CalendarEvent[] = [];
+    for (const e of events) {
+      if (e.recurrence !== "yearly") continue;
+      const src = new Date(e.startTime);
+      if (src.getFullYear() === year && src.getMonth() === month) continue; // 当年原事件已覆盖
+      const hit = new Date(year, month, src.getDate());
+      if (hit.getMonth() === month && hit.getDate() === src.getDate()) {
+        out.push({ ...e, startTime: hit.getTime(), endTime: hit.getTime() + 3600_000 });
+      }
+    }
+    return out;
+  }, [events, year, month]);
+
+  /** 当月事件（含循环展开） */
   const monthEvents = useMemo(() => {
-    return events.filter((e) => {
+    return [...events, ...recurringMonthEvents].filter((e) => {
       const d = new Date(e.startTime);
       return d.getFullYear() === year && d.getMonth() === month;
     });
-  }, [events, year, month]);
+  }, [events, recurringMonthEvents, year, month]);
 
   /** 当日事件 */
   const dayEvents = useMemo(() => {
@@ -75,7 +95,7 @@ export function CalendarPage() {
 
   const handleCreate = () => {
     if (!personaId || !title.trim()) return;
-    addEvent({
+    void addEvent({
       personaId,
       title: title.trim(),
       description: description.trim(),
@@ -90,6 +110,9 @@ export function CalendarPage() {
     setDescription("");
     setShowCreateDialog(false);
   };
+
+  /** 今日节日/节气展示（选中今天时显示） */
+  const isSelectedToday = selectedDate === todayStr;
 
   /** 事件类型中文映射 */
   const eventTypeLabel: Record<CalendarEvent["type"], string> = {
@@ -270,6 +293,31 @@ export function CalendarPage() {
         </div>
 
         <ScrollArea className="flex-1 min-h-0">
+          {/* 今日节日/节气提示 */}
+          {isSelectedToday && (todayInfo.items.length > 0 || todayInfo.solarTerm) && (
+            <div className="mb-4 space-y-2">
+              {todayInfo.items.map((item, i) => (
+                <div
+                  key={`today-${i}`}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+                  style={{
+                    background: "color-mix(in srgb, var(--theme-accent-gold, #fbbf24) 10%, transparent)",
+                    border: "1px solid color-mix(in srgb, var(--theme-accent-gold, #fbbf24) 25%, transparent)",
+                    color: "var(--color-card-foreground)",
+                  }}
+                >
+                  <CalendarIcon className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--theme-accent-gold, #fbbf24)" }} />
+                  <span>{item.kind === "user" ? item.title : item.title}</span>
+                </div>
+              ))}
+              {todayInfo.solarTerm && !todayInfo.items.some((t) => t.title.includes("【节气】")) && (
+                <p className="text-[10px]" style={{ color: "var(--color-muted-foreground)" }}>
+                  今日节气：{todayInfo.solarTerm}
+                </p>
+              )}
+            </div>
+          )}
+
           {dayEvents.length === 0 ? (
             /* ====== 空状态：日历图标 + 暂无日程 ====== */
             <div className="flex flex-col items-center justify-center py-12 gap-4">
@@ -329,7 +377,7 @@ export function CalendarPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => deleteEvent(event.id)}
+                    onClick={() => void deleteEvent(event.id)}
                     className="shrink-0 p-2 rounded-lg opacity-0 group-hover:opacity-100
                       transition-all duration-200
                       text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_10%,transparent)]"

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>星尘像素小镇 · 美术示例</title>
+<style>
+  :root {
+    --ink: #2b1f3d;
+    --paper: #f7f1e3;
+    --accent: #e8a13d;
+    --accent2: #7fb069;
+    --muted: #8a7d6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Georgia, 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+    background: radial-gradient(circle at 20% 10%, #3a2c55, #211533 70%);
+    color: var(--paper);
+    padding: 40px 5vw 80px;
+  }
+  header { text-align: center; margin-bottom: 8px; }
+  header h1 { font-size: 34px; letter-spacing: 1px; margin: 0 0 6px; }
+  header p { color: var(--muted); margin: 0 0 4px; }
+  .tag { font-size: 13px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; margin-top: 30px; }
+  .card {
+    background: rgba(43,31,61,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    transition: transform .25s ease;
+  }
+  .card:hover { transform: translateY(-4px); }
+  .card img { width: 100%; height: auto; border-radius: 10px; display: block; background: #1a1226; }
+  .card h3 { margin: 12px 6px 2px; font-size: 18px; }
+  .card p { margin: 0 6px 8px; color: var(--muted); font-size: 13px; }
+  .note {
+    max-width: 760px; margin: 46px auto 0; padding: 20px 22px;
+    background: rgba(127,176,105,0.10);
+    border-left: 3px solid var(--accent2);
+    border-radius: 0 12px 12px 0;
+    font-size: 14px; line-height: 1.8; color: #d8e6c9;
+  }
+  .note b { color: var(--accent2); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="tag">StarDust · Pixel Town</div>
+    <h1>美术示例库</h1>
+    <p>目标对标《星露谷物语》级高清像素质感 · 供资产风格对齐与评审</p>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <img src="item_sheet.jpg" alt="物品图鉴：蔬菜/浆果/工具/宝石等" />
+      <h3>物品 · 图鉴集合</h3>
+      <p>食材、工具、宝石、农产品，48px/格，柔和描边与土暖配色。</p>
+    </div>
+    <div class="card">
+      <img src="villager_portrait.jpg" alt="女性村民艾米丽概念" />
+      <h3>人物 · 艾米丽（概念）</h3>
+      <p>短棕发 + 绿衫黄巾，呆立待机姿态，抖动发丝与体积阴影。</p>
+    </div>
+    <div class="card">
+      <img src="item_closeup.jpg" alt="物品特写：热茶与茶叶" />
+      <h3>物品 · 热茶特写</h3>
+      <p>单物品大特写，蒸汽动效预留，暖色烛光，农舍氛围。</p>
+    </div>
+    <div class="card">
+      <img src="villager_male.jpg" alt="男性铁匠村民概念" />
+      <h3>人物 · 铁匠（概念）</h3>
+      <p>深色乱发 + 红头巾，络腮胡，双臂交叉站姿待机。</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>说明：</b>以上为 AI 生成的<b>风格方向参考图</b>，用于确立正式美术资产的目标观感。当前游戏内的艾米丽/玩家仍采用<b>程序化像素角色</b>（`game-frontend/src/characters.ts`，48px 参数化渲染）与<b>多地貌 tilemap</b>（`tileset.ts`）。后续可通过资产热替换管线，将这种风格的专业 sprite 逐帧换入，实现真正星露谷级观感。
+  </div>
+</body>
+</html>

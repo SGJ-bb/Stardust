@@ -8,6 +8,7 @@ import { EntranceAnimation } from "@/components/effects/EntranceAnimation";
 import { ActivationDialog } from "@/components/activation/ActivationDialog";
 import { useThemeStore } from "@/stores/useThemeStore";
 import { useActivationStore } from "@/stores/useActivationStore";
+import { initEngines, disposeEngines } from "@/engine";
 
 // 页面组件懒加载
 const HomePage = lazy(() => import("@/pages/Home/HomePage").then((m) => ({ default: m.HomePage })));
@@ -37,6 +38,9 @@ const ActivationPage = lazy(() => import("@/pages/Activation/ActivationPage").th
 const LocalModelPage = lazy(() => import("@/pages/LocalModel/LocalModelPage").then((m) => ({ default: m.LocalModelPage })));
 const OverlayPet = lazy(() => import("@/pages/Overlay/OverlayPet").then((m) => ({ default: m.OverlayPet })));
 const AgentWorkspace = lazy(() => import("@/components/agent/AgentWorkspace").then((m) => ({ default: m.AgentWorkspace })));
+const IlinkPage = lazy(() => import("@/pages/Ilink/IlinkPage").then((m) => ({ default: m.IlinkPage })));
+const FavoritesPage = lazy(() => import("@/pages/Favorites/FavoritesPage").then((m) => ({ default: m.FavoritesPage })));
+const NicknamePage = lazy(() => import("@/pages/Nickname/NicknamePage").then((m) => ({ default: m.NicknamePage })));
 
 /**
  * 根组件
@@ -64,6 +68,12 @@ function App() {
   const [showingEntrance, setShowingEntrance] = useState(true);
   const { currentTheme } = useThemeStore();
   const { isPremiumUnlocked, isFirstActivated } = useActivationStore();
+
+  // 启动统一引擎（主动搭话/闹钟/唤醒/日记/朋友圈/虚拟世界/iLink 轮询）
+  useEffect(() => {
+    initEngines();
+    return () => disposeEngines();
+  }, []);
 
   /** 用户点击入场动画后进入主界面 */
   const handleEntranceDismiss = () => {
@@ -181,6 +191,15 @@ function App() {
 
               {/* Agent 智能体工作台 */}
               <Route path="/agent" element={<AgentWorkspace />} />
+
+              {/* 微信互联（对应 Android iLink 模块） */}
+              <Route path="/ilink" element={<IlinkPage />} />
+
+              {/* 收藏消息管理 */}
+              <Route path="/favorites" element={<FavoritesPage />} />
+
+              {/* 昵称管理 */}
+              <Route path="/nicknames" element={<NicknamePage />} />
             </Route>
             </Routes>
           </Suspense>

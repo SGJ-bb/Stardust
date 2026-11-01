@@ -9,10 +9,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, BookOpen, Trash2, Edit3, CalendarDays, Smile, ChevronRight } from "lucide-react";
+import { ArrowLeft, Plus, BookOpen, Trash2, Edit3, CalendarDays, Smile, ChevronRight, Sparkles } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { useState } from "react";
-import { isTauri } from "@/lib/tauri";
+import { useEffect, useState } from "react";
+import type { DiaryRecord } from "@/engine/kinds";
 
 /** 心情映射：emoji + 颜色 */
 const MOOD_MAP: Record<string, { emoji: string; color: string }> = {
@@ -37,22 +37,49 @@ export function DiaryPage() {
   const { currentPersonaId } = useChatStore();
   const personaId = urlPersonaId ?? currentPersonaId ?? "";
   const navigate = useNavigate();
-  const { diaries, addDiary, deleteDiary } = useDiaryStore();
+  const { diaries, addDiary, deleteDiary, load, generateDiary, error, clearError } = useDiaryStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [mood, setMood] = useState("");
+  const [generating, setGenerating] = useState(false);
+
+  /** 进入页面 / 切换角色时从引擎加载真实日记 */
+  useEffect(() => {
+    if (personaId) void load(personaId);
+  }, [personaId, load]);
+
+  /** 监听引擎 diary-generated 事件刷新列表 */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const rec = (e as CustomEvent<DiaryRecord>).detail;
+      if (!personaId || !rec || rec.personaId === personaId) {
+        if (personaId) void load(personaId);
+      }
+    };
+    window.addEventListener("sd:diary-generated", handler);
+    return () => window.removeEventListener("sd:diary-generated", handler);
+  }, [personaId, load]);
+
+  /** 错误提示 toast：5 秒后自动消失 */
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(clearError, 5000);
+    return () => clearTimeout(t);
+  }, [error, clearError]);
 
   /** 按当前角色过滤日记 */
   const filteredDiaries = personaId
     ? diaries.filter((d) => d.personaId === personaId)
     : diaries;
 
-  /** 按日期倒序排列 */
-  const sortedDiaries = [...filteredDiaries].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  /** 按日期倒序排列（引擎日记按 date 归属日期，优先 tags[0]） */
+  const sortedDiaries = [...filteredDiaries].sort((a, b) => {
+    const ad = new Date(`${a.tags?.[0] ?? ""}T12:00:00`).getTime() || a.createdAt;
+    const bd = new Date(`${b.tags?.[0] ?? ""}T12:00:00`).getTime() || b.createdAt;
+    return bd - ad;
+  });
 
   /** 当前选中的日记 */
   const selectedDiary = sortedDiaries.find((d) => d.id === selectedId) ?? sortedDiaries[0] ?? null;
@@ -65,11 +92,19 @@ export function DiaryPage() {
 
   const handleCreate = () => {
     if (!personaId || !title.trim()) return;
-    addDiary(personaId, title.trim(), content.trim(), mood.trim());
+    void addDiary(personaId, title.trim(), content.trim(), mood.trim());
     setTitle("");
     setContent("");
     setMood("");
     setShowCreateDialog(false);
+  };
+
+  /** AI 生成今日日记（真实走 LLM，未配置时 store 会给出错误提示） */
+  const handleGenerate = async () => {
+    if (!personaId || generating) return;
+    setGenerating(true);
+    await generateDiary(personaId);
+    setGenerating(false);
   };
 
   return (
@@ -86,14 +121,32 @@ export function DiaryPage() {
             </h1>
           </div>
           {/* 新建日记按钮 */}
-          <Button
-            onClick={() => setShowCreateDialog(true)}
-            className="rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90 text-white shadow-lg shadow-[var(--color-primary)]/25 transition-all duration-300 hover:scale-105"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            写日记
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void handleGenerate()}
+              disabled={!personaId || generating}
+              className="rounded-xl border-[var(--color-primary)]/40 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-all duration-300"
+            >
+              <Sparkles className={`h-4 w-4 mr-2 ${generating ? "animate-spin" : ""}`} />
+              {generating ? "AI 生成中..." : "生成日记"}
+            </Button>
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              className="rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90 text-white shadow-lg shadow-[var(--color-primary)]/25 transition-all duration-300 hover:scale-105"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              写日记
+            </Button>
+          </div>
         </div>
+
+        {/* ====== 错误提示 toast ====== */}
+        {error && (
+          <div className="fixed bottom-6 right-6 z-[100] max-w-sm rounded-xl border border-red-500/50 bg-red-50 p-4 text-red-900 shadow-lg animate-slide-in-right">
+            <p className="text-sm font-semibold">{error}</p>
+          </div>
+        )}
 
         {/* ====== 主内容区：左侧列表 + 右侧详情 ====== */}
         <div className="flex gap-6 min-h-[calc(100vh-200px)]">
@@ -186,7 +239,7 @@ export function DiaryPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => deleteDiary(selectedDiary.id)}
+                      onClick={() => void deleteDiary(selectedDiary.id)}
                       className="text-[var(--color-muted-foreground)] hover:text-red-400"
                     >
                       <Trash2 className="h-4 w-4" />

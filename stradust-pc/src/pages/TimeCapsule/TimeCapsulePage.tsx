@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Timer, Plus, Lock, Unlock, Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * 时光胶囊页面
@@ -24,15 +24,20 @@ export function TimeCapsulePage() {
   const { currentPersonaId } = useChatStore();
   const personaId = urlPersonaId ?? currentPersonaId ?? "";
   const navigate = useNavigate();
-  const { capsules, createCapsule, openCapsule, deleteCapsule } = useCapsuleStore();
+  const { capsules, load, createCapsule, openCapsule, deleteCapsule } = useCapsuleStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [openDate, setOpenDate] = useState("");
 
+  /** 进入页面 / 切换角色时加载真实胶囊 */
+  useEffect(() => {
+    if (personaId) void load(personaId);
+  }, [personaId, load]);
+
   const handleCreate = () => {
     if (!personaId || !title.trim() || !openDate) return;
-    createCapsule(personaId, title.trim(), content.trim(), new Date(openDate).getTime());
+    void createCapsule(personaId, title.trim(), content.trim(), new Date(openDate).getTime());
     setTitle("");
     setContent("");
     setOpenDate("");
@@ -94,11 +99,11 @@ export function TimeCapsulePage() {
                       </div>
                       <div className="flex gap-1">
                         {!capsule.opened && canOpen && (
-                          <Button size="sm" onClick={() => openCapsule(capsule.id)}>
+                          <Button size="sm" onClick={() => void openCapsule(capsule.id)}>
                             开启
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" onClick={() => deleteCapsule(capsule.id)}>
+                        <Button variant="ghost" size="icon" onClick={() => void deleteCapsule(capsule.id)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>

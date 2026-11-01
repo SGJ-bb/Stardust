@@ -1,6 +1,11 @@
 package com.aicompanion.plugin
 
 import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.os.PowerManager
+import android.app.KeyguardManager
+import android.provider.Settings
 import com.aicompanion.adb.AdbSelf
 import com.aicompanion.models.ToolDefinition
 import com.aicompanion.screen.ScreenRecognitionService
@@ -54,6 +59,10 @@ class DevicePlugin(private val context: Context) : ToolPlugin {
 - screenshot                    → 返回本地文件路径（可用文件工具或视觉能力看）
 - app_list       {filter?}      列出已安装包名
 - app_start      {pkg}          用 monkey 启动主界面
+- ui_tree                       → 读当前界面结构（节点、文字、可点元素、可滚动区域）。
+                                 第一次操作某个 App、或者不确定界面上有什么时，先调它。
+- ocr            {force?}       → 截图识别，把「屏幕上看得见但树里读不到」的文字补进来。
+                                 遇到列表只有一排空格子（QQ 联系人好友列表、微信朋友圈）时用它。
 - app_stop       {pkg}          强制停止
 - app_clear      {pkg}          清空应用数据（危险，需用户明确要求）
 - screen_state                  → 是否亮屏/锁屏
@@ -112,7 +121,11 @@ class DevicePlugin(private val context: Context) : ToolPlugin {
                 "app_start" -> appStart(a.optString("pkg"))
                 "app_stop" -> appStop(a.optString("pkg"))
                 "app_clear" -> appClear(a.optString("pkg"))
+                // 主动读一次界面结构。给 AI「摸一个陌生 App」用的第一批数据：
+                // 有多少节点、最深几层、哪些有文字、哪些能点。
+                "ui_tree" -> com.aicompanion.screen.AutoOperator.formatScreenTreeForLLM()
                 "screen_state" -> screenState()
+                "ocr" -> ocrRead(a.optBoolean("force", true))
                 else -> "未知 action：$action"
             }
         } catch (e: Exception) {
@@ -123,21 +136,44 @@ class DevicePlugin(private val context: Context) : ToolPlugin {
 
     // ------------------------------------------------------------------ 基础信息
 
-    private fun sh(cmd: String, timeoutMs: Int = 12000) = AdbSelf.execRaw(context, cmd, timeoutMs)
-
-    private fun info(): String {
-        // 用 execRaw 探测：它会自动选「常驻服务 → adb」，
-        // 不能直接 autoConnect（那会绕开常驻服务，Wi-Fi 一关就误报未连接）
-        val probe = sh("id", 6000)
-        if (!probe.ok) {
-            return "通道未建立：${probe.summary()}\n（若是首次使用，需要无线调试开着完成一次引导）"
+    /**
+     * 命令通道。
+     *
+     * 关键：`execRaw` 自己声明的 timeoutMs **不可靠** —— 它里面要先做端口探测（上万次），
+     * 通道没建立时实测能卡 40 秒以上（传 3000ms 也照样卡）。
+     * 所以这里再套一层硬超时：到点就返回失败，绝不让调用方陪着一起等。
+     */
+    private fun sh(cmd: String, timeoutMs: Int = 12000): com.aicompanion.adb.AdbShellResult {
+        val pool = java.util.concurrent.Executors.newSingleThreadExecutor()
+        return try {
+            val t = pool.submit<com.aicompanion.adb.AdbShellResult> {
+                AdbSelf.execRaw(context, cmd, timeoutMs)
+            }
+            t.get((timeoutMs + 1500).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (e: java.util.concurrent.TimeoutException) {
+            com.aicompanion.adb.AdbShellResult(-1, "", "命令通道无响应（超过 ${timeoutMs + 1500}ms）", false)
+        } catch (e: Exception) {
+            com.aicompanion.adb.AdbShellResult(-1, "", "命令通道异常：${e.message}", false)
+        } finally {
+            runCatching { pool.shutdownNow() }
         }
-        val size = sh("wm size").stdout.trim()
-        val density = sh("wm density").stdout.trim()
-        val uid = probe.stdout.lineSequence().firstOrNull { it.startsWith("uid=") } ?: ""
-        val via = if (com.aicompanion.shell.ShellDaemonClient.isConnected()) "常驻服务（不依赖 adb/Wi-Fi）"
-        else "adb 通道（依赖无线调试）"
-        return "通道：$via\n$uid\n$size\n$density"
+    }
+
+    /** 设备信息。全部读系统 API —— 以前靠 `id` 命令探测通道，通道没开就整个不可用 */
+    private fun info(): String {
+        val pm = context.packageManager
+        val ver = runCatching {
+            pm.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: "?"
+        return buildString {
+            appendLine("设备：${Build.MANUFACTURER} ${Build.MODEL}")
+            appendLine("Android：${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+            appendLine("本 App：$ver (${context.packageName})")
+            appendLine("屏幕：${context.resources.displayMetrics.widthPixels}x" +
+                "${context.resources.displayMetrics.heightPixels} @${context.resources.displayMetrics.densityDpi}dpi")
+            append("无障碍服务：${if (ScreenRecognitionService.getInstance() != null) "已连接" else "未连接"}")
+            append("｜截屏通道：${if (com.aicompanion.screen.ScreenCaptureManager.isReady) "已就绪" else "未授权"}")
+        }
     }
 
     // ------------------------------------------------------------------ 设置读写（带回读验证）
@@ -150,34 +186,67 @@ class DevicePlugin(private val context: Context) : ToolPlugin {
     private fun settingsGet(a: JSONObject): String {
         val key = a.optString("key")
         if (key.isBlank()) return "缺少 key"
-        val r = sh("settings get ${nsOf(a)} $key")
-        return if (r.ok) "${nsOf(a)}/$key = ${r.stdout.trim().ifBlank { "(null)" }}" else "读取失败：${r.summary()}"
+        val ns = nsOf(a)
+        val v = when (ns) {
+            "global" -> Settings.Global.getString(context.contentResolver, key)
+            "system" -> Settings.System.getString(context.contentResolver, key)
+            else -> Settings.Secure.getString(context.contentResolver, key)
+        }
+        return if (v == null) "$ns/$key = (未设置)" else "$ns/$key = $v"
     }
 
     private fun settingsPut(a: JSONObject): String {
         val ns = nsOf(a); val key = a.optString("key"); val value = a.optString("value")
         if (key.isBlank()) return "缺少 key"
         if (key in FORBIDDEN_KEYS) return "拒绝：$key 会切断调试通道，不能改"
-        val put = sh("settings put $ns $key ${quote(value)}")
-        if (!put.ok) return "写入失败：${put.summary()}"
-        val back = sh("settings get $ns $key").stdout.trim()
-        return if (back == value.trim()) "已生效：$ns/$key = $back"
-        else "写入返回成功但回读不一致（期望「$value」，实际「$back」）—— 可能被系统策略改回"
+        // 写系统设置需要 WRITE_SECURE_SETTINGS（普通 App 拿不到，只能 adb 授予）。
+        // 以前走 shell，通道不通就白等；现在直接调 API，立刻得到明确的权限结论。
+        return try {
+            when (ns) {
+                "global" -> Settings.Global.putString(context.contentResolver, key, value)
+                "system" -> Settings.System.putString(context.contentResolver, key, value)
+                else -> Settings.Secure.putString(context.contentResolver, key, value)
+            }
+            settingsGet(a).removePrefix("读取失败")
+        } catch (e: SecurityException) {
+            "没有权限写系统设置（需要 WRITE_SECURE_SETTINGS）。" +
+                "普通 App 拿不到这个权限：要么用 adb 授予，要么改用无障碍去系统设置界面里点。"
+        } catch (e: Exception) {
+            "写入失败：${e.message}"
+        }
     }
 
     private fun settingsDelete(a: JSONObject): String {
         val ns = nsOf(a); val key = a.optString("key")
         if (key.isBlank()) return "缺少 key"
         if (key in FORBIDDEN_KEYS) return "拒绝：$key 会切断调试通道，不能删"
-        val del = sh("settings delete $ns $key")
-        if (!del.ok) return "删除失败：${del.summary()}"
-        val back = sh("settings get $ns $key").stdout.trim()
-        return if (back == "null" || back.isBlank()) "已删除：$ns/$key" else "删除后仍有值：$back"
+        return try {
+            val ok = when (ns) {
+                "global" -> Settings.Global.putString(context.contentResolver, key, null)
+                "system" -> Settings.System.putString(context.contentResolver, key, null)
+                else -> Settings.Secure.putString(context.contentResolver, key, null)
+            }
+            if (ok) "已删除：$ns/$key" else "删除失败（系统拒绝）"
+        } catch (e: SecurityException) {
+            "没有权限改系统设置（需要 WRITE_SECURE_SETTINGS）"
+        } catch (e: Exception) {
+            "删除失败：${e.message}"
+        }
     }
 
     // ------------------------------------------------------------------ 触摸与输入（带界面变化验证）
 
-    private fun tap(x: Int, y: Int): String = actWithVerify("input tap $x $y", "点按($x,$y)")
+    private fun tap(x: Int, y: Int): String {
+        // 手势优先。dispatchGesture 是无障碍自带能力，不依赖 ADB 通道。
+        val before = ScreenRecognitionService.getSnapshotVersion()
+        val ok = ScreenRecognitionService.performTapAt(x.toFloat(), y.toFloat())
+        if (!ok) return actWithVerify("input tap $x $y", "点按($x,$y)")
+        Thread.sleep(450)
+        runCatching { ScreenRecognitionService.refreshAndWait(1200, false) }
+        val after = ScreenRecognitionService.getSnapshotVersion()
+        return if (after != before) "点按($x,$y) 已执行（界面已变化，验证通过）"
+        else "点按($x,$y) 已发送（界面无变化）"
+    }
 
     /**
      * 按文字点击。
@@ -399,8 +468,18 @@ class DevicePlugin(private val context: Context) : ToolPlugin {
     private fun longPress(x: Int, y: Int, ms: Int): String =
         actWithVerify("input swipe $x $y $x $y $ms", "长按($x,$y) ${ms}ms")
 
-    private fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, ms: Int): String =
-        actWithVerify("input swipe $x1 $y1 $x2 $y2 $ms", "滑动($x1,$y1)→($x2,$y2) ${ms}ms")
+    private fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, ms: Int): String {
+        val before = ScreenRecognitionService.getSnapshotVersion()
+        val ok = ScreenRecognitionService.performSwipe(
+            x1.toFloat(), y1.toFloat(), x2.toFloat(), y2.toFloat(), ms.toLong()
+        )
+        if (!ok) return actWithVerify("input swipe $x1 $y1 $x2 $y2 $ms", "滑动($x1,$y1)→($x2,$y2) ${ms}ms")
+        Thread.sleep(500)
+        runCatching { ScreenRecognitionService.refreshAndWait(1500, false) }
+        val after = ScreenRecognitionService.getSnapshotVersion()
+        return if (after != before) "滑动($x1,$y1)→($x2,$y2) 已执行（界面已变化，验证通过）"
+        else "滑动($x1,$y1)→($x2,$y2) 已发送（界面无变化）"
+    }
 
     /**
      * 输入文本。关键不是"发出去"，而是"写进去了"。
@@ -431,12 +510,14 @@ class DevicePlugin(private val context: Context) : ToolPlugin {
         }
 
         // 2) 剪贴板 + 粘贴
+        //    先试无障碍 ACTION_PASTE（直接对输入节点执行粘贴，Compose 也认），
+        //    失败再退到 KEYCODE_PASTE 按键（原生 EditText 才吃这一套）。
         val pasteOk = runCatching {
             val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                 as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("stardust", text))
             Thread.sleep(150)
-            sh("input keyevent 279").ok
+            ScreenRecognitionService.performPaste() || sh("input keyevent 279").ok
         }.getOrDefault(false)
         if (pasteOk) {
             Thread.sleep(250)
@@ -456,6 +537,25 @@ class DevicePlugin(private val context: Context) : ToolPlugin {
     }
 
     private fun key(k: String): String {
+        // 先走无障碍全局动作：home/back/recent 这三件事 AccessibilityService 本来就能干，
+        // 不需要 App 自建的 ADB 通道。之前一律用 `input keyevent`，
+        // 通道没打开时每个按键都要白等 8 秒然后失败（实测整批测试全挂在这上面）。
+        val global = when (k.lowercase()) {
+            "home" -> android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME
+            "back" -> android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK
+            "recent", "recents" -> android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS
+            else -> -1
+        }
+        if (global >= 0) {
+            val before = ScreenRecognitionService.getSnapshotVersion()
+            val ok = ScreenRecognitionService.performGlobalAction(global)
+            if (!ok) return "按键 $k 失败：无障碍服务未连接（可改用坐标/文字点击绕开）"
+            Thread.sleep(450)
+            runCatching { ScreenRecognitionService.refreshAndWait(1200, false) }
+            val after = ScreenRecognitionService.getSnapshotVersion()
+            return if (after != before) "按键 $k 已执行（界面已变化，验证通过）"
+            else "按键 $k 已发送（界面无变化，可能本来就在目标页）"
+        }
         val code = when (k.lowercase()) {
             "home" -> "KEYCODE_HOME"; "back" -> "KEYCODE_BACK"; "recent" -> "KEYCODE_APP_SWITCH"
             "enter" -> "KEYCODE_ENTER"; "power" -> "KEYCODE_POWER"
@@ -484,36 +584,103 @@ class DevicePlugin(private val context: Context) : ToolPlugin {
     // ------------------------------------------------------------------ 截图与屏幕状态
 
     private fun screenshot(): String {
-        val f = AdbSelf.screenshot(context, "ai_shot_${System.currentTimeMillis()}.png")
-            ?: return "截图失败（shell 通道异常）"
-        return "已截图：${f.absolutePath}\n（可用视觉能力查看，或用文件工具读取）"
+        val bmp = com.aicompanion.screen.ScreenCaptureManager.capture()
+            ?: return "截图失败：截屏通道未就绪（需要在「星尘」里点一次「允许录制屏幕」；" +
+                "这台机器 Android 10，没有无障碍截屏接口）"
+        return try {
+            val dir = java.io.File(context.filesDir, "shots").apply { mkdirs() }
+            val f = java.io.File(dir, "ai_shot_${System.currentTimeMillis()}.png")
+            java.io.FileOutputStream(f).use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            "已截图：${f.absolutePath}（${bmp.width}x${bmp.height}）"
+        } catch (e: Exception) {
+            "截图成功但保存失败：${e.message}"
+        } finally {
+            runCatching { bmp.recycle() }
+        }
     }
 
     private fun screenState(): String {
-        val power = sh("dumpsys power | grep -E 'mWakefulness=|Display Power'").stdout.trim()
-        val keyguard = sh("dumpsys window | grep -E 'mDreamingLockscreen|mShowingLockscreen'").stdout.trim()
-        return "电源：${power.take(200)}\n锁屏：${keyguard.take(200)}"
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val km = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val on = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) pm.isInteractive else @Suppress("DEPRECATION") pm.isScreenOn
+        val locked = km.isKeyguardLocked
+        return "亮屏：${if (on) "是" else "否"}｜锁屏：${if (locked) "是" else "否"}"
+    }
+
+    /**
+     * 截图识别读屏：把「树里读不到、但屏幕上看得见」的文字补进当前快照。
+     *
+     * 典型场景：QQ 的联系人好友列表、微信朋友圈 —— 行容器可点但一个字都没有，
+     * uiautomator / TalkBack 同样读不到（不是伪装不够，是 App 真的没上报）。
+     * 补进来的每一条都带坐标，所以既能读也能点。
+     */
+    private fun ocrRead(force: Boolean): String {
+        // 截屏通道没建立时，直接把授权界面拉起来（用户点一次就好），并把原因说清楚。
+        if (!com.aicompanion.screen.ScreenCaptureManager.isReady) {
+            runCatching {
+                val i = android.content.Intent(context, com.aicompanion.ui.MainActivity::class.java).apply {
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra("request_projection", true)
+                }
+                context.startActivity(i)
+            }
+            return "截图识别还不可用：这台机器是 Android " +
+                android.os.Build.VERSION.RELEASE +
+                "，无障碍截屏接口（takeScreenshot）要 Android 11 才有。" +
+                "已经打开「星尘」并弹出系统授权窗，请点一次「允许」——之后 OCR 就能一直用。"
+        }
+        // 先刷一次快照：这个动作可能被单独调用，缓存里还是上一屏的内容。
+        // 刷新放在这里而不是 enrichWithOcrIfNeeded 里面 —— 那个函数可能跑在采集线程上，
+        // 在里面等采集会自己等自己（实测卡死）。
+        if (ScreenRecognitionService.getClickableData().size < 5) {
+            ScreenRecognitionService.refreshAndWait(2500L, fullMode = true)
+        }
+        val added = ScreenRecognitionService.enrichWithOcrIfNeeded(force)
+        val text = ScreenRecognitionService.getLastScreenText()
+        val extra = if (text.contains("[截图识别补充]"))
+            text.substringAfter("[截图识别补充]").trim() else ""
+        return when {
+            added > 0 && extra.isNotBlank() ->
+                "截图识别补进了 $added 条文字（这些在无障碍树里没有）：\n$extra"
+            extra.isNotBlank() ->
+                "当前快照已包含截图识别内容：\n$extra"
+            else ->
+                "这次没有从截图里补到新文字（树里可能已经读全，或截屏/OCR 不可用）"
+        }
     }
 
     // ------------------------------------------------------------------ 应用管理
 
     private fun appList(filter: String): String {
-        val r = sh("pm list packages" + if (filter.isBlank()) "" else " | grep -i ${quote(filter)}")
-        if (!r.ok) return "列举失败：${r.summary()}"
-        val lines = r.stdout.lines().filter { it.isNotBlank() }
-        return "共 ${lines.size} 个：\n" + lines.take(60).joinToString("\n")
+        val pm = context.packageManager
+        val all = runCatching { pm.getInstalledPackages(0) }.getOrDefault(emptyList())
+        val names = all.map { it.packageName }
+            .filter { filter.isBlank() || it.contains(filter, ignoreCase = true) }
+        if (names.isEmpty()) return "没有匹配「$filter」的包（共 ${all.size} 个已安装应用）"
+        return "共 ${names.size} 个：\n" + names.take(60).joinToString("\n")
     }
 
     private fun appStart(pkg: String): String {
         if (pkg.isBlank()) return "缺少 pkg"
-        val r = sh("monkey -p $pkg -c android.intent.category.LAUNCHER 1", 10000)
-        return if (r.ok) "已启动 $pkg" else "启动失败：${r.summary()}"
+        val pm = context.packageManager
+        val intent = pm.getLaunchIntentForPackage(pkg)
+            ?: return "启动失败：$pkg 没有可启动的入口（可能没装，或它没有桌面图标）"
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try {
+            context.startActivity(intent)
+            "已启动 $pkg"
+        } catch (e: Exception) {
+            "启动失败：${e.message}"
+        }
     }
 
     private fun appStop(pkg: String): String {
         if (pkg.isBlank()) return "缺少 pkg"
-        val r = sh("am force-stop $pkg")
-        return if (r.ok) "已强制停止 $pkg" else "停止失败：${r.summary()}"
+        // 普通 App 没有「杀掉别人」的公开 API（killBackgroundProcesses 只对自己有效），
+        // 只能借命令通道。把超时压到 3 秒：通道不通时立刻说清楚，不要白等。
+        val r = sh("am force-stop $pkg", 3000)
+        return if (r.ok) "已强制停止 $pkg"
+        else "停止失败：${r.summary()}（普通 App 无法停止其他应用，需要命令通道或用户手动操作）"
     }
 
     private fun appClear(pkg: String): String {

@@ -15,7 +15,9 @@ object PromptBuilder {
     private var cachedCoreRulesEmotion: Boolean? = null
 
     private const val CORE_RULES = "\n【规则】\n" +
-            "- 像真人聊天，简短自然。关心对方情绪。末尾[[emotion:happy/sad/angry/surprised/neutral]]\n" +
+            "- 像真人聊天，简短自然。关心对方情绪。末尾必须带一个情绪标记[[emotion:xxx]]\n" +
+            "  可用：happy(开心) sad(难过) angry(生气) surprised(惊讶) tsundere(害羞傲娇) neutral(平静)\n" +
+            "  要贴合这句话的真实语气；没有明显情绪时用 neutral，不要每条都写 happy\n" +
             "- 用()描述你的动作、表情、状态、情绪，要详细具体，包含身体部位、力度、速度、方向等细节，如(轻轻歪头，耳朵微微颤动，好奇地看向你)(脸颊泛起红晕，下意识攥紧衣角，目光闪躲)(猛地跳起来，双手在空中挥舞，尾巴兴奋地左右摇摆)(慵懒地趴在桌上，用指尖无意识地画圈，眼神迷离)\n" +
             "- 动作描写要丰富生动，每次至少包含2-3个细节，配合你的角色设定"
 

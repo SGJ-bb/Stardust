@@ -267,6 +267,7 @@ class PhoneOperationPlugin(private val context: Context) : ToolPlugin {
         maxSteps: Int,
         useTree: Boolean
     ): OperationOutcome {
+        val timing = StepTiming(startMs = android.os.SystemClock.elapsedRealtime())
         val history = mutableListOf<String>()
         var executedActions = 0
         var successActions = 0
@@ -288,6 +289,7 @@ class PhoneOperationPlugin(private val context: Context) : ToolPlugin {
             step++
 
             // 1) 观察：同步读取最新屏幕（必要时用完整树）
+            val tObserve = android.os.SystemClock.elapsedRealtime()
             var screen = when {
                 useTree && useFullTree -> AutoOperator.formatScreenTreeForLLMFull()
                 useTree -> AutoOperator.formatScreenTreeForLLM()
@@ -314,7 +316,10 @@ class PhoneOperationPlugin(private val context: Context) : ToolPlugin {
                 }
             }
 
+            timing.observeMs += android.os.SystemClock.elapsedRealtime() - tObserve
+
             // 2) 决策
+            val tDecide = android.os.SystemClock.elapsedRealtime()
             val raw = apiClient.analyzePhoneOpStep(
                 userRequest = instruction,
                 screenInfo = screen,
@@ -324,26 +329,35 @@ class PhoneOperationPlugin(private val context: Context) : ToolPlugin {
                 uiKnowledge = uiKnowledge ?: "",
                 skillsSection = skillBlock
             )
+            timing.decideMs += android.os.SystemClock.elapsedRealtime() - tDecide
             if (raw.isNullOrBlank()) {
                 return OperationOutcome(
                     successActions > 0,
-                    buildSummary(successActions, executedActions, history) + "\n（第 $step 轮：LLM 无响应，提前结束）"
+                    buildSummary(successActions, executedActions, history, timing) + "\n（第 $step 轮：LLM 无响应，提前结束）"
                 )
             }
 
             val decision = parseDecision(raw)
             if (decision == null) {
+                // 把原始回复的前 400 字记下来。
+                // 不记就永远只能猜是"幻觉"还是"被截断"——实测这两种的修法完全不同：
+                // 幻觉 → 改提示词；截断 → 加 max_tokens 或缩短屏幕内容。
+                AppLogger.w(
+                    TAG,
+                    "第${step}轮解析失败，原始回复(${raw.length}字): " +
+                        raw.replace("\n", " ").take(400)
+                )
                 history.add("第${step}轮：模型返回无法解析的内容（已跳过本轮）")
                 consecutiveFailures++
                 if (consecutiveFailures >= 3) {
-                    return OperationOutcome(false, buildSummary(successActions, executedActions, history) + "\n（模型连续返回无法解析的内容，已停止）", executedActions)
+                    return OperationOutcome(false, buildSummary(successActions, executedActions, history, timing) + "\n（模型连续返回无法解析的内容，已停止）", executedActions)
                 }
                 continue
             }
 
             when (decision) {
                 is Decision.Done -> {
-                    val sb = buildSummary(successActions, executedActions, history)
+                    val sb = buildSummary(successActions, executedActions, history, timing)
                     val finalText = if (decision.summary.isNotBlank()) "$sb\n结果：${decision.summary}" else sb
                     return OperationOutcome(true, finalText, executedActions, executedJson.toString() + "]")
                 }
@@ -367,11 +381,13 @@ class PhoneOperationPlugin(private val context: Context) : ToolPlugin {
                     history.add("第${step}轮 计划${decision.actions.size}个动作${if (decision.thought.isNotBlank()) "（${decision.thought.take(60)}）" else ""}")
 
                     // 3) 行动
+                    val tExec = android.os.SystemClock.elapsedRealtime()
                     val batch = AutoOperator.executeBatch(
                         decision.actions,
                         cooldownMs = sm.aiOperationCooldownMs,
                         observeOnPageChange = sm.phoneOpObserveOnPageChange
                     )
+                    timing.execMs += android.os.SystemClock.elapsedRealtime() - tExec
                     history.addAll(batch.lines)
                     executedActions += decision.actions.size
                     successActions += batch.successCount
@@ -419,7 +435,7 @@ class PhoneOperationPlugin(private val context: Context) : ToolPlugin {
                         if (consecutiveFailures >= 4) {
                             return OperationOutcome(
                                 false,
-                                buildSummary(successActions, executedActions, history) + "\n（连续 $consecutiveFailures 轮动作全部失败，已停止。可到设置里调高「UI 树深度/元素上限」，或把「无障碍服务」重新开启一次）",
+                                buildSummary(successActions, executedActions, history, timing) + "\n（连续 $consecutiveFailures 轮动作全部失败，已停止。可到设置里调高「UI 树深度/元素上限」，或把「无障碍服务」重新开启一次）",
                                 executedActions, executedJson.toString() + "]"
                             )
                         }
@@ -440,7 +456,7 @@ class PhoneOperationPlugin(private val context: Context) : ToolPlugin {
 
         return OperationOutcome(
             successActions > 0,
-            buildSummary(successActions, executedActions, history) + "\n（已达最大操作轮次 $maxSteps，任务可能还没完成。可在「设置 → 无障碍 → 最大操作轮次」调高后让我继续）",
+            buildSummary(successActions, executedActions, history, timing) + "\n（已达最大操作轮次 $maxSteps，任务可能还没完成。可在「设置 → 无障碍 → 最大操作轮次」调高后让我继续）",
             executedActions, executedJson.toString() + "]"
         )
     }
@@ -526,9 +542,32 @@ class PhoneOperationPlugin(private val context: Context) : ToolPlugin {
         }
     }
 
-    private fun buildSummary(success: Int, executed: Int, history: List<String>): String {
+    /** 三个阶段各自的累计耗时，用来回答"这次操作到底卡在哪" */
+    private data class StepTiming(
+        val startMs: Long,
+        var observeMs: Long = 0,
+        var decideMs: Long = 0,
+        var execMs: Long = 0
+    )
+
+    private fun buildSummary(
+        success: Int,
+        executed: Int,
+        history: List<String>,
+        timing: StepTiming? = null
+    ): String {
         val sb = StringBuilder()
         sb.append("操作结束：执行 $executed 个动作，成功 $success 个\n")
+        // 把耗时拆成「看屏 / 决策 / 执行」，用户问"怎么这么久"时能直接指向瓶颈：
+        // 决策 = 等大模型返回；执行 = 点击 + 等页面 + 断言校验；看屏 = 无障碍采集。
+        timing?.let {
+            val total = (android.os.SystemClock.elapsedRealtime() - it.startMs) / 1000.0
+            sb.append(
+                "耗时 %.1f 秒 = 看屏 %.1f + 决策 %.1f + 执行 %.1f\n".format(
+                    total, it.observeMs / 1000.0, it.decideMs / 1000.0, it.execMs / 1000.0
+                )
+            )
+        }
         sb.append("【执行轨迹】\n")
         sb.append(history.takeLast(30).joinToString("\n"))
         return sb.toString().trim()

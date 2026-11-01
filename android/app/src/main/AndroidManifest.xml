@@ -360,6 +360,15 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- 屏幕读取（MediaProjection）。
+             为什么要它：AccessibilityService.takeScreenshot 是 API 30+ 才有的接口，
+             这台测试机是 API 29，所以那条路根本走不到。MediaProjection 从 API 21 就有。
+             代价是需要用户手动点一次授权（Android 的设计，不 root 绕不过）。 -->
+        <service
+            android:name=".screen.ScreenCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
     </application>
 
 </manifest>

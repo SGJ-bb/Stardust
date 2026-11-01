@@ -47,6 +47,21 @@ class UiProbeService : Service() {
                 stopSelf()
                 return@thread
             }
+            // 调试用：通过 adb 写入 API key。
+            // 为什么要这个入口：key 存在 EncryptedSharedPreferences 里，adb 无法直接写
+            // （加密密钥在 AndroidKeyStore，拿不到），而设置页的输入框是 Compose 写的，
+            // 无障碍 ACTION_SET_TEXT / ACTION_PASTE / KEYCODE_PASTE 三种注入方式都进不去。
+            // 只好让应用自己去写——走的就是 SettingsManager 的正常 setter，加密不变。
+            val apiKeyExtra = intent?.getStringExtra("set_api_key")
+            if (!apiKeyExtra.isNullOrBlank()) {
+                runCatching {
+                    com.aicompanion.settings.SettingsManager(this).chatApiKey = apiKeyExtra
+                    val saved = com.aicompanion.settings.SettingsManager(this).chatApiKey
+                    AppLogger.i("UiProbe", "API key 已写入：长度=${apiKeyExtra.length} 回读长度=${saved.length} 一致=${saved == apiKeyExtra}")
+                }.onFailure { AppLogger.e("UiProbe", "写 API key 失败: ${it.message}") }
+                stopSelf()
+                return@thread
+            }
             // 逐行 dump 全量节点：排查"为什么这个页面读不到内容"时用
             val wantDump = intent?.getBooleanExtra("dump", false) == true
             if (wantDump) {

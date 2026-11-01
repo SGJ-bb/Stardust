@@ -49,7 +49,17 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", currentTheme);
     document.documentElement.classList.toggle("dark", darkMode);
+    // globals.css 的明暗覆盖层/表面样式以 data-theme-mode 为开关，必须同步
+    document.documentElement.setAttribute("data-theme-mode", darkMode ? "dark" : "light");
   }, [currentTheme, darkMode]);
+
+  /** 显示密度与背景明暗（设置→外观） */
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-density", settings.appearance.density ?? "standard");
+    const mask = settings.appearance.bgMask ?? 1;
+    root.style.setProperty("--bg-mask-opacity", String(Math.min(1, Math.max(0.2, mask))));
+  }, [settings.appearance.density, settings.appearance.bgMask]);
 
   return <>{children}</>;
 }

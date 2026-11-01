@@ -5,7 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Sticker as StickerIcon, Star, Download } from "lucide-react";
+import { ArrowLeft, Sticker as StickerIcon, Star, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+/** 文件选择转 dataURL */
+function fileToDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 /**
  * 表情包页面
@@ -13,7 +24,34 @@ import { ArrowLeft, Sticker as StickerIcon, Star, Download } from "lucide-react"
  */
 export function StickerPage() {
   const navigate = useNavigate();
-  const { packs, recentStickers, toggleFavorite } = useStickerStore();
+  const { packs, recentStickers, toggleFavorite, load, addStickerItem, removeSticker } = useStickerStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  /** 进入页面时从引擎加载表情（内置 + 自定义） */
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const allStickers = packs.flatMap((p) => p.stickers ?? []);
+
+  const handleFilePicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setUploadError("请选择图片文件");
+      return;
+    }
+    try {
+      const dataUrl = await fileToDataURL(file);
+      const name = file.name.replace(/\.[^.]+$/, "");
+      await addStickerItem({ name, tags: [name], dataUrl });
+      setUploadError(null);
+    } catch {
+      setUploadError("读取图片失败，请重试");
+    }
+  };
 
   return (
     <PageContainer>
@@ -23,7 +61,27 @@ export function StickerPage() {
           返回
         </Button>
         <h1 className="text-2xl font-bold text-[var(--color-card-foreground)]">表情包</h1>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => void handleFilePicked(e)}
+        />
+        <Button
+          variant="outline"
+          onClick={() => fileInputRef.current?.click()}
+          className="ml-auto gap-2"
+          title="选择图片添加为表情"
+        >
+          <Upload className="h-4 w-4" />
+          添加表情
+        </Button>
       </div>
+
+      {uploadError && (
+        <p className="mb-3 text-sm text-red-400">{uploadError}</p>
+      )}
 
       <Tabs defaultValue="packs">
         <TabsList className="mb-4">
@@ -44,6 +102,34 @@ export function StickerPage() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+
+            {/* 全部表情网格（内置 + 自定义，可收藏/删除） */}
+            <div className="mt-6">
+              <h3 className="text-sm font-medium text-[var(--color-muted-foreground)] mb-3">全部表情 ({allStickers.length})</h3>
+              <div className="grid grid-cols-6 gap-2">
+                {allStickers.map((sticker) => (
+                  <div key={sticker.id} className="group relative aspect-square rounded bg-[var(--color-muted)] hover:bg-[var(--color-accent)] transition-colors flex items-center justify-center overflow-hidden">
+                    <img src={sticker.thumbnail || sticker.path} alt={sticker.name} title={sticker.name} className="w-full h-full object-contain" />
+                    <button
+                      onClick={() => toggleFavorite(sticker.id)}
+                      className={`absolute top-0.5 left-0.5 p-0.5 rounded ${sticker.favorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                      title="收藏"
+                    >
+                      <Star className={`h-3.5 w-3.5 ${sticker.favorited ? "fill-yellow-400 text-yellow-400" : "text-[var(--color-muted-foreground)]"}`} />
+                    </button>
+                    {!sticker.id.startsWith("builtin_") && (
+                      <button
+                        onClick={() => void removeSticker(sticker.id)}
+                        className="absolute top-0.5 right-0.5 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:text-red-400"
+                        title="删除"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-[var(--color-muted-foreground)]" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </ScrollArea>
         </TabsContent>

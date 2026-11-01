@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ChatMessage, ChatSession, StreamEvent, Favorability } from "@/types/chat";
 import { generateId } from "@/lib/utils";
+import { regenerateVariant, switchVariant } from "@/engine/chatEngine";
 
 /** 按角色ID分组的消息存储 */
 type MessagesByPersona = Record<string, ChatMessage[]>;
@@ -52,6 +53,12 @@ interface ChatState {
   setFavorability: (favorability: Favorability) => void;
   /** 设置加载状态 */
   setLoadingHistory: (loading: boolean) => void;
+  /** 内部：引擎消息回写 */
+  _applyEngineMessage: (personaId: string, messageId: string, engineMsg: { content: string; emotion?: string; variants?: { content: string; createdAt: number }[]; variantIdx?: number }) => void;
+  /** 重新生成某条 AI 回复（追加候选变体并切换） */
+  regenerateMessage: (personaId: string, messageId: string) => Promise<void>;
+  /** 切换 AI 回复显示第 n 个候选 */
+  switchMessageVariant: (personaId: string, messageId: string, idx: number) => Promise<void>;
 }
 
 /** 更新指定角色的消息并返回新的 messagesByPersona */
@@ -196,6 +203,38 @@ export const useChatStore = create<ChatState>()(
       },
       setFavorability: (favorability) => set({ favorability }),
       setLoadingHistory: (loading) => set({ isLoadingHistory: loading }),
+
+      regenerateMessage: async (personaId, messageId) => {
+        const updated = await regenerateVariant(personaId, messageId);
+        if (!updated) return;
+        get()._applyEngineMessage(personaId, messageId, updated);
+      },
+
+      switchMessageVariant: async (personaId, messageId, idx) => {
+        const updated = await switchVariant(personaId, messageId, idx);
+        if (!updated) return;
+        get()._applyEngineMessage(personaId, messageId, updated);
+      },
+
+      /** 内部：把引擎更新后的消息映射回页面 ChatMessage 并替换 */
+      _applyEngineMessage: (personaId, messageId, engineMsg) =>
+        set((state) => {
+          const mapFn = (msgs: ChatMessage[]) =>
+            msgs.map((m) =>
+              m.id === messageId
+                ? {
+                    ...m,
+                    content: engineMsg.content,
+                    emotion: engineMsg.emotion,
+                    variants: engineMsg.variants?.map((v) => ({ content: v.content, createdAt: v.createdAt })),
+                    variantIdx: engineMsg.variantIdx,
+                  }
+                : m,
+            );
+          const messagesByPersona = updatePersonaMessages(state.messagesByPersona, personaId, mapFn);
+          const messages = state.currentPersonaId === personaId ? messagesByPersona[personaId] : state.messages;
+          return { messages, messagesByPersona };
+        }),
     }),
     {
       name: "stradust-chat",

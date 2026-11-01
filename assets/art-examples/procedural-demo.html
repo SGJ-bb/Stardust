@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>星尘像素小镇 · 程序化渲染演示（纯代码像素，零图片API）</title>
+<style>
+  :root {
+    --ink: #2b1f3d; --paper: #efe6d2; --accent: #e8a13d;
+    --accent2: #7fb069; --muted: #8a7d6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI','Microsoft YaHei',Georgia,system-ui,sans-serif;
+    color: var(--paper);
+    background: radial-gradient(circle at 20% 8%, #3a2c55, #211533 70%);
+    padding: 36px 4vw 70px;
+  }
+  header { text-align: center; }
+  header .tag { font-size: 13px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; }
+  header h1 { margin: 6px 0 4px; font-size: 30px; }
+  header p { color: var(--muted); margin: 0; font-size: 14px; }
+  .stage {
+    margin: 26px auto 0; max-width: 1040px;
+    background: #150d20; border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px; padding: 14px; box-shadow: 0 14px 40px rgba(0,0,0,.4);
+  }
+  canvas { width: 100%; height: auto; image-rendering: pixelated; display: block; border-radius: 8px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 26px; justify-content: center; margin: 20px 0 0; font-size: 13px; color: var(--muted); }
+  .legend b { color: var(--paper); }
+  .note {
+    max-width: 820px; margin: 26px auto 0; padding: 18px 20px;
+    background: rgba(127,176,105,.10); border-left: 3px solid var(--accent2);
+    border-radius: 0 12px 12px 0; font-size: 14px; line-height: 1.85; color: #d9e8cb;
+  }
+  .note b { color: var(--accent2); }
+  button { cursor: pointer; background: rgba(255,255,255,.06); color: var(--paper);
+    border: 1px solid rgba(255,255,255,.16); border-radius: 8px; padding: 7px 16px;
+    font-size: 13px; margin: 4px; transition: .2s; }
+  button:hover { background: rgba(232,161,61,.2); border-color: var(--accent); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="tag">StarDust · Pixel Town</div>
+    <h1>程序化像素渲染演示</h1>
+    <p>全部由 <b>Canvas 代码逐像素绘制</b> · 无图片 API · 无网络请求 · 可离线打开</p>
+  </header>
+
+  <div class="stage">
+    <canvas id="c" width="1600" height="1000"></canvas>
+    <div class="row-btns">
+      <button onclick="render()">重新渲染</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><b>人物</b> · 待机像素精灵</span>
+    <span><b>物品</b> · 像素图鉴</span>
+    <span><b>技法</b> · 高光/暗部 + 1px描边 + 接地阴影</span>
+  </div>
+
+  <div class="note">
+    <b>说明：</b>这一页完全没有引用任何图片文件，也没有调用图片生成 API。画面上每个人物、每个物品，都是 JavaScript 里<span style="color:#fff">硬编码的像素位图</span>，通过 <span style="color:#fff">Canvas <code>fillRect</code></span> 逐格上色生成。<br/>
+    这正是游戏当前采用的<span style="color:#fff">程序化渲染路径</span>（<code>characters.ts</code> / <code>tileset.ts</code> 同一思路）：引擎本地即可产出，且给后续"参考图 → 预烘焙 sprite 资产"的高速替换留了接口——观感可从演示版提升到参考图级别的静态资源，但依然<span style="color:#fff">零运行时 API、零成本</span>。
+  </div>
+
+<script>
+"use strict";
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const PIX = 6;
+const W = cv.width;  // 1600
+const H = cv.height; // 1000
+
+/* 位图着色: 字符串图 + 调色盘 -> 像素 */
+function drawMap(palette, map, ox, oy, s = PIX) {
+  for (let r = 0; r < map.length; r++) {
+    const row = map[r];
+    for (let c = 0; c < row.length; c++) {
+      const ch = row[c];
+      if (ch === ' ' || ch === '.') continue;
+      const col = palette[ch];
+      if (!col) continue;
+      ctx.fillStyle = col;
+      ctx.fillRect(ox + c * s, oy + r * s, s, s);
+    }
+  }
+}
+
+/* 给像素区域套 1px 描边 */
+function outline(ox, oy, wc, hc, s, color = 'rgba(35,24,15,0.75)') {
+  ctx.strokeStyle = color; ctx.lineWidth = 1;
+  ctx.strokeRect(ox + 0.5, oy + 0.5, wc * s - 1, hc * s - 1);
+}
+
+/* 椭圆接地阴影 */
+function groundShadow(cx, cy, wHalf, hHalf, color = 'rgba(0,0,0,0.35)') {
+  ctx.save();
+  ctx.translate(cx, cy); ctx.scale(1, 0.28);
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.ellipse(0, 0, wHalf, hHalf, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+/* ============ 艾米丽 (13 宽 × 18 高) ============ */
+const PE = {
+  'B':'#6d4a2b','b':'#8f6a3d','S':'#f1c79b','s':'#d7a276',
+  'K':'#2f2118','R':'#eea9a0','G':'#4f8f3f','g':'#35702f',
+  'Y':'#f3c94e','y':'#d9a93a','D':'#5a6a8a','d':'#46536c','T':'#7a4a26','t':'#5f381c'
+};
+const EMILY = [
+  "....BBBB.....",
+  "...BBBBBB....",
+  "..BBBBBBBB...",
+  "..bbBBBBBB...",
+  ".bSSSSSSSSb..",
+  ".SSSSSSSSSS..",
+  ".SSKSSSSKSS..",  // 眼睛 col3 & col9
+  ".SSSKKSSKSS..",  // 眼睛暗部
+  ".SSRSSSSRSS..",  // 腮红 col3 & col9
+  "..SSSSSSSS...",
+  "..YYGGGGYY...",  // 围巾
+  ".GGGGGGGGGG..",
+  ".GgggGGggGG..",
+  ".GGGGGGGGGG..",
+  "..gggggggg...",
+  "..sDDDDDDs...",
+  "..sDDdddDD...",
+  "..ssssssss...",
+];
+function drawEmily(ox, oy, s) {
+  drawMap(PE, EMILY, ox, oy, s);
+  // 眼睛高光
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(ox + 3 * s, oy + 5 * s, s, s);
+  ctx.fillRect(ox + 9 * s, oy + 5 * s, s, s);
+  outline(ox, oy, 11, 18, s);
+}
+
+/* ============ 铁匠 (13 宽 × 17 高) ============ */
+const PS = {
+  'H':'#3a2b23','h':'#5a4232','S':'#eec093','s':'#d19c6f',
+  'B':'#6d4a2b','b':'#8a5c34','R':'#c0392b','G':'#8e6b45',
+  'g':'#6f4e2f','D':'#4d4033','T':'#7a4a26'
+};
+const SMITH = [
+  "....HHHH.....",
+  "...HHHHHH....",
+  "..HHHHHHHH...",
+  "..hhhhhhHH...",
+  ".SSSSSSSSSS..",
+  ".SSKSSSSKSS..",
+  "..SSSSSSSS...",
+  "..BBBBBBBB...",
+  ".BbbbbbbbB...",
+  "BBbbbbbbBB...",
+  "..GGGGGGGG...",
+  ".GggGGggGG...",
+  ".GGGGGGGGGG..",
+  "..ggggggggg..",
+  "..sDDDDDDs...",
+  "..ssssssss...",
+];
+function drawSmith(ox, oy, s) {
+  drawMap(PS, SMITH, ox, oy, s);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(ox + 3 * s, oy + 5 * s, s, s);
+  ctx.fillRect(ox + 9 * s, oy + 5 * s, s, s);
+  outline(ox, oy, 12, 17, s);
+}
+
+/* ============ 物品图鉴 (程序化绘制) ============ */
+function drawCarrot(ox, oy, s) {
+  // 胡萝卜身
+  ctx.fillStyle = '#e8702c';
+  ctx.fillRect(ox, oy + 4 * s, 2 * s, 7 * s);
+  ctx.fillRect(ox, oy + 11 * s, s, 2 * s); // 锥尾
+  ctx.fillStyle = '#f2a05c';
+  ctx.fillRect(ox + s, oy + 4 * s, s, 3 * s); // 高光
+  // 叶子
+  ctx.fillStyle = '#4f8f3f';
+  ctx.fillRect(ox, oy + 1 * s, s, 4 * s);
+  ctx.fillRect(ox + s, oy, s, 3 * s);
+  ctx.fillRect(ox + 2 * s, oy - 1 * s, s, 4 * s);
+  ctx.fillRect(ox + 3 * s, oy, s, 3 * s);
+  ctx.fillRect(ox + 4 * s, oy + 1 * s, s, 4 * s);
+  outline(ox, oy, 6, 14, s);
+}
+
+function drawTool(ox, oy, s) {
+  // 浇花壶
+  ctx.fillStyle = '#b7c4d1';
+  ctx.fillRect(ox + s, oy + 3 * s, 5 * s, 4 * s);   // 壶身
+  ctx.fillRect(ox + 2 * s, oy + 2 * s, 3 * s, s);   // 壶顶
+  ctx.fillRect(ox + 3 * s, oy + 1 * s, s, s);       // 盖尖
+  ctx.fillStyle = '#d9e2ec';
+  ctx.fillRect(ox + s, oy + 3 * s, s, 2 * s);       // 高光
+  ctx.fillStyle = '#8a9cac';
+  ctx.fillRect(ox + 2 * s, oy + 6 * s, s, 4 * s);   // 壶底
+  ctx.fillRect(ox + s, oy + 3 * s, s, 2 * s);       // 暗边
+  // 壶嘴
+  ctx.fillStyle = '#c4d0dd';
+  ctx.fillRect(ox + 4 * s, oy + 4 * s, s, s);
+  ctx.fillRect(ox + 6 * s, oy + 1 * s, s, s);
+  // 手柄(右)
+  ctx.strokeStyle = '#b7c4d1'; ctx.lineWidth = s * 0.8;
+  ctx.beginPath();
+  ctx.arc(ox + 7.5 * s, oy + 4.6 * s, s * 1.6, -1.1, 1.1);
+  ctx.stroke();
+  outline(ox, oy, 9, 11, s);
+}
+
+function drawBerry(ox, oy, s) {
+  const colors = ['#4458b8', '#5a6ee0', '#3a4a9e'];
+  const pos = [[3, 0], [1, 2], [5, 2], [3, 4], [3, 6]];
+  // 茎
+  ctx.strokeStyle = '#6d4a2b'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(ox + 3.5 * s, oy + 1 * s); ctx.lineTo(ox + 3.5 * s, oy); ctx.stroke();
+  pos.forEach(([x, y], i) => {
+    const base = colors[i % colors.length];
+    ctx.fillStyle = base;
+    ctx.beginPath(); ctx.arc(ox + (x + 0.5) * s, oy + (y + 0.5) * s, s * 0.45, 0, Math.PI * 2); ctx.fill();
+    // 高光
+    ctx.fillStyle = '#9aa8f5';
+    ctx.beginPath(); ctx.arc(ox + (x + 0.68) * s, oy + (y + 0.32) * s, s * 0.16, 0, Math.PI * 2); ctx.fill();
+    // 暗部
+    ctx.fillStyle = '#2e3b80';
+    ctx.beginPath(); ctx.arc(ox + (x + 0.38) * s, oy + (y + 0.64) * s, s * 0.13, 0, Math.PI * 2); ctx.fill();
+  });
+  outline(ox, oy, 8, 8, s);
+}
+
+function drawGem(ox, oy, s) {
+  ctx.fillStyle = '#b06ad4';
+  ctx.fillRect(ox + 2 * s, oy, 2 * s, s);
+  ctx.fillRect(ox + s, oy + s, 4 * s, 3 * s);
+  ctx.fillRect(ox + s, oy + 4 * s, 4 * s, 2 * s);
+  ctx.fillRect(ox + 1.5 * s, oy + 6 * s, 3 * s, s);
+  ctx.fillStyle = '#e2b4f5';
+  ctx.fillRect(ox + 2 * s, oy + s, s, 2 * s);
+  ctx.fillStyle = '#8a4aa8';
+  ctx.fillRect(ox + 2 * s, oy + 5 * s, s, s);
+  outline(ox, oy, 6, 7, s);
+}
+
+function drawBread(ox, oy, s) {
+  ctx.fillStyle = '#e8b25c';
+  ctx.fillRect(ox + s, oy + 2 * s, 6 * s, 4 * s);
+  ctx.fillStyle = '#f2c98f';
+  ctx.fillRect(ox + 2 * s, oy + 2 * s, 2 * s, 2 * s);
+  ctx.fillStyle = '#c9823a';
+  ctx.fillRect(ox + s, oy + 6 * s, 6 * s, s);
+  // 切口(割线)
+  ctx.fillStyle = '#c9823a';
+  ctx.fillRect(ox + 4 * s, oy + 2 * s, s, 4 * s);
+  outline(ox, oy, 8, 7, s);
+}
+
+/* ============ 主渲染 ============ */
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  const s = PIX;
+
+  ctx.fillStyle = '#1e1430';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.fillRect(W * 0.40, 0, 2, H);
+
+  ctx.font = '20px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillText('人物 · 程序化像素精灵', 60, 56);
+  ctx.fillText('物品 · 程序化像素图鉴', W * 0.40 + 60, 56);
+
+  // --- 左侧: 人物 ---
+  groundShadow(230, 330, 95, 16);
+  drawEmily(150, 158, s);
+  ctx.font = '15px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillText('艾米丽', 205, 400);
+
+  groundShadow(680, 330, 95, 16);
+  drawSmith(600, 158, s);
+  ctx.fillText('铁匠', 660, 400);
+
+  // --- 右侧: 物品 ---
+  const ox = W * 0.40 + 70;
+  const oy = 150;
+  const items = [
+    { f: drawCarrot, t: '胡萝卜', x: ox,        y: oy },
+    { f: drawTool,   t: '浇花壶', x: ox + 170,  y: oy - 6 },
+    { f: drawBerry,  t: '蓝莓',   x: ox + 340,  y: oy - 8 },
+    { f: drawGem,    t: '紫晶',   x: ox + 510,  y: oy },
+    { f: drawBread,  t: '烤面包', x: ox + 680,  y: oy },
+  ];
+  items.forEach((it) => {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(it.x - 14, it.y - 18, 132, 118);
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.strokeRect(it.x - 14 + 0.5, it.y - 18 + 0.5, 132, 118);
+    groundShadow(it.x + 3 * s, it.y + 13 * s + 8, 45, 70);
+    it.f(it.x, it.y, s);
+    ctx.font = '14px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(it.t, it.x + 40, it.y + 13 * s + 36);
+    ctx.restore();
+  });
+}
+
+render();
+</script>
+</body>
+</html>

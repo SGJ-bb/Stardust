@@ -25,7 +25,7 @@ interface ThemeState {
 
 export const useThemeStore = create<ThemeState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       currentTheme: "sakura",
       darkMode: false,
       bubbleSkin: "default",
@@ -33,12 +33,14 @@ export const useThemeStore = create<ThemeState>()(
 
       setTheme: (theme) => {
         document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.setAttribute("data-theme-mode", get().darkMode ? "dark" : "light");
         // 同步到useSettingsStore
         useSettingsStore.getState().setTheme(theme);
         set({ currentTheme: theme });
       },
 
       setDarkMode: (darkMode) => {
+        document.documentElement.setAttribute("data-theme-mode", darkMode ? "dark" : "light");
         document.documentElement.classList.toggle("dark", darkMode);
         // 同步到useSettingsStore
         useSettingsStore.getState().setDarkMode(darkMode);

@@ -118,14 +118,14 @@ class ApiClient(
         var total = 0
         for (i in 0 until messagesArray.length()) {
             val msg = messagesArray.getJSONObject(i)
-            total += estimateTokens(msg.optString("content", "") ?: "")
+            total += estimateTokens(msg.str("content") ?: "")
             // tool_calls 也算 token
             val tcArray = msg.optJSONArray("tool_calls")
             if (tcArray != null) {
                 total += tcArray.length() * 50 // 每个 tool_call 约50 token
             }
             // tool_call_id 字段
-            val toolCallId = msg.optString("tool_call_id", "")
+            val toolCallId = msg.str("tool_call_id")
             if (toolCallId.isNotBlank()) total += 10
         }
         // tools 定义本身的 token 开销
@@ -555,7 +555,7 @@ class ApiClient(
                     frameCount++
 
                     obj.optJSONObject("error")?.let { err ->
-                        val m = err.optString("message", "").ifBlank { "流式响应返回错误" }
+                        val m = err.str("message").ifBlank { "流式响应返回错误" }
                         AppLogger.e(TAG, "[Stream] 服务端下发 error 事件: $m")
                         return@use ChatResponse("", Emotion.SAD, Action.IDLE, errorMessage = m)
                     }
@@ -566,10 +566,10 @@ class ApiClient(
                     // 标准是 delta；个别厂商（含非流式回包）用 message
                     val delta = choice.optJSONObject("delta") ?: choice.optJSONObject("message") ?: continue
 
-                    delta.optString("reasoning_content", "")
+                    delta.str("reasoning_content")
                         .takeIf { it.isNotEmpty() }?.let { reasoningBuf.append(it) }
 
-                    val piece = delta.optString("content", "")
+                    val piece = delta.str("content")
                     if (piece.isNotEmpty()) {
                         textBuf.append(piece)
                         val shown = stripEmotionTagStreaming(textBuf.toString())
@@ -583,10 +583,10 @@ class ApiClient(
                             val holder = tcFragments.getOrPut(idx) {
                                 JSONObject().apply { put("args", StringBuilder()) }
                             }
-                            tcd.optString("id", "").takeIf { it.isNotEmpty() }?.let { holder.put("id", it) }
+                            tcd.str("id").takeIf { it.isNotEmpty() }?.let { holder.put("id", it) }
                             tcd.optJSONObject("function")?.let { fn ->
-                                fn.optString("name", "").takeIf { it.isNotEmpty() }?.let { holder.put("name", it) }
-                                val argPiece = fn.optString("arguments", "")
+                                fn.str("name").takeIf { it.isNotEmpty() }?.let { holder.put("name", it) }
+                                val argPiece = fn.str("arguments")
                                 if (argPiece.isNotEmpty()) {
                                     (holder.get("args") as StringBuilder).append(argPiece)
                                 }
@@ -601,10 +601,10 @@ class ApiClient(
                 }
 
                 val toolCalls = tcFragments.entries.sortedBy { it.key }.mapNotNull { (i, h) ->
-                    val name = h.optString("name", "")
+                    val name = h.str("name")
                     if (name.isBlank()) return@mapNotNull null
                     ToolCall(
-                        id = h.optString("id", "call_$i"),
+                        id = h.str("id", "call_$i"),
                         name = name,
                         arguments = (h.get("args") as? StringBuilder)?.toString()?.ifBlank { "{}" } ?: "{}"
                     )
@@ -761,7 +761,7 @@ class ApiClient(
         val choices = json.optJSONArray("choices")
         if (choices != null && choices.length() > 0) {
             val message = choices.getJSONObject(0).optJSONObject("message")
-            val fullText = message?.optString("content", "") ?: ""
+            val fullText = message?.str("content") ?: ""
 
             val toolCalls = mutableListOf<ToolCall>()
             val tcArray = message?.optJSONArray("tool_calls")
@@ -771,15 +771,15 @@ class ApiClient(
                     val func = tc.optJSONObject("function")
                     if (func != null) {
                         toolCalls.add(ToolCall(
-                            id = tc.optString("id", "call_$i"),
-                            name = func.optString("name", ""),
-                            arguments = func.optString("arguments", "{}")
+                            id = tc.str("id", "call_$i"),
+                            name = func.str("name"),
+                            arguments = func.str("arguments", "{}")
                         ))
                     }
                 }
             }
 
-            val reasoningContent = message?.optString("reasoning_content", "")?.takeIf { it.isNotBlank() }
+            val reasoningContent = message?.str("reasoning_content")?.takeIf { it.isNotBlank() }
 
             val (cleanText, extractedEmotion, extractedAction) = extractEmotionAction(fullText)
 
@@ -1076,7 +1076,7 @@ class ApiClient(
                 val json = org.json.JSONObject(bodyStr)
                 val choices = json.optJSONArray("choices")
                 if (choices != null && choices.length() > 0) {
-                    val content = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "") ?: ""
+                    val content = choices.getJSONObject(0).optJSONObject("message")?.str("content") ?: ""
                     parseScoredMoments(content)
                 } else emptyList()
             }
@@ -1096,7 +1096,7 @@ class ApiClient(
             val results = mutableListOf<Triple<String, Int, String>>()
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
-                val content = obj.optString("content", "")
+                val content = obj.str("content")
                 val score = obj.optInt("score", 0)
                 val category = obj.optString("category", "detail")
                 if (content.isNotBlank() && score >= 8) {
@@ -1177,7 +1177,7 @@ class ApiClient(
                 val json = JSONObject(responseBody as String)
                 val choices = json.optJSONArray("choices")
                 if (choices != null && choices.length() > 0) {
-                    choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")?.trim()
+                    choices.getJSONObject(0).optJSONObject("message")?.str("content")?.trim()
                 } else null
             }
         } catch (e: Exception) {
@@ -1239,7 +1239,7 @@ class ApiClient(
                 val json = JSONObject(responseBody as String)
                 val choices = json.optJSONArray("choices")
                 if (choices != null && choices.length() > 0) {
-                    choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")?.trim()
+                    choices.getJSONObject(0).optJSONObject("message")?.str("content")?.trim()
                 } else null
             }
         } catch (e: Exception) {
@@ -1314,7 +1314,7 @@ class ApiClient(
                 val json = JSONObject(bodyStr)
                 val choices = json.optJSONArray("choices")
                 if (choices != null && choices.length() > 0) {
-                    choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")
+                    choices.getJSONObject(0).optJSONObject("message")?.str("content")
                 } else null
             }
         } catch (e: Exception) {
@@ -1461,14 +1461,23 @@ $knowledgeSection
 8. wait - {"action":"wait","ms":1500}
 9. read - {"action":"read"}  强制重新读取屏幕（页面加载慢或内容截断时用）
 10. notifications / recents
+11. launch - {"action":"launch","package":"tv.danmaku.bili"}  直接启动指定 App（**首选**）
 
 【规则】
 - 你能操作90%的日常应用，不要说"做不到"
-- 当前不在目标App时，先 home 回桌面再 click 打开
+- **要打开某个 App，一律用 launch + 包名**（{"action":"launch","package":"tv.danmaku.bili"}）。
+  不要 home 回桌面再去找图标 —— 桌面图标可能在别的屏、被文件夹收着、或者名字看不全，
+  实测会连点错三四个 App（误开夸克、Termux、应用市场）。launch 是确定性的，一步到位。
+  不知道包名就先 read 一次屏幕，或者用常见包名：微信 com.tencent.mm、QQ com.tencent.mobileqq、
+  B站 tv.danmaku.bili、支付宝 com.eg.android.AlipayWidget、抖音 com.ss.android.ugc.aweme。
+- 只有在 launch 失败（提示未找到该应用）时才退回到 home + click 图标
 - 页面切换后加适当wait（加载慢用2000ms，快用1000ms）
 - 最多30步，复杂任务也要尽量完成
 - 遇到支付/密码/验证码页面，返回 {"error":"原因说明"} 表示拒绝执行
 - 优先用 index 点击（快照里的索引最准确）；没有 index 时再用 text
+- **点了但 read 一看还是原页面，必须换一种点法**：改用 {"action":"tap","x":..,"y":..} 点那个元素的中心。
+  不少 App 的自绘控件（QQ 的会话行、发送按钮）对无障碍 click 返回"成功"但其实没反应，
+  只有真实触摸才生效。**用同样的 index/text 连点三次是最常见的浪费**（实测白白多花十几秒）。
 - 看到「内容超长已截断」时，先 scroll 翻页，再 {"action":"read"} 重新读取
 - 看到「无文字可点元素」时用它的 index 或 @x,y 坐标 tap
 - 需要进入列表里的某一项但屏幕上看不到完整文字时，可以用 tap 坐标兜底
@@ -1512,7 +1521,7 @@ $knowledgeSection
                 val json = JSONObject(bodyStr)
                 val choices = json.optJSONArray("choices")
                 if (choices != null && choices.length() > 0) {
-                    var content = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")
+                    var content = choices.getJSONObject(0).optJSONObject("message")?.str("content")
                     if (content != null) {
                         content = content.trim()
                         if (content.startsWith("```")) {
@@ -1568,7 +1577,7 @@ $knowledgeSection
                 val json = JSONObject(bodyStr)
                 val choices = json.optJSONArray("choices") ?: return@use null
                 if (choices.length() == 0) return@use null
-                var content = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")
+                var content = choices.getJSONObject(0).optJSONObject("message")?.str("content")
                 if (content != null) {
                     content = content.trim()
                     if (content.startsWith("```")) {
@@ -1643,6 +1652,7 @@ $knowledgeSection
 {"error":"原因说明"}
 
 【动作类型】
+- {"action":"launch","package":"tv.danmaku.bili"}   直接启动 App（打开 App 一律用这个）
 - {"action":"click","index":3} 或 {"action":"click","text":"微信"} 或 {"action":"click","target":"n14"}
 - {"action":"tap","x":540,"y":2100}        坐标点击（无文字元素兜底）
 - {"action":"input","text":"内容"}         指定输入框：再加 "target":"搜索"
@@ -1660,16 +1670,44 @@ $knowledgeSection
 - "expect":"出现:我的钱包"              动作后屏幕上应出现该文字（最常用）
 - "expect":"消失:正在加载"              该文字应当消失
 - "expect":"包名:com.android.settings"  前台应用应切换到该包名
+- "expect":"输入框为空"                 输入框被清空了（**发送消息的唯一正确判据**）
 - "expect":"变化"                       屏幕内容或前台应用至少有一项变化（点按钮后的通用写法）
 例如：{"action":"click","index":3,"expect":"变化"}
-      {"action":"click","text":"发送","expect":"消失:发送"}
+      {"action":"click","text":"发送","expect":"输入框为空"}
+
+⚠ **发送消息千万别写 `消失:<你输入的内容>`**：消息发出去之后，那段文字会作为聊天气泡
+留在屏幕上，所以"文字消失"永远不成立，你会被判失败然后重发一遍——实测就是这么错的。
+发消息一律用 `"expect":"输入框为空"`。
+
+⚠ **`出现:` 后面只能写屏幕上真实看得见的文字**，不要写元素类型名。
+错误示范：`"expect":"出现:输入框"`、`"expect":"出现:发送按钮"`——屏幕上没有这四个字，
+必然判失败（实测 QQ 踩到）。想确认"进了聊天页"，用 `"expect":"输入框为空"`（进去时框是空的），
+或者干脆别加 expect，下一轮 read 看内容。
+
+⚠ **这些动作不要加 expect**（加了必误判）：
+- **点播放 / 暂停 / 播放器画面**：视频画面不产生文字和结构变化，屏幕校验永远"没变"，
+  你会误以为失败然后放弃。正确做法：点完 {"action":"wait","ms":2000} 再 {"action":"read"}，
+  看播放进度数字（形如 00:13 / 05:57）有没有往前走。
+- 点空白处 / 收键盘 / 切 Tab 里的高亮态：同样不产生可读变化。
+- 任何"主要效果是声音、动画"的操作。
 
 【规则】
-- 一次返回 1~4 个动作即可，页面会变的时候少给几个；页面切换后上层会重新观察
+- **打开 App 一律用 launch + 包名**，不要 home 回桌面找图标。
+  桌面图标可能在别的屏、被收进文件夹、名字被截断——实测会连点错三四个 App
+  （误开夸克、Termux、应用市场），一步错了后面全错，这是最容易翻车的地方。
+  常见包名：微信 com.tencent.mm、QQ com.tencent.mobileqq、B站 tv.danmaku.bili、
+  支付宝 com.eg.android.AlipayWidget、抖音 com.ss.android.ugc.aweme、淘宝 com.taobao.taobao、
+  高德 com.autonavi.minimap、美团 com.sankuai.meituan
+- **你看不到图，只认文字**：屏幕内容里没出现的东西就是不存在，不要凭想象去点。
+  不确定自己在哪，先 {"action":"read"}，看第一行「页面：xxx (包名)」。
+- **每一步只做一件事**，页面会变的时候少给动作（上层会自动重新观察）
+- **能一次做完的别拆开**：能 launch 就别"回桌面→找图标→点图标"三段
 - 优先用 index（索引来自当前快照，最准）；没有 index 再用 text；都没有就用 tap 坐标
 - 每次都要基于【当前屏幕】判断，不要照抄历史
 - 点按钮、切页面、提交表单时务必加 expect，否则「点了没反应」会被你误判成成功
 - 看到「内容超长已截断」：先 scroll 翻页，再 {"action":"read"}
+- **如果上面给了【技能】，按技能里的步骤走**，那是对这个 App 踩过坑总结出来的路径，
+  比自己摸索成功率高得多；技能里没写的页面才自己看图判断
 - 觉得"已经做完了"就返回 done，不要为了凑步数继续点
 - 不要说"做不到"，你能操作绝大多数日常 App
 $knowledgeSection$skillsSection
@@ -1786,6 +1824,12 @@ $packageSection$refineSection
 - uiMap 要提炼本次经过的页面结构（不是 raw click 序列）
 - workflow 要写高层步骤（人能看懂的），不要写 {"action":"click","text":"xxx"}
 - triggerKeywords 要覆盖用户可能的表述方式（如"发消息""发个""发给""说一下"）
+- **启动 App 一律写「用 launch 直接启动 + 包名」，绝对不要写"在桌面/应用抽屉里找图标"**——
+  实测按后者做会在桌面上乱滑、误开别的应用，白烧十几个动作
+- **关键元素优先写资源 id**（如 `#expand_search`、`#action_search`、`#frame_like`）。
+  本次轨迹里出现过 id 的，必须写进 uiMap；没有 id 才写文字或大致位置
+- 只写**这次真的验证过**的东西。没点过的页面、没确认的按钮不要写进去——
+  写了错误的先验，下次会照着错的做，比不写更糟
 - 只返回JSON，不要解释
 """.trimIndent()
 
@@ -1823,7 +1867,7 @@ $packageSection$refineSection
                 val json = JSONObject(bodyStr)
                 val choices = json.optJSONArray("choices")
                 if (choices != null && choices.length() > 0) {
-                    var content = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "")
+                    var content = choices.getJSONObject(0).optJSONObject("message")?.str("content")
                     if (content != null) {
                         content = content.trim()
                         if (content.startsWith("```")) {
@@ -1958,7 +2002,7 @@ $packageSection$refineSection
                 val models = mutableListOf<String>()
                 for (i in 0 until dataArr.length()) {
                     val modelObj = dataArr.getJSONObject(i)
-                    val modelId = modelObj.optString("id", "")
+                    val modelId = modelObj.str("id")
                     if (modelId.isNotBlank()) {
                         models.add(modelId)
                     }
@@ -1973,3 +2017,17 @@ $packageSection$refineSection
         }
     }
 }
+
+/**
+ * 安全取字符串。
+ *
+ * **不要直接用 `optString(key, "")`**。org.json 的实现是 `JSON.toString(opt(key))`，
+ * 而 `JSONObject.NULL.toString()` 返回的正是字符串 **"null"** —— 所以后端返回
+ * `"content": null` 时，optString 拿到的是 "null"，expressions 里的 fallback 根本不会生效。
+ *
+ * 流式响应上后果最严重：推理模型会连续发几十个 `content: null` 的 chunk，
+ * 每个都往正文里拼一个 "null"，用户最后看到"满屏 null + 末尾一句正常回复"
+ * （2026-10-26 实测踩到，见 SKILL 的踩坑记录）。
+ */
+private fun JSONObject.str(key: String, fallback: String = ""): String =
+    if (isNull(key)) fallback else optString(key, fallback)

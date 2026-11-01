@@ -9,6 +9,18 @@
 
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script>
+    // 首帧前应用主题，避免明暗覆盖层闪烁
+    try {
+      var st = JSON.parse(localStorage.getItem("stradust-theme") || "{}");
+      var settings = JSON.parse(localStorage.getItem("stradust-settings") || "{}");
+      var dark = st.state ? !!st.state.darkMode : !!(settings.state && settings.state.settings && settings.state.settings.appearance && settings.state.settings.appearance.darkMode);
+      var theme = (st.state && st.state.currentTheme) || (settings.state && settings.state.settings && settings.state.settings.appearance && settings.state.settings.appearance.theme) || "sakura";
+      document.documentElement.setAttribute("data-theme", theme);
+      document.documentElement.setAttribute("data-theme-mode", dark ? "dark" : "light");
+      if (dark) document.documentElement.classList.add("dark");
+    } catch (e) {}
+  </script>
+  <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

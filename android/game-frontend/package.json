@@ -1,0 +1,20 @@
+{
+  "name": "llm-town-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "世界书驱动像素小镇 - 前端(M0 骨架;独立模块,不影响 app 主工程)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.4.16",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}

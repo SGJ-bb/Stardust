@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { usePixelPetStore } from "@/stores/usePixelPetStore";
+import { isTauri as isTauriRef } from "@/lib/tauri";
 import { Settings, Save, TestTube, AlertTriangle, CheckCircle } from "lucide-react";
 import type { ImageGenConfig, ImageGenProvider } from "@/lib/pixelpet/types";
 import {
@@ -20,7 +21,7 @@ interface PixelPetSettingsProps {
  * - 测试连接功能
  */
 export function PixelPetSettings({ onSaved }: PixelPetSettingsProps) {
-  const { genConfig, updateGenConfig, testGenApi } = usePixelPetStore();
+  const { genConfig, updateGenConfig } = usePixelPetStore();
   const [provider, setProvider] = useState<ImageGenProvider>(genConfig.provider);
   const [apiUrl, setApiUrl] = useState(genConfig.apiUrl);
   const [apiKey, setApiKey] = useState(genConfig.apiKey);
@@ -61,13 +62,18 @@ export function PixelPetSettings({ onSaved }: PixelPetSettingsProps) {
       // 先保存当前配置以便测试
       await updateGenConfig({ provider, apiUrl, apiKey, model, stylePrompt, size, steps, cfgScale });
 
-      // 调用测试命令
-      const { invoke } = await import('@tauri-apps/api/core');
-      // 使用一个最小提示词测试
-      const result = await invoke<string>('test_pixel_gen_api', {
-        prompt: 'a simple pixel art dot, 64x64 pixels',
-      });
-      setTestResult({ ok: true, msg: '连接成功！API响应正常' });
+      // Tauri 桌面：走原生测试命令；浏览器：直接探测 API 可达性
+      if (isTauriRef()) {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke<string>('test_pixel_gen_api', {
+          prompt: 'a simple pixel art dot, 64x64 pixels',
+        });
+        setTestResult({ ok: true, msg: '连接成功！API响应正常' });
+      } else {
+        const res = await fetch(apiUrl, { method: 'GET', signal: AbortSignal.timeout(8000) });
+        // 任何 HTTP 应答（含405/401）都说明端点可达
+        setTestResult({ ok: true, msg: `API 端点可达（HTTP ${res.status}），保存后即可生成` });
+      }
     } catch (e) {
       setTestResult({ ok: false, msg: e instanceof Error ? e.message : String(e) });
     } finally {

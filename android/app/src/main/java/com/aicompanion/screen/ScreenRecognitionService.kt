@@ -374,6 +374,107 @@ open class ScreenRecognitionService : AccessibilityService() {
             return refreshByOcr(ctx)
         }
 
+        /** 上次 OCR 补采时间，避免每轮都跑（OCR 本身 0.5~2 秒） */
+        @Volatile
+        private var lastOcrEnrichAt = 0L
+
+        /**
+         * 「看得见但树里没有」的兜底：把截图识别出来的文字**合并**进当前快照。
+         *
+         * 为什么需要它：有些 App 的列表是画在 Canvas 上的（QQ 的联系人好友列表、
+         * 微信朋友圈），无障碍树里只有一排空容器 —— uiautomator / TalkBack 同样读不到，
+         * 这不是我们伪装不够，是 App 真没上报。
+         *
+         * 但**屏幕上确实有字**，所以用 OCR 补：识别出的每一行都变成一个可点元素
+         * （cls="ocr"，点它等于点那块区域），模型既能读也能点。
+         *
+         * 不替换整棵树，只做增量合并 —— 原生节点仍然是最可靠的定位手段。
+         *
+         * @return 补进去的条目数（0 表示没触发或没识别到）
+         */
+        fun enrichWithOcrIfNeeded(force: Boolean = false): Int {
+            val context = appContext ?: return 0
+            // 注意：这里不要调 refreshAndWait —— 本函数可能运行在与采集同一线程上，
+            // 那样会自己等自己（实测直接卡死，既不报错也没有结果）。
+            // 需要新鲜快照时由调用方（DevicePlugin.ocrRead）先刷一次。
+            val clickables = _lastClickableData.get()
+            // force 时不看可点元素数量：整屏都是画出来的界面可能一个可点节点都没有，
+            // 这种情况恰恰最需要 OCR。
+            if (clickables.size < 5 && !force) {
+                AppLogger.i(TAG, "OCR补采跳过：可点元素只有 ${clickables.size} 个")
+                return 0
+            }
+            val screenW = context.resources.displayMetrics.widthPixels
+
+            // 触发条件：出现 ≥3 个「整行宽、行高正常、却一个字都没有」的可点元素。
+            // 这正是自绘列表的特征；正常列表行的文字会挂在子 TextView 上被采到。
+            val canvasRows = clickables.count {
+                it.text.isBlank() && it.desc.isBlank() &&
+                    it.bounds.width() > screenW * 0.55 &&
+                    it.bounds.height() in 80..420
+            }
+            AppLogger.i(
+                TAG,
+                "OCR补采体检：可点 ${clickables.size}，其中无文字整行 $canvasRows 个"
+            )
+            // 只要出现 1 个"整行宽、却一个字都没有"的可点元素就补。
+            // 别要求 3 个：QQ 好友列表在「特别关心」下只露出 2 行，实测因此一次都没触发。
+            if (canvasRows < 1 && !force) {
+                AppLogger.i(TAG, "OCR补采跳过：没有无文字的可点行")
+                return 0
+            }
+
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (!force && now - lastOcrEnrichAt < 4000) return 0
+            lastOcrEnrichAt = now
+
+            val bmp = captureBitmap(context)
+            if (bmp == null) {
+                AppLogger.w(TAG, "OCR补采跳过：截图拿不到")
+                return 0
+            }
+            val res = try {
+                OcrView.recognize(bmp)
+            } catch (t: Throwable) {
+                AppLogger.w(TAG, "OCR 补采失败: ${t.message}")
+                return 0
+            } finally {
+                runCatching { bmp.recycle() }
+            }
+            if (res.items.isEmpty()) {
+                AppLogger.w(TAG, "OCR补采跳过：OCR 没识别出文字")
+                return 0
+            }
+
+            val existing = _lastScreenText.get()
+            val existingClick = clickables.map { it.text }.filter { it.isNotBlank() }.toMutableList()
+            val added = mutableListOf<ClickableData>()
+            for (it in res.items) {
+                val t = it.text.trim()
+                if (t.length < 1) continue
+                if (existing.contains(t)) continue          // 树里已有的不重复加
+                if (existingClick.any { e -> e == t }) continue
+                added.add(
+                    ClickableData(
+                        text = t, desc = "", bounds = it.bounds,
+                        cls = "ocr", viewId = "", path = ""
+                    )
+                )
+                existingClick.add(t)
+            }
+            if (added.isEmpty()) {
+                AppLogger.i(TAG, "OCR补采：识别到 ${res.items.size} 条，但都与树里已有文字重复")
+                return 0
+            }
+
+            // 合并进可点列表（后面点它 = 手势点那块区域）
+            _lastClickableData.set(clickables + added)
+            val extra = added.joinToString("\n") { "  ${it.text}" }
+            _lastScreenText.set(existing + "\n[截图识别补充]\n" + extra)
+            AppLogger.i(TAG, "OCR 补采：窗口里 ${canvasRows} 行无文字，补进 ${added.size} 条")
+            return added.size
+        }
+
         fun isSnapshotDegenerate(): Boolean {
             val text = _lastScreenText.get()
             val clickables = _lastClickableData.get()
@@ -390,7 +491,17 @@ open class ScreenRecognitionService : AccessibilityService() {
                 val st = ScreenWaker.ensureAwake(context)
                 if (!st.ready) AppLogger.w(TAG, "截屏前唤醒未完全就绪：${ScreenWaker.describe(st)}")
             }
+            // 首选 MediaProjection：统一在 API 21+ 可用。
+            // （takeScreenshot 是 API 30+，这台测试机 API 29 根本走不到，见 ScreenCaptureManager 注释）
+            if (com.aicompanion.screen.ScreenCaptureManager.isReady) {
+                com.aicompanion.screen.ScreenCaptureManager.capture()?.let { return it }
+            }
             val svc = currentInstance
+            AppLogger.i(
+                TAG,
+                "captureBitmap 入口：projection=${com.aicompanion.screen.ScreenCaptureManager.isReady} " +
+                    "service=${svc != null} sdk=${android.os.Build.VERSION.SDK_INT}"
+            )
             if (svc != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                 try {
                     val latch = CountDownLatch(1)
@@ -420,14 +531,60 @@ open class ScreenRecognitionService : AccessibilityService() {
                             }
                         }
                     )
-                    latch.await(3, TimeUnit.SECONDS)
+                    // 3 秒对多窗口/繁忙时刻不够（实测偶发 callback 迟迟不来 → 拿不到图，
+                    // 于是 OCR 兜底整条挂掉）。放宽到 6 秒，并允许再试一次：
+                    // 系统同一时刻只允许一个截屏请求，短间隔内第二次会被拒（code=3）。
+                    latch.await(6, TimeUnit.SECONDS)
                     if (out != null) return out
                 } catch (e: Exception) {
                     AppLogger.w(TAG, "takeScreenshot 异常: ${e.message}")
                 }
             }
-            // 兜底：自建 ADB 通道
-            val f = runCatching { com.aicompanion.adb.AdbSelf.screenshot(context, "ocr_shot.png") }.getOrNull()
+            // 第一次没拿到就再来一次（间隔 1.2 秒，避开系统的截屏频率限制）
+            if (svc != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                try { Thread.sleep(1200) } catch (_: Exception) {}
+                try {
+                    val latch2 = CountDownLatch(1)
+                    var out2: Bitmap? = null
+                    svc.takeScreenshot(
+                        android.view.Display.DEFAULT_DISPLAY,
+                        Executors.newSingleThreadExecutor(),
+                        object : TakeScreenshotCallback {
+                            override fun onSuccess(result: ScreenshotResult) {
+                                try {
+                                    val buf = result.hardwareBuffer
+                                    val hw = Bitmap.wrapHardwareBuffer(buf, ColorSpace.get(ColorSpace.Named.SRGB))
+                                    out2 = hw?.copy(Bitmap.Config.ARGB_8888, false)
+                                    buf.close()
+                                } catch (_: Exception) {
+                                } finally { latch2.countDown() }
+                            }
+
+                            override fun onFailure(errorCode: Int) {
+                                AppLogger.w(TAG, "takeScreenshot 第二次失败 code=$errorCode")
+                                latch2.countDown()
+                            }
+                        }
+                    )
+                    latch2.await(6, TimeUnit.SECONDS)
+                    if (out2 != null) return out2
+                } catch (_: Exception) {
+                }
+            }
+            // 兜底：自建 ADB 通道。
+            // 这条路会去扫本机端口（上万次探测），环境不对时会挂很久，
+            // 实测把整个 OCR 流程拖死在"截图拿不到"之前 → 这里限时 4 秒，超时就放弃。
+            val f = try {
+                val fut = Executors.newSingleThreadExecutor()
+                val task = fut.submit<java.io.File?> {
+                    runCatching { com.aicompanion.adb.AdbSelf.screenshot(context, "ocr_shot.png") }.getOrNull()
+                }
+                val r = runCatching { task.get(4, TimeUnit.SECONDS) }.getOrNull()
+                runCatching { fut.shutdownNow() }
+                r
+            } catch (_: Exception) {
+                null
+            }
             if (f != null && f.exists()) {
                 return runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull()
             }
@@ -860,6 +1017,30 @@ open class ScreenRecognitionService : AccessibilityService() {
         }
 
         /**
+         * 用无障碍的 ACTION_PASTE 往当前焦点输入框里粘贴剪贴板内容。
+         *
+         * 为什么不发 KEYCODE_PASTE（279）：那是**按键事件**，要走输入法的处理链路。
+         * Compose 的输入框（本项目自己的聊天框就是）不接这个按键，发了等于没发——
+         * 表现为剪贴板明明有内容，输入框还是空的，键盘上方的剪贴板建议条倒是弹出来了。
+         * ACTION_PASTE 是直接在节点上执行粘贴动作，Compone/原生 EditText 都认。
+         */
+        fun performPaste(): Boolean {
+            val service = currentInstance ?: return false
+            val root = runCatching { service.rootInActiveWindow }.getOrNull() ?: return false
+            return try {
+                val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                    ?: findFirstEditable(root)
+                    ?: return false
+                node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+            } catch (_: Exception) {
+                false
+            } finally {
+                runCatching { root.recycle() }
+            }
+        }
+
+        /**
          * 回读当前输入框里的文字，用于验证「到底写进去了没有」。
          *
          * 为什么必需：ACTION_SET_TEXT 和 KEYCODE_PASTE 都可能返回成功却什么都没写
@@ -882,15 +1063,103 @@ open class ScreenRecognitionService : AccessibilityService() {
         /**
          * 输入文本：找到目标输入框并填入内容。
          * 无目标时用当前焦点节点；找不到焦点则回退到"屏幕上第一个可见输入框"。
+         *
+         * target 支持两种写法：
+         * - 输入框上的文字/提示（如「搜索」）
+         * - **UI 树节点 id（如 "n1"）** —— 模型看图时最自然地会写这个，
+         *   而老实现只认文字，于是每次输入都报「未找到输入框: n1」（实测卡住整条任务）。
          */
         fun performInput(targetText: String, content: String): Boolean {
             val service = currentInstance ?: return false
-            val root = service.rootInActiveWindow ?: return false
-            try {
-                val targetNode = if (targetText.isBlank()) {
+            // 最多试 3 次：点完搜索框之后页面要 300~800ms 才把真正的输入框渲染出来，
+            // 立刻找就会"未找到输入框"（实测 B站搜索页反复因此失败）。
+            repeat(3) { attempt ->
+                // 关键：键盘弹出后 rootInActiveWindow 可能变成**输入法窗口**，
+                // 那里面一个可编辑节点都没有，于是"点输入框 → 输入"直接判失败
+                // （实测小红书：明明 EditText 在树里，perfomInput 三轮全报未找到）。
+                // 所以要把应用窗口一起纳入候选。
+                val roots = candidateRoots(service)
+                if (roots.isEmpty()) return@repeat
+                var ok = false
+                for (root in roots) {
+                    if (!ok) ok = runCatching { inputInto(root, targetText, content) }.getOrDefault(false)
+                    runCatching { root.recycle() }
+                }
+                if (ok) return true
+                try { Thread.sleep(450) } catch (_: Exception) {}
+            }
+            return false
+        }
+
+        /** 当前可用来找输入框的根节点：优先当前活动窗口，再补应用窗口（不含输入法窗口） */
+        private fun candidateRoots(service: android.accessibilityservice.AccessibilityService): List<AccessibilityNodeInfo> {
+            val out = mutableListOf<AccessibilityNodeInfo>()
+            runCatching { service.rootInActiveWindow }.getOrNull()?.let { out.add(it) }
+            runCatching {
+                for (w in service.windows) {
+                    if (w.type != android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION) continue
+                    val r = runCatching { w.root }.getOrNull() ?: continue
+                    if (out.any { it === r }) { continue }
+                    out.add(r)
+                    if (out.size >= 3) break
+                }
+            }
+            return out
+        }
+
+        /**
+         * 当前输入框里的文字。没有输入框返回空串。
+         *
+         * 用途：判断"发送成功了吗"。消息发出去之后文本仍然留在聊天记录里，
+         * 用"文字还在不在"判断必然误判（实测微信：发出去了，断言说「测试一下」仍在屏幕上）。
+         * 唯一可靠的判据是**输入框空了**。
+         */
+        fun currentInputText(): String {
+            val service = currentInstance ?: return ""
+            val roots = runCatching { candidateRoots(service) }.getOrDefault(emptyList())
+            for (root in roots) {
+                val node = runCatching {
                     root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: findFirstEditable(root)
-                } else {
-                    findEditableNodeByText(root, targetText)
+                }.getOrNull()
+                if (node != null) {
+                    val t = runCatching {
+                        val editableText = node.text?.toString().orEmpty()
+                        if (node !== root) runCatching { node.recycle() }
+                        editableText
+                    }.getOrDefault("")
+                    runCatching { root.recycle() }
+                    return t
+                }
+                runCatching { root.recycle() }
+            }
+            return ""
+        }
+
+        /** 单次尝试：定位输入框并写入 */
+        private fun inputInto(root: AccessibilityNodeInfo, targetText: String, content: String): Boolean {
+            run {
+                val idPattern = Regex("^n\\d+$")
+                val targetNode = when {
+                    targetText.isBlank() ->
+                        root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: findFirstEditable(root)
+                    idPattern.matches(targetText) -> {
+                        // 先在树里定位这个节点，点一下让它拿到焦点，再回退到"当前焦点"
+                        val node = _lastUiTree.get().firstOrNull { it.id == targetText }
+                        if (node != null) {
+                            val r = node.bounds
+                            performTapAt(r.centerX().toFloat(), r.centerY().toFloat())
+                            try { Thread.sleep(350) } catch (_: Exception) {}
+                        }
+                        root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                            ?: findFirstEditable(root)
+                    }
+                    else -> findEditableNodeByText(root, targetText)
+                        // 文字对不上时不要直接判死：很多输入框点过之后才会渲染出真正的
+                        // EditText（之前那个是占位容器），或者提示词跟模型写的措辞差一个字。
+                        // 这时用「当前焦点」或「屏幕上第一个输入框」比报错有用得多
+                        // —— 模型通常已经上一步点过输入框了（实测小红书就是这样卡住的）。
+                        ?: root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                        ?: findFirstEditable(root)
                 } ?: return false
 
                 return try {
@@ -905,8 +1174,6 @@ open class ScreenRecognitionService : AccessibilityService() {
                 } finally {
                     if (targetNode !== root) try { targetNode.recycle() } catch (_: Exception) {}
                 }
-            } finally {
-                root.recycle()
             }
         }
 
@@ -934,8 +1201,14 @@ open class ScreenRecognitionService : AccessibilityService() {
 
         private fun findEditableNodeByText(node: AccessibilityNodeInfo, target: String): AccessibilityNodeInfo? {
             if (isEditableNode(node)) {
-                val nodeText = listOfNotNull(node.text?.toString(), node.contentDescription?.toString())
-                    .joinToString(" ")
+                // 空输入框的 text 是空的，提示词在 hintText 里（小红书/B站/淘宝都这样）。
+                // 只比对 text 的话，"点搜索框 → input target=搜索" 必然找不到，
+                // 实测小红书搜索页因此卡死（改用节点 id 才能过）。
+                val nodeText = listOfNotNull(
+                    node.text?.toString(),
+                    node.contentDescription?.toString(),
+                    try { node.hintText?.toString() } catch (_: Exception) { null }
+                ).joinToString(" ")
                 if (nodeText.contains(target, ignoreCase = true)) return node
             }
             for (i in 0 until node.childCount) {

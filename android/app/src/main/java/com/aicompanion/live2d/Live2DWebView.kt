@@ -619,6 +619,24 @@ class Live2DWebView @JvmOverloads constructor(
                 modelBasePath = localDir.absolutePath
                 textureCache.clear()
 
+                // 表情/动作语义分析：模型的文件名和参数名是作者随手起的（有的叫 happy，
+                // 有的叫 1.exp3.json、参数 Param37），硬编码映射换个模型就失效。
+                // 这里读一遍 cdi3 + exp3，自己判断每个表情是什么情绪，存成 emotion_map.json
+                // 跟模型走，运行时直接用，不再猜名字。
+                val emoJson = runCatching {
+                    val result = ModelSemanticAnalyzer.analyze(modelDir)
+                    if (result != null) {
+                        File(modelDir, ModelSemanticAnalyzer.MAP_FILE).writeText(result.toString(2), Charsets.UTF_8)
+                        val emoCount = result.optJSONObject("emotions")?.length() ?: 0
+                        val presetCount = result.optJSONObject("paramPresets")?.length() ?: 0
+                        addLog("表情语义：${emoCount} 个情绪表情，${presetCount} 组参数配方")
+                        result.optJSONArray("notes")?.let { n ->
+                            for (i in 0 until n.length()) addLog("  · ${n.optString(i)}")
+                        }
+                        result.toString()
+                    } else null
+                }.getOrNull() ?: "null"
+
                 // 先验证和修复，再处理纹理（确保修复后的纹理也被处理）
                 // 传入 localDir（缓存根目录），因为纹理可能在兄弟目录中
                 validateAndFixModel(cachedModelJson, modelDir, localDir)
@@ -638,7 +656,7 @@ class Live2DWebView @JvmOverloads constructor(
                     if (!isDestroyed) {
                         // 计算模型JSON相对于缓存根目录的路径
                         val modelRelPath = cachedModelJson.relativeTo(localDir).path.replace("\\", "/")
-                        val html = buildLive2DHtml(modelRelPath)
+                        val html = buildLive2DHtml(modelRelPath, emoJson)
                         val htmlFile = File(localDir, "view.html")
                         htmlFile.writeText(html, Charsets.UTF_8)
 
@@ -1614,6 +1632,30 @@ class Live2DWebView @JvmOverloads constructor(
         }
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        // View 自己的尺寸变了（键盘弹出把聊天区压矮就是这条路径）。
+        // 用 onSizeChanged 而不是父容器的 layout 监听：这个回调由 View 框架保证触发，
+        // 不依赖 Compose 是否重新 compose，也不受 tag 被占用之类的问题影响。
+        if (w != oldw || h != oldh) forceResize()
+    }
+
+    /**
+     * 让页面里的 PIXI 重新计算渲染尺寸。
+     *
+     * 什么时候需要：WebView 的原生尺寸变了（最典型是软键盘弹出，聊天区被压到屏幕上半截），
+     * 但页面里的 `window` 不一定收到 resize 事件——尤其当 WebView 自己被设为固定高度、
+     * 只是父容器变矮时。不主动通知的话，canvas 会保持旧尺寸被 CSS 拉伸，模型就压扁了。
+     */
+    fun forceResize() {
+        if (isDestroyed) return
+        post {
+            runCatching {
+                evaluateJavascript("window.__l2dForceResize && window.__l2dForceResize()", null)
+            }
+        }
+    }
+
     fun setEmotion(emotion: Emotion) {
         if (isDestroyed) return
         val now = System.currentTimeMillis()
@@ -1707,12 +1749,13 @@ class Live2DWebView @JvmOverloads constructor(
         android.util.Log.d("Live2DWebView", msg)
     }
 
-    private fun buildLive2DHtml(modelFileName: String): String {
+    private fun buildLive2DHtml(modelFileName: String, emoMapJson: String = "null"): String {
         return """
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="UTF-8">
+            <script>window.__EMO_MAP = $emoMapJson;</script>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2237,13 +2280,93 @@ class Live2DWebView @JvmOverloads constructor(
                     'tap_body': ['tapbody','body','poke','tap']
                 };
 
+                // 参数驱动的表情：模型没有对应 exp3 表情文件时，直接改 Cubism 标准参数。
+                //
+                // 三个要点（参考 AIRI 的 Live2D expression 管线，他们踩过的坑）：
+                // ① 用 addParameterValueById **叠加**，不要 set —— set 会把这帧自动眨眼、
+                //    呼吸算出来的值整个盖掉，模型会变成"死鱼眼"。叠加是在基础动画之上加偏移。
+                // ② 强度做淡入/淡出（300ms 进、600ms 出），不要瞬间到位，否则切换情绪像抽帧。
+                // ③ 新情绪触发时**先清掉旧的待执行重置**（_stopEmoParams），否则旧情绪那 4 秒
+                //    计时器会在中途把参数清零，表现为"表情自己抖回去"。
+                var _emoRAF = null;
+                var _emoState = null;
+                var _EMO_IN = 300, _EMO_HOLD = 3500, _EMO_OUT = 600;
+
+                function _stopEmoParams() {
+                    if (_emoRAF) { cancelAnimationFrame(_emoRAF); _emoRAF = null; }
+                    _emoState = null;
+                }
+
+                function _nowMs() {
+                    return (window.performance && performance.now) ? performance.now() : Date.now();
+                }
+
+                function _applyEmoParams(pairs) {
+                    _stopEmoParams();
+                    _emoState = { pairs: pairs, startAt: _nowMs() };
+                    function tick() {
+                        if (!model || !_emoState) { _emoRAF = null; return; }
+                        var el = _nowMs() - _emoState.startAt;
+                        var k;
+                        if (el < _EMO_IN) k = el / _EMO_IN;
+                        else if (el < _EMO_IN + _EMO_HOLD) k = 1;
+                        else if (el < _EMO_IN + _EMO_HOLD + _EMO_OUT) k = 1 - (el - _EMO_IN - _EMO_HOLD) / _EMO_OUT;
+                        else { _emoState = null; _emoRAF = null; return; }
+
+                        try {
+                            var cm = model.internalModel.coreModel;
+                            for (var i = 0; i < _emoState.pairs.length; i++) {
+                                var id = _emoState.pairs[i][0];
+                                var v = _emoState.pairs[i][1] * k;
+                                try {
+                                    if (cm.addParameterValueById) cm.addParameterValueById(id, v);
+                                    else cm.setParameterValueById(id, v);
+                                } catch (e) {}
+                            }
+                        } catch (e) {}
+                        _emoRAF = requestAnimationFrame(tick);
+                    }
+                    _emoRAF = requestAnimationFrame(tick);
+                }
+
+                /**
+                 * 切换情绪。优先级：
+                 * 1) 分析出来的表情文件（作者亲手调的，效果最好）
+                 * 2) 标准参数配方（模型没有情绪表情时的通用兜底）
+                 * 3) 老的 EMOTION_MAP 名字模糊匹配（历史兼容）
+                 */
                 window.setLive2DEmotion = function(emotion) {
                     if (!model) return;
+                    var emo = (emotion || '').toLowerCase();
+                    var map = window.__EMO_MAP || null;
+
+                    // 1) 分析结果里的表情
                     try {
+                        var hit = map && map.emotions && map.emotions[emo];
+                        if (hit && hit.expression) {
+                            model.expression(hit.expression);
+                            _stopEmoParams();
+                            try { Live2DBridge.onEmotionChanged(hit.expression); } catch(e) {}
+                            return;
+                        }
+                    } catch (e) {}
+
+                    // 2) 标准参数配方
+                    try {
+                        var preset = map && map.paramPresets && map.paramPresets[emo];
+                        if (preset && preset.length) {
+                            _applyEmoParams(preset);
+                            try { Live2DBridge.onEmotionChanged(emo); } catch(e) {}
+                            return;
+                        }
+                    } catch (e) {}
+
+                    // 3) 老路子：按名字模糊匹配
+                    try {
+                        _stopEmoParams();
                         var expressions = model.internalModel.settings.expressions || [];
                         if (expressions.length === 0) return;
-                        var emotionLower = (emotion || '').toLowerCase();
-                        var candidates = EMOTION_MAP[emotionLower] || [emotionLower];
+                        var candidates = EMOTION_MAP[emo] || [emo];
                         var best = null;
                         for (var c = 0; c < candidates.length && !best; c++) {
                             for (var i = 0; i < expressions.length; i++) {
@@ -2306,12 +2429,10 @@ class Live2DWebView @JvmOverloads constructor(
                 window.setModelScale = function(scaleMultiplier) {
                     if (!model) return;
                     try {
+                        _userScaleMul = scaleMultiplier;   // 记住，resize 后要沿用
                         var newScale = baseScale * scaleMultiplier;
                         model.scale.set(newScale);
-                        console.log('[L2D] setModelScale: base=' + baseScale + ' mul=' + scaleMultiplier + ' result=' + newScale);
-                    } catch(e) {
-                        console.error('[L2D] setModelScale error: ' + e.message);
-                    }
+                    } catch(e) {}
                 };
 
                 window.getModelScale = function() {
@@ -2320,6 +2441,57 @@ class Live2DWebView @JvmOverloads constructor(
                         return model.scale.x / baseScale;
                     } catch(e) { return 1.0; }
                 };
+
+                // 窗口尺寸变化（最常见的就是弹出键盘，WebView 高度从满屏缩到输入框上方）：
+                // ① 必须真的 resize 渲染器，否则 canvas 的像素尺寸还是旧的，
+                //    被 CSS 拉成 100% 高 —— 非等比拉伸，模型看起来就是"被压扁"。
+                // ② 必须同时重算 baseScale，否则模型按旧尺寸缩放，在新的矮画布里
+                //    要么溢出要么只剩一条。
+                var _resizeTimer = null;
+                var _lastW = 0, _lastH = 0;
+                var _userScaleMul = 1.0;   // 用户手动调过的倍率，单独记，不去反推
+
+                function _applyResize() {
+                    if (!app || !app.renderer) return;
+                    var w = window.innerWidth, h = window.innerHeight;
+                    if (w <= 0 || h <= 0) return;
+                    if (w === _lastW && h === _lastH) return;   // 没变就别折腾
+                    _lastW = w; _lastH = h;
+                    try {
+                        app.renderer.resize(w, h);
+                        canvasW = w; canvasH = h;
+                        if (model) {
+                            // 按新画布重算基准缩放：取宽高比例的较小值，保证模型完整可见。
+                            // 不能沿用旧倍率反推（model.scale.x / baseScale），
+                            // 因为 baseScale 会被反复重算，反推会在多轮里累积放大。
+                            var sx = w / model.width, sy = h / model.height;
+                            baseScale = Math.min(sx, sy) * 0.8;
+                            model.scale.set(baseScale * _userScaleMul);
+                            model.x = w / 2;
+                            model.y = h / 2;
+                        }
+                    } catch(e) {}
+                }
+
+                // 供原生侧主动调用（WebView 尺寸变了但没触发 window resize 时兜底）
+                window.__l2dForceResize = function() {
+                    _lastW = 0; _lastH = 0;
+                    _applyResize();
+                };
+
+                window.addEventListener('resize', function() {
+                    // 键盘弹起/收起是动画，会连发好几次 resize；等停下来再处理，
+                    // 否则渲染器尺寸跟着动画抖动，画面会闪。
+                    if (_resizeTimer) clearTimeout(_resizeTimer);
+                    _resizeTimer = setTimeout(_applyResize, 120);
+                });
+                // 兜底：有些 WebView 版本在软键盘遮挡时只发 visualViewport 事件
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', function() {
+                        if (_resizeTimer) clearTimeout(_resizeTimer);
+                        _resizeTimer = setTimeout(_applyResize, 120);
+                    });
+                }
 
                 if (typeof PIXI !== 'undefined' && typeof PIXI.live2d !== 'undefined') initLive2D();
                 else window.addEventListener('load', function() { setTimeout(checkReady, 100); });

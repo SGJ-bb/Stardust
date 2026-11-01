@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useChatStore } from "@/stores/useChatStore";
 import { formatTime } from "@/lib/utils";
 import type { ChatMessage, ToolCall, Attachment } from "@/types/chat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -45,7 +46,7 @@ export function ChatBubble({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "flex gap-3 px-5 py-2.5 group reveal-up",
+        "chat-msg-row flex gap-2.5 md:gap-3 px-3 md:px-6 group reveal-up",
         isUser ? "flex-row-reverse" : "flex-row"
       )}
     >
@@ -68,7 +69,7 @@ export function ChatBubble({
       </div>
 
       {/* Message content */}
-      <div className={cn("max-w-[72%] space-y-1.5", isUser ? "items-end" : "items-start")}>
+      <div className={cn("max-w-[70%] md:max-w-[76%] space-y-1", isUser ? "items-end" : "items-start")}>
         {/* Name */}
         {!isUser && personaName && (
           <span className="text-label px-1">
@@ -90,7 +91,7 @@ export function ChatBubble({
           <div className="relative">
             <div
               className={cn(
-                "inline-block px-4 py-2.5 text-[14px] leading-relaxed",
+                "chat-bubble-text inline-block px-4 py-2.5",
                 isUser ? "bubble-user" : "bubble-assistant"
               )}
             >
@@ -111,6 +112,7 @@ export function ChatBubble({
                 favorited={message.favorited}
                 role={message.role}
                 content={message.content}
+                personaId={message.personaId}
               />
             </div>
           </div>
@@ -139,9 +141,32 @@ export function ChatBubble({
           </div>
         )}
 
-        {/* Time - 使用 text-caption 类 */}
+        {/* 变体切换（重新生成历史，Operit 式消息分支最小实现） */}
+        {!isUser && (message.variants?.length ?? 0) > 1 && (
+          <div className="flex items-center gap-1 px-1 text-[10px] text-[var(--color-muted-foreground)]">
+            <button
+              className="h-5 w-5 rounded hover:bg-[var(--color-muted)]/60 disabled:opacity-30 transition-colors"
+              disabled={(message.variantIdx ?? 0) <= 0}
+              onClick={() => void useChatStore.getState().switchMessageVariant(message.personaId, message.id, (message.variantIdx ?? 0) - 1)}
+              aria-label="上一个回复"
+            >
+              ‹
+            </button>
+            <span className="tabular-nums">{(message.variantIdx ?? 0) + 1}/{message.variants!.length}</span>
+            <button
+              className="h-5 w-5 rounded hover:bg-[var(--color-muted)]/60 disabled:opacity-30 transition-colors"
+              disabled={(message.variantIdx ?? 0) >= message.variants!.length - 1}
+              onClick={() => void useChatStore.getState().switchMessageVariant(message.personaId, message.id, (message.variantIdx ?? 0) + 1)}
+              aria-label="下一个回复"
+            >
+              ›
+            </button>
+          </div>
+        )}
+
+        {/* Time - 悬停展开，减少纵向碎片 */}
         {showTime && (
-          <span className="text-caption px-1">
+          <span className="text-caption px-1 block max-h-0 opacity-0 group-hover:max-h-6 group-hover:opacity-100 overflow-hidden transition-all duration-200">
             {formatTime(message.timestamp)}
           </span>
         )}

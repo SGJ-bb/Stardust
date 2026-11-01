@@ -32,6 +32,7 @@ export function useTheme() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", currentTheme);
     document.documentElement.classList.toggle("dark", darkMode);
+    document.documentElement.setAttribute("data-theme-mode", darkMode ? "dark" : "light");
   }, [currentTheme, darkMode]);
 
   return {

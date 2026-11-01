@@ -86,7 +86,17 @@ object AppLogger {
         val safe = sanitize(msg)
         val line = "[${dateFmt.format(Date())}] I/$tag: $safe"
         add(line)
-        if (isDebug) android.util.Log.i(tag, safe)
+        if (isDebug) {
+            // logcat 每行上限约 4000 字节，中文一个字 3 字节 → 超过 1300 字就被截断。
+            // 操作轨迹、UI 树 dump 这类长文本一定超，之前排查"AI 到底说了什么"
+            // 时看到的是半句话，就是这里截的。分块打，别让关键结论丢在截断点上。
+            var idx = 0
+            while (idx < safe.length) {
+                val end = (idx + 1200).coerceAtMost(safe.length)
+                android.util.Log.i(tag, safe.substring(idx, end))
+                idx = end
+            }
+        }
     }
 
     private fun addLog(level: String, tag: String, msg: String, throwable: Throwable?) {

@@ -9,6 +9,8 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { usePersonaStore } from "@/stores/usePersonaStore";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { isTauri } from "@/lib/tauri";
+import { useEmotionDriver } from "@/hooks/useEmotionDriver";
+import { ToolConfirmDialog } from "@/components/chat/ToolConfirmDialog";
 
 const DEFAULT_LIVE2D_MODEL = "F:\\stradust\\vtuber\\小恶魔.model3.json";
 
@@ -20,10 +22,28 @@ function toLive2dUrl(raw: string | undefined): string {
   return `live2d://${name}`;
 }
 
+/**
+ * 命中区路径：按模型文件名推导（public/models/zones_<key>.json）
+ * whale2.model3.json → /models/zones_whale2.json
+ * claudia_expr.model3.json → /models/zones_claudia.json
+ * 文件不存在时 loadZones 会静默返回 null（点击交互自动关闭，不影响渲染）
+ */
+function zonesUrlFor(raw: string | undefined): string {
+  const name = (raw || DEFAULT_LIVE2D_MODEL).replace(/\\/g, "/").split("/").pop() || "";
+  const key = name
+    .replace(/\.model3\.json$/i, "")
+    .replace(/[_-](expr|v\d+|pkg).*$/i, "")
+    .toLowerCase();
+  return `/models/zones_${key}.json`;
+}
+
 export function AppLayout() {
   const { settings } = useSettingsStore();
   const { activePersona } = usePersonaStore();
   const { isRaining, rainIntensity } = useWeather(true);
+
+  // 聊天情绪 → Live2D 表情/动作 自动驱动
+  useEmotionDriver();
 
   // 天气动效开关逻辑（兼容老用户：weatherEffect 可能为 undefined）
   const weatherMode = settings.appearance.weatherEffect ?? "auto";
@@ -64,6 +84,9 @@ export function AppLayout() {
         </main>
       </div>
 
+      {/* 工具执行确认弹窗（ask 权限） */}
+      <ToolConfirmDialog />
+
       {/* Live2D 悬浮层 */}
       {settings.appearance.live2dVisible && (
         <ErrorBoundary>
@@ -71,6 +94,9 @@ export function AppLayout() {
             scale={settings.appearance.live2dScale}
             opacity={settings.appearance.live2dOpacity}
             modelPath={toLive2dUrl(activePersona?.live2dModelPath)}
+            zonesPath={zonesUrlFor(activePersona?.live2dModelPath)}
+            gaze
+            dock
           />
         </ErrorBoundary>
       )}
