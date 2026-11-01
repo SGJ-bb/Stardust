@@ -8,12 +8,12 @@ import { ChatSidebar } from "./ChatSidebar";
 import { ChatToolbar } from "./ChatToolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { streamChat } from "@/lib/tauri";
+import { streamChat, getChatHistory } from "@/lib/tauri";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
 import { motion, AnimatePresence } from "framer-motion";
 import { UserPlus, ArrowRight, AlertCircle, X, Settings } from "lucide-react";
 
-const SUGGESTED_REPLIES = ["你好呀", "今天心情怎么样", "聊聊天吧"];
+const DEFAULT_SUGGESTIONS = ["你好呀", "今天心情怎么样", "聊聊天吧"];
 
 export function ChatPage() {
   const { personaId: urlPersonaId } = useParams<{ personaId: string }>();
@@ -26,6 +26,8 @@ export function ChatPage() {
     streamingContent,
     setCurrentPersona,
     addUserMessage,
+    addAssistantMessage,
+    setMessages,
     setSending,
     setStreaming,
     appendStreamContent,
@@ -43,8 +45,10 @@ export function ChatPage() {
 
   const [showSidebar, setShowSidebar] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
+  const historyLoadedRef = useRef<string>("");
 
   // 自动选择第一个角色时同步到 store（无条件的 effect）
   useEffect(() => {
@@ -61,11 +65,20 @@ export function ChatPage() {
     }
   }, [personaId, setCurrentPersona]);
 
-  // 监听后端 "chat-stream" 事件
+  // 切换角色时从引擎持久层加载聊天历史
+  useEffect(() => {
+    if (!personaId || historyLoadedRef.current === personaId) return;
+    historyLoadedRef.current = personaId;
+    getChatHistory(personaId)
+      .then((history) => setMessages(history))
+      .catch(() => undefined);
+  }, [personaId, setMessages]);
+
+  // 监听统一引擎 "chat-stream" 事件（浏览器/Tauri 双模式）
   useTauriEvent<{
     type: string;
     content?: string;
-    finish_reason?: string;
+    personaId?: string;
     tool_name?: string;
     result?: string;
   }>("chat-stream", (event) => {
@@ -73,8 +86,22 @@ export function ChatPage() {
       case "content":
         if (event.content) appendStreamContent(event.content);
         break;
+      case "suggestions":
+        try {
+          const s = JSON.parse(event.content ?? "[]") as string[];
+          if (Array.isArray(s) && s.length) setSuggestions(s);
+        } catch { /* ignore */ }
+        break;
+      case "proactive":
+        // 主动搭话/情绪关怀/闹钟提醒：引擎已落库，重拉历史对齐消息 ID
+        if (event.content && (!event.personaId || event.personaId === personaId)) {
+          getChatHistory(personaId).then(setMessages).catch(() => undefined);
+        }
+        break;
       case "done":
         finishStream();
+        // 引擎为单一数据源：重拉历史，使 store 消息 ID 与库一致（重新生成/收藏依赖）
+        getChatHistory(personaId).then(setMessages).catch(() => undefined);
         break;
       case "error":
         console.error("Stream error:", event.content);
@@ -282,9 +309,9 @@ export function ChatPage() {
                     {persona.greeting || "开始和角色聊天吧"}
                   </p>
 
-                  {/* 建议回复 */}
+                  {/* 建议回复（引擎预测 or 默认） */}
                   <div className="flex flex-wrap items-center justify-center gap-2">
-                    {SUGGESTED_REPLIES.map((reply) => (
+                    {suggestions.map((reply) => (
                       <button
                         key={reply}
                         onClick={() => handleSuggestedReply(reply)}

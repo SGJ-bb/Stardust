@@ -20,11 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
-import { useState } from "react";
-import {
-  commentMoment as commentMomentApi,
-  publishMoment as publishMomentApi,
-} from "@/lib/tauri";
+import { useEffect, useState } from "react";
 
 /**
  * 朋友圈页面
@@ -35,7 +31,7 @@ export function MomentsPage() {
   const { currentPersonaId } = useChatStore();
   const personaId = urlPersonaId ?? currentPersonaId ?? "";
   const navigate = useNavigate();
-  const { moments, publishMoment, likeMoment, commentMoment } = useMomentsStore();
+  const { moments, isLoading, error, load, publishMoment, likeMoment, commentMoment, generateAi, clearError } = useMomentsStore();
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [content, setContent] = useState("");
   /** 评论相关状态 */
@@ -44,31 +40,44 @@ export function MomentsPage() {
   /** 刷新动画 */
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  /** 进入页面 / 切换角色时从引擎加载真实动态 */
+  useEffect(() => {
+    void load(personaId || undefined);
+  }, [personaId, load]);
+
+  /** 错误提示 toast：5 秒后自动消失 */
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(clearError, 5000);
+    return () => clearTimeout(t);
+  }, [error, clearError]);
+
   const handlePublish = () => {
     if (!personaId || !content.trim()) return;
-    publishMoment(personaId, content.trim(), []);
-    // 调用后端API
-    publishMomentApi(personaId, content.trim(), []).catch((error) => {
-      console.error("发布朋友圈失败:", error);
-    });
+    // store → engine 一条路：落库 + AI 自动点赞评论由引擎完成
+    void publishMoment(personaId, content.trim(), []);
     setContent("");
     setShowPublishDialog(false);
   };
 
   const handleComment = (momentId: string) => {
     if (!commentContent.trim()) return;
-    commentMoment(momentId, "user", "我", commentContent.trim());
-    // 调用后端API
-    commentMomentApi(momentId, commentContent.trim()).catch((error) => {
-      console.error("评论失败:", error);
-    });
+    void commentMoment(momentId, "user", "我", commentContent.trim());
     setCommentContent("");
     setCommentingMomentId(null);
   };
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 800);
+    void load(personaId || undefined).finally(() => {
+      setTimeout(() => setIsRefreshing(false), 800);
+    });
+  };
+
+  /** AI 生成一条动态 */
+  const handleAiGenerate = () => {
+    if (!personaId) return;
+    void generateAi(personaId);
   };
 
   return (
@@ -86,21 +95,41 @@ export function MomentsPage() {
             </h1>
           </div>
           {/* 刷新按钮 */}
-          <button
-            onClick={handleRefresh}
-            className="p-2 rounded-xl text-[var(--color-muted-foreground)] hover:text-[var(--color-primary)] hover:bg-[var(--color-muted)]/30 transition-all duration-300"
-          >
-            <RefreshCw className={`h-4.5 w-4.5 ${isRefreshing ? "animate-spin" : ""}`} />
-          </button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleAiGenerate}
+              disabled={!personaId}
+              className="rounded-xl text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 gap-1.5"
+              title="让 AI 发一条动态"
+            >
+              <Sparkles className="h-4 w-4" />
+              AI 动态
+            </Button>
+            <button
+              onClick={handleRefresh}
+              className="p-2 rounded-xl text-[var(--color-muted-foreground)] hover:text-[var(--color-primary)] hover:bg-[var(--color-muted)]/30 transition-all duration-300"
+            >
+              <RefreshCw className={`h-4.5 w-4.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
+
+        {/* ====== 错误提示 toast ====== */}
+        {error && (
+          <div className="fixed bottom-24 right-6 z-[100] max-w-sm rounded-xl border border-red-500/50 bg-red-50 p-4 text-red-900 shadow-lg animate-slide-in-right">
+            <p className="text-sm font-semibold">{error}</p>
+          </div>
+        )}
 
         {/* ====== 动态流式布局（朋友圈风格）===== */}
         <ScrollArea className="flex-1 pb-24 pr-1">
           {moments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24">
-              <ImageIcon className="h-16 w-16 text-[var(--color-muted-foreground)]/35 mb-4 animate-pulse" />
-              <p className="text-sm text-[var(--color-muted-foreground)]">还没有动态</p>
-              <p className="text-xs text-[var(--color-muted-foreground)]/50 mt-1">点击右下角发布第一条</p>
+              <ImageIcon className={`h-16 w-16 text-[var(--color-muted-foreground)]/35 mb-4 ${isLoading ? "animate-spin" : "animate-pulse"}`} />
+              <p className="text-sm text-[var(--color-muted-foreground)]">{isLoading ? "加载中..." : "还没有动态"}</p>
+              <p className="text-xs text-[var(--color-muted-foreground)]/50 mt-1">{isLoading ? "正在读取动态流" : "点击右下角发布第一条"}</p>
             </div>
           ) : (
             <div className="space-y-5 max-w-xl mx-auto">
@@ -161,7 +190,7 @@ export function MomentsPage() {
                     <div className="flex items-center gap-5">
                       {/* 点赞按钮 */}
                       <button
-                        onClick={() => likeMoment(moment.id)}
+                        onClick={() => void likeMoment(moment.id)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
                           moment.liked
                             ? "text-red-400 bg-red-500/10"

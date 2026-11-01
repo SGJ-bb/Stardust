@@ -1,0 +1,31 @@
+{
+  "request_id": "548ef60a-7772-4766-8310-85f00bee63bf",
+  "entries": [
+    {
+      "stage": 2,
+      "agent": "doc-formatter",
+      "route": "html",
+      "html_sub": "template",
+      "genre": "business-report",
+      "skills_invoked": ["design-token", "doc-typeset", "html-review"],
+      "template_used": "business-report",
+      "html_review_attempts": 1,
+      "fallback": false,
+      "fallback_reason": null,
+      "timestamp": "2026-09-14T19:02:57+08:00"
+    },
+    {
+      "stage": 3,
+      "agent": "doc-converter",
+      "operations": "html_to_docx_convert",
+      "skill_used": "html-to-docx",
+      "success": true,
+      "present_files_opened": true,
+      "fallback": false,
+      "fallback_reason": null,
+      "warnings": [],
+      "duration_ms": 8000,
+      "timestamp": "2026-09-14T19:06:20+08:00"
+    }
+  ]
+}

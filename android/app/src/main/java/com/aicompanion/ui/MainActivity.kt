@@ -234,6 +234,37 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
 
     // Runnable 变量已移至各 Coordinator，此处保留 focusRunnable 用于 focusTimerCoordinator 之前的兼容
 
+    /**
+     * 屏幕读取授权（MediaProjection）。
+     *
+     * 为什么需要用户点一次：Android 规定任何 App 想拿屏幕像素（除 root）都必须经过这次确认，
+     * 这是系统级安全设计。点一次「立即开始」之后，后续截屏全部由代码完成，不再打扰。
+     */
+    private val projectionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                com.aicompanion.screen.ScreenCaptureManager.start(this, result.resultCode, result.data)
+                AppLogger.i(TAG, "屏幕读取授权成功，正在建立截屏通道")
+            } else {
+                AppLogger.w(TAG, "屏幕读取授权被取消 resultCode=${result.resultCode}")
+            }
+        }
+
+    /** 拉起系统授权弹窗；已授权则直接跳过 */
+    private fun requestScreenCapture() {
+        if (com.aicompanion.screen.ScreenCaptureManager.isReady) {
+            AppLogger.i(TAG, "屏幕读取通道已就绪，无需再次授权")
+            return
+        }
+        val intent = com.aicompanion.screen.ScreenCaptureManager.requestIntent(this)
+        if (intent == null) {
+            AppLogger.e(TAG, "系统不支持屏幕读取授权")
+            return
+        }
+        runCatching { projectionLauncher.launch(intent) }
+            .onFailure { AppLogger.e(TAG, "拉起授权失败: ${it.message}") }
+    }
+
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         AppLogger.w(TAG, "pickImageLauncher: resultCode=${result.resultCode}")
         if (result.resultCode == Activity.RESULT_OK) {
@@ -442,6 +473,11 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 调试/自动化入口：am start ... --ez request_projection true 直接拉起截屏授权
+        if (intent?.getBooleanExtra("request_projection", false) == true) {
+            requestScreenCapture()
+        }
 
         // === P0: UI必需立即初始化 (阻塞主线程, <500ms) ===
         // 不调用 enableEdgeToEdge()：传统模式下系统自动避开导航栏，

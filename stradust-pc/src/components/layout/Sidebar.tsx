@@ -25,10 +25,14 @@ import {
   ChevronDown,
   Sparkles,
   Maximize2,
+  Tag,
+  Heart,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isTauri } from "@/lib/tauri";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useChatStore } from "@/stores/useChatStore";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { AnimatePresence, motion } from "framer-motion";
@@ -45,8 +49,10 @@ const PRIMARY_NAV: NavItem[] = [
   { icon: MessageCircle, label: "聊天", path: "/chat" },
   { icon: Users, label: "群聊", path: "/group-chat" },
   { icon: Brain, label: "记忆", path: "/memory" },
+  { icon: Tag, label: "昵称", path: "/nicknames" },
   { icon: BookOpen, label: "日记", path: "/diary" },
   { icon: Image, label: "朋友圈", path: "/moments" },
+  { icon: Heart, label: "收藏", path: "/favorites" },
 ];
 
 const SOCIAL_NAV: NavItem[] = [
@@ -68,6 +74,7 @@ const TOOLS_NAV: NavItem[] = [
   { icon: Key, label: "激活", path: "/activation" },
   { icon: Cpu, label: "本地AI", path: "/local-model" },
   { icon: Zap, label: "Agent", path: "/agent" },
+  { icon: Smartphone, label: "微信", path: "/ilink" },
 ];
 
 function CollapsibleSection({
@@ -178,7 +185,9 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { settings } = useSettingsStore();
   const { currentPersonaId } = useChatStore();
-  const collapsed = settings.appearance.sidebarCollapsed;
+  // 窄屏（手机/小窗口）自动折叠为图标栏，避免内容区被挤压
+  const isNarrow = useMediaQuery("(max-width: 900px)");
+  const collapsed = isNarrow || settings.appearance.sidebarCollapsed;
 
   const getNavPath = (basePath: string) => {
     const needsPersonaId = [

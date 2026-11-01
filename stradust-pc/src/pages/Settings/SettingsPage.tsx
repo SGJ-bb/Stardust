@@ -40,9 +40,9 @@ const SETTING_GROUPS = [
     icon: Palette,
     component: AppearanceSettings,
   },
-  { key: "voice", label: "语音", icon: Mic, component: VoiceSettings },
-  { key: "safety", label: "安全", icon: Shield, component: SafetySettings },
-  { key: "plugin", label: "插件", icon: Puzzle, component: PluginSettings },
+  { key: "voice", label: "语音/图像服务", icon: Mic, component: VoiceSettings },
+  { key: "safety", label: "安全与功能", icon: Shield, component: SafetySettings },
+  { key: "plugin", label: "插件/工具", icon: Puzzle, component: PluginSettings },
   { key: "memory", label: "记忆", icon: Database, component: MemorySettings },
   { key: "llm", label: "LLM模型", icon: Brain, component: LLMSettings },
   {
@@ -51,7 +51,7 @@ const SETTING_GROUPS = [
     icon: Sparkles,
     component: PixelPetManagePanel,
   },
-  { key: "system", label: "系统", icon: Monitor, component: SystemSettings },
+  { key: "system", label: "系统/数据", icon: Monitor, component: SystemSettings },
 ];
 
 /** 12个主题配置 */
@@ -152,14 +152,14 @@ export function SettingsPage() {
                           ?.label ?? ""}
                       </span>
                     </div>
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+                    <div className="grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-12 gap-2">
                       {THEME_OPTIONS.map((theme) => {
                         const isActive = appearance.theme === theme.key;
                         return (
                           <button
                             key={theme.key}
                             onClick={() => changeTheme(theme.key as any)}
-                            className={`relative group aspect-square rounded-xl transition-all duration-300 ${
+                            className={`relative group aspect-square w-full max-w-12 rounded-xl transition-all duration-300 ${
                               isActive
                                 ? "ring-2 ring-offset-2 ring-offset-[var(--color-card)] scale-105 shadow-lg"
                                 : "hover:scale-105 hover:shadow-md"
@@ -271,6 +271,68 @@ export function SettingsPage() {
                       min={0}
                       max={24}
                       step={2}
+                    />
+                  </div>
+
+                  {/* 显示密度 */}
+                  <div className="glass-card p-5 rounded-[var(--radius-lg)]">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-[var(--color-card-foreground)]">
+                          显示密度
+                        </h3>
+                        <p className="text-xs text-[var(--color-muted-foreground)] mt-0.5">
+                          聊天消息的行距与字号缩放
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { key: "compact", label: "紧凑", hint: "信息密度优先" },
+                        { key: "standard", label: "标准", hint: "推荐" },
+                        { key: "cozy", label: "舒适", hint: "更宽松易读" },
+                      ] as const).map((d) => (
+                        <button
+                          key={d.key}
+                          onClick={() => updateSettings({ appearance: { ...appearance, density: d.key } })}
+                          className={`px-3 py-2 rounded-xl border text-left transition-all ${
+                            (appearance.density ?? "standard") === d.key
+                              ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                              : "border-[var(--color-border)] text-[var(--color-card-foreground)] hover:border-[var(--color-primary)]/50"
+                          }`}
+                        >
+                          <span className="block text-sm font-medium">{d.label}</span>
+                          <span className="block text-[10px] text-[var(--color-muted-foreground)] mt-0.5">{d.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 背景明暗 */}
+                  <div className="glass-card p-5 rounded-[var(--radius-lg)]">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-[var(--color-card-foreground)]">
+                          背景明暗
+                        </h3>
+                        <p className="text-xs text-[var(--color-muted-foreground)] mt-0.5">
+                          背景插画的遮罩浓度，太浅会影响文字可读性
+                        </p>
+                      </div>
+                      <span className="text-xs font-medium text-[var(--color-primary)] tabular-nums px-2 py-1 rounded-full bg-[var(--color-primary)]/10">
+                        {Math.round((appearance.bgMask ?? 1) * 100)}%
+                      </span>
+                    </div>
+                    <Slider
+                      value={[Math.round((appearance.bgMask ?? 1) * 100)]}
+                      onValueChange={([v]) =>
+                        updateSettings({
+                          appearance: { ...appearance, bgMask: Math.max(20, v) / 100 },
+                        })
+                      }
+                      min={20}
+                      max={100}
+                      step={5}
                     />
                   </div>
 

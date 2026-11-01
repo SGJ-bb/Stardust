@@ -37,8 +37,8 @@ export interface ProviderProfile {
   isDefault: boolean;
 }
 
-/** 语音引擎 */
-export type VoiceEngine = "edge-tts" | "vits" | "gpt-sovits" | "local";
+/** 语音引擎（web=浏览器原生 speechSynthesis，cloud=OpenAI兼容TTS API） */
+export type VoiceEngine = "edge-tts" | "vits" | "gpt-sovits" | "local" | "web" | "cloud";
 
 /** 语音配置 */
 export interface VoiceConfig {
@@ -49,6 +49,75 @@ export interface VoiceConfig {
   volume: number;
   /** 自动播放 */
   autoPlay: boolean;
+  /** 云端TTS服务（engine=cloud 时使用） */
+  cloud?: ServiceEndpointConfig;
+}
+
+/** ASR 配置 */
+export interface AsrConfig {
+  /** web = SpeechRecognition；cloud = OpenAI whisper 兼容接口 */
+  mode: "web" | "cloud";
+  cloud?: ServiceEndpointConfig;
+  language: string;
+}
+
+/** 通用服务端点配置（TTS/ASR/图片生成/图片识别） */
+export interface ServiceEndpointConfig {
+  presetId: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+/** AI 功能开关（对齐 Android SettingsManager） */
+export interface AiFeaturesConfig {
+  emotionAnalysisEnabled: boolean;
+  llmEmotionAnalysisEnabled: boolean;
+  searchEnabled: boolean;
+  searchProvider: "duckduckgo" | "bing" | "baidu";
+  live2dEnabled: boolean;
+  offlineModeEnabled: boolean;
+  screenAwarenessEnabled: boolean;
+  safetyFilterEnabled: boolean;
+  humanizerEnabled: boolean;
+  replyPredictEnabled: boolean;
+  proactiveEnabled: boolean;
+}
+
+/** 聊天参数（对齐 Android 全局 LLM 采样参数） */
+export interface ChatParamsConfig {
+  temperature: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  maxTokens: number;
+  contextTurns: number;
+  languageStyle: "normal" | "tsundere" | "cute";
+}
+
+/** 日记与主动搭话 */
+export interface RhythmConfig {
+  nagFrequency: "low" | "medium" | "high" | "off";
+  diaryTriggerMode: "manual" | "msg50" | "hourly" | "every2h" | "daily22";
+  momentsEnabled: boolean;
+  checkInReminder: boolean;
+}
+
+/** 定时唤醒（Web 替代：页面内调度 + 系统通知） */
+export interface WakeConfig {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+  notifyDesktop: boolean;
+}
+
+/** 用户画像 */
+export interface UserProfileConfig {
+  nickname: string;
+  gender: "" | "male" | "female" | "other";
+  birthday: string;
+  appearance: string;
+  description: string;
 }
 
 /** 主题名称（12套） */
@@ -87,6 +156,10 @@ export interface AppearanceConfig {
   weatherEffect: "auto" | "always" | "off";
   /** 雨滴密集度: 0.2~2.0（1.0 为标准密度） */
   rainDensity: number;
+  /** 界面显示密度：compact 紧凑 / standard 标准 / cozy 舒适 */
+  density?: "compact" | "standard" | "cozy";
+  /** 背景遮罩明暗（0=背景全亮, 1=标准遮罩） */
+  bgMask?: number;
 }
 
 /** 记忆配置 */
@@ -149,4 +222,25 @@ export interface Settings {
   notificationEnabled: boolean;
   /** 语言 */
   language: string;
+  /** ===== 以下为对齐 Android 版的扩展配置（可选，引擎有默认值） ===== */
+  /** 全局聊天采样参数 */
+  chatParams?: ChatParamsConfig;
+  /** AI 功能开关 */
+  aiFeatures?: AiFeaturesConfig;
+  /** 日记/搭话节奏 */
+  rhythm?: RhythmConfig;
+  /** 定时唤醒 */
+  wake?: WakeConfig;
+  /** 用户画像 */
+  userProfile?: UserProfileConfig;
+  /** 语音识别 */
+  asr?: AsrConfig;
+  /** 图片生成服务 */
+  imageGen?: ServiceEndpointConfig;
+  /** 图片识别服务 */
+  imageRecog?: ServiceEndpointConfig;
+  /** 星尘币余额（皮肤商店） */
+  coins?: number;
+  /** 工具权限三档（借鉴 Operit）：auto=自动允许 ask=每次询问 deny=拒绝；缺省 auto */
+  toolPermissions?: Record<string, "auto" | "ask" | "deny">;
 }

@@ -6,9 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, Users, Settings, Image as ImageIcon } from "lucide-react";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { cn } from "@/lib/utils";
-import { sendGroupMessage } from "@/lib/tauri";
 import { useTauriEvent } from "@/hooks/useTauriEvent";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SpeakMode } from "@/types/group-chat";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -29,9 +28,14 @@ const SPEAK_MODE_LABELS: Record<SpeakMode, string> = {
 export function GroupChatPage() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
-  const { groups, addGroupMessage, updateGroup } = useGroupChatStore();
+  const { groups, load, addGroupMessage, updateGroup } = useGroupChatStore();
   const group = groups.find((g) => g.id === groupId);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+
+  /** 进入页面时从引擎加载群聊数据 */
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   /** 根据personaId查找群成员获取名称和头像 */
   const getMemberInfo = (personaId: string) => {
@@ -40,10 +44,10 @@ export function GroupChatPage() {
     return { name: member?.name ?? personaId, avatar: member?.avatar ?? "" };
   };
 
-  /** 监听群聊AI回复事件 */
-  useTauriEvent<{ groupId: string; personaId: string; content: string }>("group-chat:ai-reply", (payload) => {
-    if (payload.groupId === groupId) {
-      addGroupMessage(payload.groupId, payload.personaId, payload.content);
+  /** 监听引擎群聊数据变化事件：AI 回复完成后重拉最新消息 */
+  useTauriEvent<{ collection?: string; groupId?: string }>("data-changed", (payload) => {
+    if (payload.collection === "groupChats" && (!payload.groupId || payload.groupId === groupId)) {
+      void load();
     }
   });
 
@@ -55,11 +59,8 @@ export function GroupChatPage() {
     const finalContent = mentions
       ? `${content}${attachments ? ` [附件: ${attachments.length}个]` : ""}`
       : `${content}${attachments ? ` [附件: ${attachments.length}个]` : ""}`;
-    addGroupMessage(groupId, "user", finalContent);
-    // 调用后端群聊API触发AI回复
-    sendGroupMessage(groupId, finalContent).catch((error) => {
-      console.error("发送群聊消息失败:", error);
-    });
+    // store → engine：落库用户消息并触发 AI 成员回复（模式透传），回复经事件刷新
+    void addGroupMessage(groupId, "user", finalContent);
   };
 
   /** 切换发言模式 */

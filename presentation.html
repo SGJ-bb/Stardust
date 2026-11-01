@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星尘 Stradust — 会记住你的 AI 伴侣框架 · 安卓端路演</title>
+<link rel="icon" href="data:,">
+<style>
+/* ========== 基础（暖色护眼） ========== */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+  background:radial-gradient(1200px 800px at 78% 18%,#33200e 0%,transparent 60%),
+             radial-gradient(1000px 700px at 12% 88%,#2a1a0c 0%,transparent 55%),
+             linear-gradient(160deg,#1a1008 0%,#221408 55%,#170d05 100%);
+  color:#fff3e4;user-select:none;cursor:default;
+}
+canvas#bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+.spotlight{position:fixed;left:0;top:0;width:640px;height:640px;z-index:1;pointer-events:none;
+  border-radius:50%;opacity:0;transition:opacity .6s ease;will-change:transform;
+  background:radial-gradient(circle,rgba(255,190,115,.10) 0%,rgba(255,170,100,.05) 40%,transparent 68%)}
+.vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(12,6,2,.55) 100%)}
+.deck{position:fixed;inset:0;z-index:2}
+
+/* ========== 幻灯片框架 ========== */
+.slide{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding:44px 72px 64px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transform:translateY(46px) scale(.985);transition:opacity .65s ease,transform .65s cubic-bezier(.22,.9,.3,1),visibility .65s;
+}
+.slide::-webkit-scrollbar{display:none}
+.slide::before,.slide::after{content:"";flex:1 1 0}
+.slide.active{opacity:1;visibility:visible;pointer-events:auto;transform:none;z-index:2}
+.shead{text-align:center;margin-bottom:22px}
+.kicker{display:inline-block;font-size:clamp(11px,1vw,13px);letter-spacing:.35em;color:var(--acc,#ffcf87);
+  border:1px solid color-mix(in srgb,var(--acc,#ffcf87) 45%,transparent);border-radius:999px;
+  padding:5px 16px 5px 19px;margin-bottom:14px;background:color-mix(in srgb,var(--acc,#ffcf87) 8%,transparent)}
+h2.stitle{font-size:clamp(24px,3.2vw,44px);font-weight:800;line-height:1.25;
+  background:linear-gradient(92deg,#fff6e6 10%,var(--acc,#ffcf87) 55%,#ff9aa8 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 22px color-mix(in srgb,var(--acc,#ffcf87) 30%,transparent))}
+.subline{margin-top:10px;color:#c9b295;font-size:clamp(12px,1.15vw,15px)}
+
+/* 入场动画 */
+.rv{opacity:0;transform:translateY(26px)}
+.slide.active .rv{animation:rise .75s cubic-bezier(.2,.8,.25,1) forwards;animation-delay:var(--d,0s)}
+@keyframes rise{to{opacity:1;transform:none}}
+.pop{opacity:0;transform:scale(.7)}
+.slide.active .pop{animation:pop .6s cubic-bezier(.3,1.5,.5,1) forwards;animation-delay:var(--d,0s)}
+@keyframes pop{to{opacity:1;transform:scale(1)}}
+
+/* ========== 通用组件 ========== */
+.term{position:relative;background:rgba(255,205,135,.06);border:1px solid rgba(255,190,110,.30);
+  border-radius:14px;padding:12px 15px 12px 44px;font-size:clamp(11px,.95vw,13.5px);color:#ffe9c9;line-height:1.55;text-align:left}
+.term::before{content:"💡";position:absolute;left:13px;top:11px;font-size:17px}
+.term b{color:#ffd166}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;width:100%}
+
+.chip{display:inline-flex;align-items:center;gap:7px;background:rgba(255,240,220,.05);
+  border:1px solid rgba(255,240,220,.14);border-radius:999px;padding:7px 15px;
+  font-size:clamp(11px,1vw,13.5px);color:#f3e5cf}
+.hl-bar{margin-top:16px;display:flex;align-items:center;gap:12px;justify-content:center;
+  background:linear-gradient(90deg,rgba(255,207,135,.10),rgba(255,138,112,.10));
+  border:1px solid rgba(255,190,110,.30);border-radius:14px;padding:12px 22px;
+  font-size:clamp(13px,1.25vw,16.5px);font-weight:700;color:#fff6e6;text-align:center}
+.hl-bar .em{color:#ffd166}
+
+/* 卡片 */
+.card{background:rgba(255,240,220,.04);border:1px solid rgba(255,240,220,.10);border-radius:16px;
+  padding:16px;text-align:center;position:relative;overflow:hidden;
+  transition:transform .3s ease,border-color .3s ease,box-shadow .3s ease}
+.card:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--acc,#ffcf87) 55%,transparent);
+  box-shadow:0 12px 34px color-mix(in srgb,var(--acc,#ffcf87) 16%,transparent)}
+.card .ico{font-size:clamp(24px,2.4vw,34px);display:block;margin-bottom:8px}
+.card b{display:block;font-size:clamp(13px,1.2vw,16px);color:#fff6e6;margin-bottom:6px}
+.card p{font-size:clamp(10.5px,.95vw,12.5px);color:#c9b295;line-height:1.55}
+.card .tag{position:absolute;top:10px;right:10px;font-size:10px;color:#ffd166;
+  background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.35);border-radius:999px;padding:2px 8px}
+
+/* 痛点卡 */
+.pain{background:linear-gradient(180deg,rgba(255,126,103,.10),rgba(255,126,103,.03));
+  border:1px solid rgba(255,138,112,.32);border-radius:16px;padding:18px 14px;text-align:center;
+  transition:transform .3s ease,border-color .3s}
+.pain:hover{transform:translateY(-6px);border-color:rgba(255,150,120,.75)}
+.pain .ico{font-size:clamp(26px,2.6vw,38px);display:block;margin-bottom:10px}
+.pain b{display:block;font-size:clamp(13px,1.25vw,17px);color:#ffb3a0;margin-bottom:8px}
+.pain p{font-size:clamp(10.5px,.95vw,12.5px);color:#e8d0bd;line-height:1.6}
+
+/* ========== 封面：鼠标 3D 视差标题 ========== */
+.hero3d{will-change:transform;transform:perspective(1000px);display:flex;flex-direction:column;align-items:center}
+.cover-kicker{margin:0 0 16px;font-size:clamp(11px,1.05vw,14px);letter-spacing:.5em;color:#b0977a;text-indent:.5em}
+h1.cover-title{font-size:clamp(72px,11vw,150px);font-weight:900;letter-spacing:.06em;line-height:1.08;
+  background:linear-gradient(100deg,#ffe3ae 5%,#ffcf87 30%,#ffab8a 62%,#ff8a70 95%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 30px rgba(255,178,102,.40));
+  animation:titleGlow 3.4s ease-in-out infinite}
+@keyframes titleGlow{0%,100%{filter:drop-shadow(0 0 26px rgba(255,178,102,.35))}50%{filter:drop-shadow(0 0 52px rgba(255,190,120,.68))}}
+.cover-en{font-size:clamp(13px,1.4vw,19px);letter-spacing:.66em;color:#a08e72;text-indent:.66em;margin-top:14px}
+.cover-sub{margin-top:22px;font-size:clamp(15px,1.6vw,21px);color:#ffe9c9;font-weight:600}
+.cover-sub em{font-style:normal;color:#ffd166}
+.cover-line{width:min(430px,42vw);height:1px;margin-top:22px;
+  background:linear-gradient(90deg,transparent,rgba(255,190,110,.6),transparent)}
+.cover-badges{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.cover-hint{position:absolute;bottom:58px;left:0;right:0;text-align:center;color:#8a7a5f;
+  font-size:12.5px;letter-spacing:.12em;animation:pulseHint 2.2s ease-in-out infinite}
+@keyframes pulseHint{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* 表情球（情感演示，角色无关） */
+.emoball{position:relative;width:clamp(112px,11vw,140px);height:clamp(112px,11vw,140px);border-radius:50%;
+  background:radial-gradient(circle at 34% 28%,color-mix(in srgb,var(--ec,#ffb45e) 42%,#fff8ec) 0%,var(--ec,#ffb45e) 72%);
+  box-shadow:0 0 46px color-mix(in srgb,var(--ec,#ffb45e) 42%,transparent),inset 0 -10px 22px rgba(60,20,0,.18);
+  display:flex;align-items:center;justify-content:center;
+  transition:box-shadow .4s ease;will-change:transform}
+.emoball::after{content:"";position:absolute;inset:-14px;border-radius:50%;
+  border:1px dashed color-mix(in srgb,var(--ec,#ffb45e) 55%,transparent);
+  animation:orbitSpin 14s linear infinite}
+@keyframes orbitSpin{to{transform:rotate(360deg)}}
+.emoball span{font-size:clamp(48px,4.6vw,60px);line-height:1;filter:drop-shadow(0 5px 10px rgba(60,20,0,.30))}
+.emoball.anim-bounce{animation:bounce .95s ease-in-out infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
+.emoball.anim-shake{animation:shake .55s ease-in-out infinite}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-9deg) translateX(-4px)}75%{transform:rotate(9deg) translateX(4px)}}
+.emoball.anim-droop{animation:droop 1.7s ease-in-out infinite}
+@keyframes droop{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(7px) scale(.965)}}
+.emoball.anim-jitter{animation:jitter .16s linear infinite}
+@keyframes jitter{0%{transform:translate(0,0) rotate(0)}25%{transform:translate(3px,-2px) rotate(1.6deg)}
+  50%{transform:translate(-3px,2px) rotate(-1.6deg)}75%{transform:translate(2px,3px) rotate(1deg)}}
+.emoball.anim-zoom{animation:zoomPop .55s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes zoomPop{0%{transform:scale(.55)}100%{transform:scale(1)}}
+.emoball.anim-breathe{animation:breathe 2.6s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+
+/* 情感按钮 */
+.emo-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:14px}
+.emo-btn{cursor:pointer;border:1px solid rgba(255,240,220,.18);background:rgba(255,240,220,.05);
+  color:#f3e5cf;border-radius:999px;padding:7px 16px;font-size:13px;font-family:inherit;
+  transition:all .25s ease}
+.emo-btn:hover{transform:translateY(-2px)}
+.emo-btn.on{border-color:var(--ec,#ffb45e);color:#fff6e6;background:color-mix(in srgb,var(--ec,#ffb45e) 20%,transparent);
+  box-shadow:0 0 16px color-mix(in srgb,var(--ec,#ffb45e) 38%,transparent)}
+.bubble{margin-top:14px;min-height:52px;background:rgba(255,171,138,.10);border:1px solid rgba(255,171,138,.38);
+  border-radius:16px 16px 16px 4px;padding:12px 16px;font-size:clamp(13px,1.15vw,15.5px);color:#fff6e6;
+  position:relative;text-align:left;line-height:1.5}
+.bubble .etag{position:absolute;top:-11px;right:12px;font-size:10.5px;padding:2px 10px;border-radius:999px;
+  background:var(--ec,#ffb45e);color:#2b1503;font-weight:800}
+.codebox{margin-top:12px;background:rgba(28,16,7,.8);border:1px solid rgba(255,190,110,.24);border-radius:12px;
+  padding:12px 14px;font-family:Consolas,"JetBrains Mono",monospace;font-size:clamp(10.5px,.9vw,12.5px);
+  line-height:1.7;text-align:left;color:#ffd9a8}
+.codebox .k{color:#ffb3a0}.codebox .s{color:#b8e6a0}.codebox .c{color:#8a7a5f}
+
+/* 流程管线（隐私页） */
+.pipe{position:relative;display:flex;justify-content:space-between;align-items:stretch;gap:10px;
+  width:100%;padding:30px 8px 40px;margin-top:6px}
+.pipe::before{content:"";position:absolute;left:4%;right:4%;top:52%;height:2px;z-index:0;
+  background:linear-gradient(90deg,rgba(255,207,135,.15),rgba(255,207,135,.55),rgba(255,207,135,.15))}
+.pnode{position:relative;z-index:2;flex:1;background:rgba(38,23,11,.94);border:1px solid rgba(255,207,135,.30);
+  border-radius:14px;padding:13px 8px;text-align:center;box-shadow:0 6px 22px rgba(15,7,2,.5)}
+.pnode .ico{font-size:clamp(20px,2vw,27px)}
+.pnode b{display:block;font-size:clamp(12px,1.05vw,14.5px);color:#fff6e6;margin:5px 0 3px}
+.pnode span{font-size:clamp(9.5px,.85vw,11px);color:#a5927a;display:block;line-height:1.45}
+.gate{position:absolute;z-index:3;left:16.5%;top:8px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.gate .g1{font-size:24px;filter:drop-shadow(0 0 10px rgba(255,209,102,.85));animation:gatePulse 1.4s ease-in-out infinite}
+@keyframes gatePulse{50%{transform:scale(1.18)}}
+.gate .g2{font-size:10px;color:#ffd166;background:rgba(28,16,7,.96);border:1px solid rgba(255,209,102,.5);
+  border-radius:999px;padding:2px 9px;white-space:nowrap}
+.pkt{position:absolute;z-index:4;top:46%;transform:translateY(-50%);font-size:11px;padding:4px 10px;
+  border-radius:999px;white-space:nowrap;font-weight:700}
+.pkt.good{left:2%;opacity:0;background:rgba(168,223,160,.14);border:1px solid #a8dfa0;color:#d7f4cf;
+  animation:pktGood 4.2s linear infinite 2.1s}
+@keyframes pktGood{0%{left:2%;opacity:0}6%{opacity:1}92%{opacity:1}100%{left:86%;opacity:0}}
+.pkt.bad{left:2%;top:44%;opacity:0;background:rgba(255,126,103,.15);border:1px solid #ff7e67;color:#ffc9bd;
+  animation:pktBad 4.2s ease-in-out infinite}
+@keyframes pktBad{0%{left:3%;opacity:1;transform:translateY(-50%)}14%{left:13%;opacity:1;transform:translateY(-50%)}
+  19%{left:15.5%;opacity:1;transform:translateY(-28%)}26%{left:16%;opacity:0;transform:translateY(46px)}100%{left:16%;opacity:0;transform:translateY(46px)}}
+.blockx{position:absolute;z-index:4;left:14.5%;top:64%;color:#ff7e67;font-weight:900;font-size:17px;
+  text-shadow:0 0 10px rgba(255,126,103,.9);animation:xFlash 4.2s infinite}
+@keyframes xFlash{0%,18%{opacity:0}22%,28%{opacity:1}38%,100%{opacity:0}}
+
+/* 三层记忆 */
+.mem{display:flex;flex-direction:column;gap:10px;width:100%}
+.mlayer{border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;
+  border:1px solid rgba(255,190,110,.35);background:rgba(255,190,110,.06);position:relative}
+.mlayer b{font-size:clamp(12.5px,1.1vw,15px);color:#fff6e6;white-space:nowrap}
+.mlayer span{font-size:clamp(10.5px,.95vw,12px);color:#d9c4a5;text-align:right;line-height:1.45}
+.mlayer.l1{border-color:rgba(255,171,138,.48);background:rgba(255,171,138,.07)}
+.mlayer.l2{border-color:rgba(255,207,135,.48);background:rgba(255,207,135,.07)}
+.mlayer.l3{border-color:rgba(255,154,168,.48);background:rgba(255,154,168,.07)}
+.slide.active .mlayer{animation:memPulse 4.5s ease-in-out infinite}
+.slide.active .mlayer.l1{animation-delay:0s}
+.slide.active .mlayer.l2{animation-delay:1.4s}
+.slide.active .mlayer.l3{animation-delay:2.8s}
+@keyframes memPulse{0%,28%,100%{box-shadow:0 0 0 rgba(255,190,110,0)}12%{box-shadow:0 0 26px rgba(255,190,110,.42)}}
+.mem-arrow{align-self:center;color:#ffb45e;font-size:15px;animation:sinkDown 1.8s ease-in-out infinite}
+@keyframes sinkDown{0%,100%{transform:translateY(-3px);opacity:.55}50%{transform:translateY(4px);opacity:1}}
+
+/* 架构图 */
+.arch{display:flex;flex-direction:column;gap:0;width:100%;align-items:center}
+.abox{width:100%;border-radius:16px;padding:13px;border:1px solid rgba(255,178,102,.38);background:rgba(255,178,102,.06)}
+.abox h4{font-size:clamp(12px,1.1vw,14.5px);color:#ffd9a8;margin-bottom:9px;display:flex;align-items:center;gap:8px}
+.amods{display:flex;gap:8px;flex-wrap:wrap}
+.amod{flex:1;min-width:86px;text-align:center;font-size:clamp(10px,.9vw,12px);color:#f3e5cf;
+  background:rgba(255,240,220,.05);border:1px solid rgba(255,240,220,.12);border-radius:10px;padding:8px 6px;line-height:1.4}
+.amod i{font-style:normal;display:block;font-size:17px;margin-bottom:3px}
+.alink{height:34px;width:2px;position:relative;margin:2px auto}
+.alink::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#ffd166,#ff8a70);
+  animation:linkFlow 1.4s linear infinite;opacity:.85}
+.alink::after{content:"HTTPS · SSE · WebSocket";position:absolute;left:14px;top:8px;font-size:10px;color:#a08e72;white-space:nowrap}
+@keyframes linkFlow{0%{transform:translateY(-14px);opacity:0}45%{opacity:1}100%{transform:translateY(14px);opacity:0}}
+
+/* 端侧 AI */
+.net-banner{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.net-pill{display:flex;align-items:center;gap:9px;border-radius:999px;padding:9px 20px;font-size:clamp(12px,1.1vw,14.5px);font-weight:700}
+.net-pill.wan{background:rgba(168,223,160,.10);border:1px solid rgba(168,223,160,.5);color:#d7f4cf;animation:pillGlowA 3.6s ease-in-out infinite}
+.net-pill.off{background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.5);color:#ffe6a8;animation:pillGlowB 3.6s ease-in-out infinite 1.8s}
+@keyframes pillGlowA{0%,40%,100%{box-shadow:0 0 0 rgba(168,223,160,0)}18%{box-shadow:0 0 22px rgba(168,223,160,.45)}}
+@keyframes pillGlowB{0%,40%,100%{box-shadow:0 0 0 rgba(255,209,102,0)}18%{box-shadow:0 0 22px rgba(255,209,102,.55)}}
+.wifi{position:relative;width:30px;height:22px}
+.wifi::before,.wifi::after{content:"";position:absolute;left:50%;border:2px solid currentColor;border-radius:50%}
+.wifi::before{width:20px;height:20px;bottom:0;transform:translateX(-50%) rotate(45deg);border-right-color:transparent;border-top-color:transparent}
+.wifi::after{width:9px;height:9px;bottom:5px;border-radius:50%;background:currentColor;transform:translateX(-50%)}
+
+/* 插件循环 */
+.loopwrap{position:relative;display:flex;justify-content:space-between;gap:10px;width:100%;padding:26px 6px 34px}
+.loopwrap::before{content:"";position:absolute;left:5%;right:5%;top:50%;height:2px;
+  background:linear-gradient(90deg,rgba(255,209,102,.2),rgba(255,209,102,.6),rgba(255,209,102,.2))}
+.lnode{position:relative;z-index:2;flex:1;background:rgba(38,23,11,.95);border:1px solid rgba(255,209,102,.35);
+  border-radius:14px;padding:14px 8px;text-align:center}
+.lnode .ico{font-size:clamp(20px,2vw,26px)}
+.lnode b{display:block;font-size:clamp(12px,1.05vw,14.5px);color:#fff6e6;margin:5px 0 3px}
+.lnode span{font-size:clamp(9.5px,.85vw,11px);color:#a5927a;display:block;line-height:1.4}
+.slide.active .lnode{animation:nodeGlow 3.6s ease-in-out infinite}
+.slide.active .lnode:nth-child(2){animation-delay:.9s}
+.slide.active .lnode:nth-child(3){animation-delay:1.8s}
+.slide.active .lnode:nth-child(4){animation-delay:2.7s}
+@keyframes nodeGlow{0%,25%,100%{border-color:rgba(255,209,102,.35);box-shadow:0 0 0 rgba(255,209,102,0)}
+  10%{border-color:#ffd166;box-shadow:0 0 22px rgba(255,209,102,.4)}}
+.loopdot{position:absolute;z-index:3;top:50%;transform:translateY(-50%);left:4%;width:11px;height:11px;border-radius:50%;
+  background:#ffd166;box-shadow:0 0 14px #ffd166;animation:loopMove 3.6s linear infinite}
+@keyframes loopMove{0%{left:4%;opacity:0}5%{opacity:1}92%{opacity:1}100%{left:93%;opacity:0}}
+
+/* 数字页 */
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;width:100%}
+.count-card{text-align:center;background:rgba(255,240,220,.035);border:1px solid rgba(255,240,220,.10);
+  border-radius:16px;padding:18px 10px 14px}
+.count-card .num{font-size:clamp(30px,3.4vw,52px);font-weight:900;line-height:1;
+  background:linear-gradient(180deg,#fff6e6,var(--acc,#ffcf87));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.count-card .lbl{margin-top:8px;font-size:clamp(11px,1vw,13px);color:#c9b295}
+.bars{width:100%;margin-top:16px;display:flex;flex-direction:column;gap:9px}
+.brow{display:grid;grid-template-columns:130px 1fr 210px;align-items:center;gap:12px;font-size:clamp(10.5px,.95vw,12.5px)}
+.brow .bn{color:#f3e5cf;text-align:right}
+.btrack{height:12px;background:rgba(255,240,220,.06);border-radius:999px;overflow:hidden}
+.bfill{height:100%;border-radius:999px;width:0;background:linear-gradient(90deg,#ffd166,#ff8a70)}
+.slide.active .bfill{animation:grow 1.4s cubic-bezier(.25,.9,.3,1) forwards;animation-delay:var(--d,0s)}
+@keyframes grow{to{width:var(--w)}}
+.brow .bv{color:#a5927a}
+
+/* 结尾 */
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%}
+.map-table{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:clamp(10.5px,.95vw,13px)}
+.map-table td{padding:7px 12px;background:rgba(255,240,220,.035)}
+.map-table td:first-child{border-radius:10px 0 0 10px;color:#ffb3a0;width:42%}
+.map-table td:last-child{border-radius:0 10px 10px 0;color:#d7f4cf}
+.map-table td b{color:#fff6e6}
+.thanks{font-size:clamp(26px,3vw,44px);font-weight:900;letter-spacing:.14em;margin-top:6px;
+  background:linear-gradient(92deg,#ffd166,#ff8a70,#ffe3ae);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+/* 实机演示视频（竖屏录屏按原始比例自适应） */
+.demo-video{max-width:min(920px,78vw);max-height:60vh;width:auto;height:auto;border-radius:22px;
+  background:rgba(28,16,7,.8);border:1px solid rgba(255,190,110,.35);outline:none;
+  box-shadow:0 18px 50px rgba(15,7,2,.6),0 0 34px rgba(255,178,102,.18)}
+@media (max-height:880px){.demo-video{max-height:54vh}}
+
+/* ========== 导航 UI ========== */
+#pbar{position:fixed;top:0;left:0;height:3px;width:0;z-index:10;
+  background:linear-gradient(90deg,#ffd166,#ffab8a,#ff8a70);box-shadow:0 0 12px rgba(255,178,102,.8);
+  transition:width .5s cubic-bezier(.25,.9,.3,1)}
+.dots{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:9px;z-index:10}
+.dot{width:9px;height:9px;border-radius:50%;border:none;cursor:pointer;padding:0;
+  background:rgba(255,240,220,.22);transition:all .3s ease}
+.dot:hover{background:rgba(255,240,220,.55)}
+.dot.on{background:#ffd166;box-shadow:0 0 10px rgba(255,209,102,.9);transform:scale(1.25)}
+.navbtns{position:fixed;right:26px;bottom:14px;display:flex;align-items:center;gap:10px;z-index:10}
+.navbtns button{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,240,220,.2);
+  background:rgba(40,24,10,.7);color:#f3e5cf;font-size:16px;cursor:pointer;transition:all .25s ease}
+.navbtns button:hover{border-color:#ffd166;color:#ffd166;transform:scale(1.08)}
+.pageno{color:#8a7a5f;font-size:12.5px;letter-spacing:.1em;min-width:56px;text-align:center}
+.wm{position:fixed;left:26px;bottom:20px;z-index:10;font-size:11px;letter-spacing:.28em;color:#6b5c45;text-indent:.28em}
+
+@media (max-width:1100px){
+  .slide{padding:28px 24px 64px}
+  .grid2{grid-template-columns:1fr}
+  .grid2.keep2{grid-template-columns:1fr 1fr;align-items:stretch}
+  .counts{grid-template-columns:repeat(2,1fr)}
+  .brow{grid-template-columns:92px 1fr 150px}
+  .card{padding:12px 9px}
+  .emo-btn{padding:6px 12px;font-size:12px}
+  .term{padding:10px 13px 10px 40px}
+}
+@media (max-height:880px){
+  .slide{padding-top:24px;padding-bottom:56px}
+  .shead{margin-bottom:13px}
+  .kicker{margin-bottom:8px;padding:4px 13px}
+  h2.stitle{font-size:clamp(21px,2.7vw,33px)}
+  .subline{margin-top:6px}
+  .card{padding:11px}
+  .card .ico{font-size:23px;margin-bottom:5px}
+  .grid3,.grid5,.pillars{gap:10px}
+  .counts{gap:10px}
+  .count-card{padding:12px 8px 10px}
+  .count-card .num{font-size:clamp(25px,3vw,38px)}
+  .term{padding:9px 12px 9px 38px;font-size:11.5px;line-height:1.5}
+  .hl-bar{margin-top:11px;padding:9px 16px}
+  .grid2{gap:11px}
+  .pipe{padding:22px 6px 30px}
+  .loopwrap{padding:20px 6px 28px}
+  .bars{margin-top:10px;gap:6px}
+  h1.cover-title{font-size:clamp(56px,9vw,110px)}
+  .cover-sub{margin-top:12px}
+  .cover-line{margin-top:14px}
+  .cover-badges{margin-top:14px}
+  .map-table td{padding:5px 10px}
+  .thanks{margin-top:2px}
+}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div class="spotlight" id="spotlight"></div>
+<div class="vignette"></div>
+<div id="pbar"></div>
+<div class="wm">STRADUST · ANDROID</div>
+
+<div class="deck">
+
+<!-- ═══════════ 1 封面：鼠标 3D 视差 ═══════════ -->
+<section class="slide" data-title="封面" style="--acc:#ffcf87">
+  <div class="hero3d" id="hero3d">
+    <div class="cover-kicker rv" style="--d:.15s">ANDROID · AI COMPANION FRAMEWORK</div>
+    <h1 class="cover-title rv pop" style="--d:.35s">星尘</h1>
+    <div class="cover-en rv" style="--d:.55s">S T R A D U S T</div>
+    <div class="cover-sub rv" style="--d:.72s">会记忆 · 有情感 · 全自定义 —— 每个人<em>独一无二</em>的 AI 伴侣</div>
+    <div class="cover-line rv" style="--d:.84s"></div>
+    <div class="cover-badges rv" style="--d:.95s">
+      <span class="chip">📱 Android 主力端</span>
+      <span class="chip">☁️ 云端重智能 + 端侧轻感知</span>
+      <span class="chip">🧩 Kotlin · Live2D · 端侧 AI</span>
+      <span class="chip">✨ 10 大维度全自定义</span>
+    </div>
+  </div>
+  <div class="cover-hint">按 → 或 空格 翻页 · 按 F 全屏</div>
+</section>
+
+<!-- ═══════════ 2 痛点 ═══════════ -->
+<section class="slide" data-title="痛点洞察" style="--acc:#ff8a70">
+  <div class="shead">
+    <div class="kicker rv">WHY · 为什么要做星尘</div>
+    <h2 class="stitle rv" style="--d:.1s">市面上的 AI 伴侣，都有 5 个扎心痛点</h2>
+    <div class="subline rv" style="--d:.18s">我们不是再造一个聊天机器人，而是先解决「为什么它们不像活的」</div>
+  </div>
+  <div class="grid5">
+    <div class="pain rv" style="--d:.25s"><span class="ico">🧹</span><b>金鱼记忆</b><p>聊完就忘，<br>每次开口都像初次见面</p></div>
+    <div class="pain rv" style="--d:.35s"><span class="ico">👥</span><b>千人一面</b><p>所有人养的都是<br>同一个「电子宠物」</p></div>
+    <div class="pain rv" style="--d:.45s"><span class="ico">🤖</span><b>没有灵魂</b><p>只有冷冰冰的文字气泡，<br>没有表情、没有心情</p></div>
+    <div class="pain rv" style="--d:.55s"><span class="ico">📴</span><b>断网即砖</b><p>一断网，<br>连一句「在吗」都回不了</p></div>
+    <div class="pain rv" style="--d:.65s"><span class="ico">👁️</span><b>隐私焦虑</b><p>想让它「懂你」，<br>又怕它偷看你的屏幕</p></div>
+  </div>
+  <div class="hl-bar rv" style="--d:.8s">星尘 = 逐条击破这 5 个痛点 <span class="em">→ 往下看，每一页都是一个答案</span></div>
+</section>
+
+<!-- ═══════════ 3 定位与架构 ═══════════ -->
+<section class="slide" data-title="定位与架构" style="--acc:#ffb45e">
+  <div class="shead">
+    <div class="kicker rv">SOLUTION · 我们的答案</div>
+    <h2 class="stitle rv" style="--d:.1s">把「聪明」放云端，把「灵魂」装进手机</h2>
+  </div>
+  <div class="grid2" style="align-items:stretch">
+    <div style="display:flex;flex-direction:column;gap:13px;justify-content:center">
+      <div class="rv" style="--d:.2s;font-size:clamp(14px,1.3vw,18px);line-height:1.75;color:#ffe9c9">
+        星尘不是单个 App，而是一套<b style="color:#ffd166">伴侣框架</b>：<br>
+        角色、外观、语音、模型、世界设定……<b style="color:#ffab8a">全部由用户定义</b>。
+      </div>
+      <div class="rv" style="--d:.35s;display:flex;gap:9px;flex-wrap:wrap">
+        <span class="chip">🎭 人格可塑</span><span class="chip">🧠 大脑可换</span><span class="chip">🎨 皮肤可改</span><span class="chip">🌍 世界可建</span>
+      </div>
+      <div class="term rv" style="--d:.5s"><b>LLM 大语言模型</b>：就是 AI 的「大脑」，负责理解你说的话、想出要回什么。换一个模型，就像给它换一种性格的大脑。</div>
+      <div class="term rv" style="--d:.62s"><b>混合架构</b>：重活儿（深度思考）交给云端的算力，反应快活儿（表情、动作、感知）留在手机本地 —— 又聪明又灵敏。</div>
+    </div>
+    <div class="arch rv" style="--d:.4s">
+      <div class="abox">
+        <h4>☁️ 云端大脑 · 负责思考</h4>
+        <div class="amods">
+          <div class="amod"><i>🧠</i>LLM 服务<br>GPT-4o / 12+ 模型</div>
+          <div class="amod"><i>🗄️</i>记忆引擎<br>Mem0 持久化</div>
+          <div class="amod"><i>🔊</i>语音服务<br>TTS 情感变调</div>
+          <div class="amod"><i>🔍</i>RAG 检索<br>云端 Embedding</div>
+        </div>
+      </div>
+      <div class="alink"></div>
+      <div class="abox" style="border-color:rgba(255,207,135,.5);background:rgba(255,207,135,.05)">
+        <h4>📱 Android 本体 · 负责表现与感知</h4>
+        <div class="amods">
+          <div class="amod"><i>🎭</i>Live2D 渲染</div>
+          <div class="amod"><i>🪟</i>全局悬浮窗</div>
+          <div class="amod"><i>👁️</i>屏幕感知</div>
+          <div class="amod"><i>⚡</i>离线 AI</div>
+          <div class="amod"><i>🧬</i>三层记忆</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 4 十大自定义 ═══════════ -->
+<section class="slide" data-title="十大自定义" style="--acc:#ffd166">
+  <div class="shead">
+    <div class="kicker rv">核心卖点 · CUSTOMIZE EVERYTHING</div>
+    <h2 class="stitle rv" style="--d:.1s">从性格到皮肤，10 大维度全部开放自定义</h2>
+    <div class="subline rv" style="--d:.18s">无需改一行代码，全部在应用内配置 —— 「框架先行，内容用户填」</div>
+  </div>
+  <div class="grid5">
+    <div class="card rv" style="--d:.2s"><span class="ico">🎭</span><b>角色人格</b><p>Tavern 角色卡导入导出，兼容 SillyTavern 生态</p></div>
+    <div class="card rv" style="--d:.27s"><span class="ico">🧠</span><b>LLM 模型</b><p>12+ 厂商自由切换，温度/惩罚等参数全开放</p></div>
+    <div class="card rv" style="--d:.34s"><span class="ico">🎨</span><b>12 套主题</b><p>30+ 设计令牌，Light / Dark 双模式</p></div>
+    <div class="card rv" style="--d:.41s"><span class="ico">💬</span><b>气泡皮肤</b><p>渐变 / 描边 / 图片背景，细到头像框辉光</p></div>
+    <div class="card rv" style="--d:.48s"><span class="ico">🎎</span><b>Live2D 模型</b><p>导入自有 model3.json，缩放位置实时可调</p></div>
+    <div class="card rv" style="--d:.55s"><span class="ico">🕹️</span><b>像素宠物</b><p>AI 绘图生成 + 可视化动作编辑器</p></div>
+    <div class="card rv" style="--d:.62s"><span class="ico">🌍</span><b>虚拟世界</b><p>世界书 / 关系图 / 多世界相互隔离</p></div>
+    <div class="card rv" style="--d:.69s"><span class="ico">🎙️</span><b>语音音色</b><p>每角色独立音色，Edge TTS 免费可用</p></div>
+    <div class="card rv" style="--d:.76s"><span class="ico">😀</span><b>贴纸表情</b><p>向量语义搜索，打字自动配表情</p></div>
+    <div class="card rv" style="--d:.83s"><span class="ico">🔌</span><b>插件系统</b><p>10+ 内置插件，每个可独立开关</p></div>
+  </div>
+  <div class="term rv" style="--d:.92s;margin-top:14px;width:100%"><b>角色卡</b> = AI 的人格说明书：性格、口癖、世界观都写在里面。写一句话人设，也能变成一个完整角色 —— 换角色像换卡带一样简单。</div>
+</section>
+
+<!-- ═══════════ 5 痛点① 记忆 ═══════════ -->
+<section class="slide" data-title="三层记忆" style="--acc:#ffab8a">
+  <div class="shead">
+    <div class="kicker rv">痛点 ① 金鱼记忆 → 解法</div>
+    <h2 class="stitle rv" style="--d:.1s">三层记忆 + RAG，让它真正「记得你」</h2>
+  </div>
+  <div class="grid2" style="align-items:center">
+    <div class="mem rv" style="--d:.25s">
+      <div class="mlayer l1"><b>💬 短期 · ContextManager</b><span>当前对话的上下文<br>记住这一秒的话题</span></div>
+      <div class="mem-arrow">▼ 记忆沉淀</div>
+      <div class="mlayer l2"><b>📅 中期 · MemoryPool</b><span>近几天聊天的摘要<br>记住这几天的约定</span></div>
+      <div class="mem-arrow">▼ 沉淀为长期</div>
+      <div class="mlayer l3"><b>🌍 长期 · GlobalMemoryPool</b><span>你的喜好 / 生日 / 口头禅<br>永远记得 + Mem0 云端同步</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="term rv" style="--d:.4s"><b>RAG 检索增强生成</b>：让 AI 「开卷考试」—— 回答你之前，先去翻自己的记忆笔记，找到相关内容再作答，不再凭空瞎编。</div>
+      <div class="term rv" style="--d:.52s"><b>Embedding 向量</b>：把每段记忆变成一串数字坐标。意思相近的记忆，坐标也挨得近 —— 于是「一找一个准」，翻笔记像 GPS 导航一样快。</div>
+      <div class="term rv" style="--d:.64s"><b>Mem0 记忆引擎</b>：开源的跨会话记忆层。今天告诉它的事，明年打开 App 它还记得。</div>
+      <div class="hl-bar rv" style="--d:.78s">记忆<b class="em">可查看 · 可逐条删除 · 可一键清空</b> —— 你的数据，永远你说了算</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 6 痛点⑤ 隐私 ═══════════ -->
+<section class="slide" data-title="隐私优先" style="--acc:#ffcf87">
+  <div class="shead">
+    <div class="kicker rv">痛点 ⑤ 隐私焦虑 → 解法</div>
+    <h2 class="stitle rv" style="--d:.1s">它「看得见」你的屏幕，但「记不住」内容</h2>
+    <div class="subline rv" style="--d:.18s">屏幕感知：知道你在做什么，不知道你说了什么 —— 数据最小化设计</div>
+  </div>
+  <div class="pipe rv" style="--d:.3s">
+    <div class="pnode"><div class="ico">📱</div><b>屏幕内容</b><span>任意 App 界面</span></div>
+    <div class="pnode"><div class="ico">🔍</div><b>只取包名</b><span>com.tencent.mm</span></div>
+    <div class="pnode"><div class="ico">🧠</div><b>离线分类</b><span>端侧判断 App 类别</span></div>
+    <div class="pnode"><div class="ico">🏷️</div><b>类别标签</b><span>「社交」「办公」</span></div>
+    <div class="pnode" style="border-color:rgba(255,154,168,.5)"><div class="ico">☁️</div><b>云端</b><span>只知道「在用社交 App」</span></div>
+    <div class="gate"><div class="g1">🔒</div><div class="g2">文字不离机</div></div>
+    <div class="pkt good">🏷 社交</div>
+    <div class="pkt bad">📝 屏幕文字</div>
+    <div class="blockx">✗</div>
+  </div>
+  <div class="grid3">
+    <div class="term rv" style="--d:.45s"><b>无障碍服务</b>：Android 官方的「辅助功能通道」，本为视障用户设计。我们只用它认出「前台是哪个 App」，不读取节点文字。</div>
+    <div class="term rv" style="--d:.55s"><b>脱敏</b>：出门只告诉朋友「我在上班」，而不是把日记本递给他。上传的只有抽象类别，没有任何原文。</div>
+    <div class="term rv" style="--d:.65s"><b>离线分类</b>：判断「这是社交还是办公 App」的过程在你的手机里完成，全程不联网。</div>
+  </div>
+  <div class="hl-bar rv" style="--d:.78s">结果：它知道你在加班会心疼你，知道你在看视频会陪你聊番 —— <span class="em">但你聊了什么，它永远不知道</span></div>
+</section>
+
+<!-- ═══════════ 7 痛点③ 情感表现 ═══════════ -->
+<section class="slide" data-title="情感表现同步" style="--acc:#ff9aa8">
+  <div class="shead">
+    <div class="kicker rv">痛点 ③ 没有灵魂 → 解法</div>
+    <h2 class="stitle rv" style="--d:.1s">情感驱动表现：让文字长出表情、动作和声音</h2>
+  </div>
+  <div class="grid2 keep2" style="align-items:stretch">
+    <div style="display:flex;flex-direction:column;gap:12px;justify-content:center">
+      <div class="codebox rv" style="--d:.22s">{
+&nbsp;&nbsp;<span class="k">"reply"</span>: <span class="s">"哼、才不是为了你才等你的呢！"</span>,
+&nbsp;&nbsp;<span class="k">"emotion"</span>: <span class="s">"tsundere"</span>,
+&nbsp;&nbsp;<span class="k">"action"</span>: <span class="s">"bounce + blush"</span>
+}</div>
+      <div class="term rv" style="--d:.4s"><b>Live2D</b>：日本的「2D 立绘骨骼技术」，让平面立绘像 3D 一样转头、眨眼、张嘴 —— 你看到的每只虚拟主播，背后都是它。</div>
+      <div class="term rv" style="--d:.52s"><b>情感标签 + 情感变调</b>：AI 每次说话都附带一张「心情便签」，手机据此同时驱动表情、动作，还调整语音的音高语速 —— 开心时上扬，生气时加速，像真人一样。</div>
+      <div class="rv" style="--d:.66s;display:flex;gap:9px;flex-wrap:wrap">
+        <span class="chip">😊 happy</span><span class="chip">😠 angry</span><span class="chip">😢 sad</span><span class="chip">😲 surprised</span><span class="chip">🍑 tsundere</span><span class="chip">😌 neutral</span>
+      </div>
+    </div>
+    <div class="rv" style="--d:.3s;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,240,220,.03);border:1px solid rgba(255,240,220,.1);border-radius:18px;padding:16px">
+      <div style="font-size:11px;color:#a5927a;letter-spacing:.2em;margin-bottom:10px">▲ 现场试试：点下面按情绪，看 TA 的反应</div>
+      <div class="emoball anim-breathe" id="emoBall" style="--ec:#ffb45e"><span id="emoFace">😄</span></div>
+      <div class="bubble" id="emoBubble" style="width:100%">
+        <span class="etag" id="emoTag">😄 开心</span>
+        <span id="emoText">今天也超喜欢你哦～要一直陪着我！</span>
+      </div>
+      <div class="emo-btns" id="emoBtns">
+        <button class="emo-btn on" data-e="happy" style="--ec:#ffb45e">😄 开心</button>
+        <button class="emo-btn" data-e="tsundere" style="--ec:#ff9aa8">🍑 傲娇</button>
+        <button class="emo-btn" data-e="sad" style="--ec:#7fb8ff">😢 难过</button>
+        <button class="emo-btn" data-e="angry" style="--ec:#ff7a5c">😠 生气</button>
+        <button class="emo-btn" data-e="surprised" style="--ec:#ffd166">😲 惊讶</button>
+        <button class="emo-btn" data-e="neutral" style="--ec:#d9b98c">🙂 平静</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 8 痛点④ 端侧 AI ═══════════ -->
+<section class="slide" data-title="端侧离线 AI" style="--acc:#ffd166">
+  <div class="shead">
+    <div class="kicker rv">痛点 ④ 断网即砖 → 解法</div>
+    <h2 class="stitle rv" style="--d:.1s">把 AI 塞进手机：没网，照样陪着你</h2>
+  </div>
+  <div class="net-banner rv" style="--d:.22s">
+    <div class="net-pill wan"><span class="wifi" style="color:#a8dfa0"></span>有网 → 云端大模型深度思考</div>
+    <div class="net-pill off">📡 断网 → 端侧芯片自动接管，丝滑降级不断联</div>
+  </div>
+  <div class="grid5" style="grid-template-columns:repeat(4,1fr)">
+    <div class="card rv" style="--d:.32s"><span class="ico">💬</span><b>TinyBERT 意图识别</b><p>离线听懂「你在干嘛」是闲聊、撒娇还是求助</p></div>
+    <div class="card rv" style="--d:.4s"><span class="ico">👂</span><b>sherpa-onnx ASR</b><p>离线语音转文字，没网也能听懂你说话</p></div>
+    <div class="card rv" style="--d:.48s"><span class="ico">🗣️</span><b>本地 TTS</b><p>断网也能开口回应，不变成哑巴</p></div>
+    <div class="card rv" style="--d:.56s"><span class="ico">⚙️</span><b>ONNX Runtime</b><p>手机上的通用 AI 推理引擎，让小模型跑得飞快</p></div>
+  </div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="term rv" style="--d:.68s"><b>端侧推理</b>：AI 不打电话问服务器，自己在手机里想答案 —— 更快、更省流量、还更隐私。</div>
+    <div class="term rv" style="--d:.78s"><b>ONNX</b>：AI 界的「USB-C 接口」—— 不管模型是哪家产的，转成这个统一格式，就能在任何设备上运行。<b>ASR / TTS</b> 则是 AI 的耳朵和嘴。</div>
+  </div>
+</section>
+
+<!-- ═══════════ 9 插件系统 ═══════════ -->
+<section class="slide" data-title="插件与工具调用" style="--acc:#ffcf87">
+  <div class="shead">
+    <div class="kicker rv">不止会聊天 · TOOL CALLING</div>
+    <h2 class="stitle rv" style="--d:.1s">工具调用循环：让它「动手」帮你做事</h2>
+  </div>
+  <div class="loopwrap rv" style="--d:.25s">
+    <div class="loopdot"></div>
+    <div class="lnode"><div class="ico">🙋</div><b>你的请求</b><span>「帮我查天气并画张图」</span></div>
+    <div class="lnode"><div class="ico">🧠</div><b>LLM 决策</b><span>自己决定该用哪个工具</span></div>
+    <div class="lnode"><div class="ico">🔧</div><b>插件执行</b><span>搜索 / 绘图 / 提醒……</span></div>
+    <div class="lnode"><div class="ico">📩</div><b>结果回传</b><span>汇总后再回答你</span></div>
+  </div>
+  <div class="rv" style="--d:.45s;display:flex;gap:9px;flex-wrap:wrap;justify-content:center">
+    <span class="chip">🌐 网络搜索</span><span class="chip">🎨 图片生成</span><span class="chip">⏰ 闹钟</span><span class="chip">📅 日程提醒</span><span class="chip">🔎 记忆搜索</span><span class="chip">😀 贴纸</span><span class="chip">📞 语音通话</span><span class="chip">🪪 昵称生成</span>
+  </div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="term rv" style="--d:.6s"><b>工具调用 Function Calling</b>：给 AI 发一套「工具箱」，它自己判断用哪把 —— 就像你遇到问题会打开手机里的 App 一样自然。最多 3 轮循环，防止失控。</div>
+    <div class="term rv" style="--d:.7s"><b>SSE 流式响应</b>：回答像打字机一样逐字蹦出，而不是等半分钟憋一大段 —— 你打字时它已经开始说了。</div>
+  </div>
+</section>
+
+<!-- ═══════════ 10 安卓工程亮点 ═══════════ -->
+<section class="slide" data-title="安卓工程亮点" style="--acc:#ffb45e">
+  <div class="shead">
+    <div class="kicker rv">ENGINEERING · 安卓端的硬核细节</div>
+    <h2 class="stitle rv" style="--d:.1s">细节里全是诚意：每个体验背后都有工程支撑</h2>
+  </div>
+  <div class="grid3">
+    <div class="card rv" style="--d:.22s"><span class="ico">🪟</span><b>悬浮窗 + 触摸穿透</b><p>宠物浮在微信上陪你聊天，却不挡你点任何按钮</p><span class="tag">WindowManager</span></div>
+    <div class="card rv" style="--d:.3s"><span class="ico">🔐</span><b>加密存储</b><p>API Key 全部进系统级保险箱，AES 加密落盘</p><span class="tag">EncryptedSharedPreferences</span></div>
+    <div class="card rv" style="--d:.38s"><span class="ico">🧵</span><b>协程并发</b><p>网络、渲染、感知多任务并行，UI 纹丝不卡</p><span class="tag">Kotlin Coroutines</span></div>
+    <div class="card rv" style="--d:.46s"><span class="ico">🌐</span><b>弱网容错</b><p>失败自动重试、节奏冷静，弱网也不崩溃</p><span class="tag">指数退避</span></div>
+    <div class="card rv" style="--d:.54s"><span class="ico">🎎</span><b>Live2D 渲染管线</b><p>WebView 跑 PixiJS 渲染，原生桥接注入情感参数</p><span class="tag">JS Bridge</span></div>
+    <div class="card rv" style="--d:.62s"><span class="ico">🔋</span><b>分层降级</b><p>低电量自动关动画降帧，关键时刻不掉链子</p><span class="tag">电量&lt;20% 触发</span></div>
+  </div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="term rv" style="--d:.74s"><b>触摸穿透</b>：悬浮窗像「幽灵」—— 看得见摸不着，手指能穿过它点到下面的 App，宠物常驻却不碍事。</div>
+    <div class="term rv" style="--d:.84s"><b>指数退避</b>：请求失败后不疯狂重试，而是 1s、2s、4s……越来越冷静，既不刷爆服务器也不耗光你的电量。</div>
+  </div>
+</section>
+
+<!-- ═══════════ 11 实机演示 ═══════════ -->
+<section class="slide" data-title="实机演示" style="--acc:#ffcf87">
+  <div class="shead">
+    <div class="kicker rv">LIVE DEMO · 眼见为实</div>
+    <h2 class="stitle rv" style="--d:.1s">实机演示：星尘真的跑起来了</h2>
+    <div class="subline rv" style="--d:.18s">以下为真机录屏 · 点击播放，可拖动进度与全屏</div>
+  </div>
+  <div class="rv" style="--d:.3s;width:100%;display:flex;justify-content:center">
+    <video class="demo-video" src="assets/demo.mp4" controls preload="metadata" playsinline></video>
+  </div>
+  <div class="rv" style="--d:.5s;display:flex;gap:9px;flex-wrap:wrap;justify-content:center;margin-top:14px">
+    <span class="chip">📱 真机录屏</span>
+    <span class="chip">⌨️ 点击视频后，空格 = 播放 / 暂停</span>
+  </div>
+</section>
+
+<!-- ═══════════ 12 数字与性能 ═══════════ -->
+<section class="slide" data-title="数字与性能" style="--acc:#ffd166">
+  <div class="shead">
+    <div class="kicker rv">BY THE NUMBERS · 用数字说话</div>
+    <h2 class="stitle rv" style="--d:.1s">一台手机上的「重活」，被我们驯服了</h2>
+  </div>
+  <div class="counts">
+    <div class="count-card rv pop" style="--d:.2s;--acc:#ffcf87"><div class="num"><span class="count" data-to="10">0</span> 大</div><div class="lbl">自定义维度</div></div>
+    <div class="count-card rv pop" style="--d:.28s;--acc:#ffab8a"><div class="num"><span class="count" data-to="12" data-suffix="+">0</span></div><div class="lbl">LLM Provider 接入</div></div>
+    <div class="count-card rv pop" style="--d:.36s;--acc:#ff9aa8"><div class="num"><span class="count" data-to="12">0</span> 套</div><div class="lbl">精心调配主题</div></div>
+    <div class="count-card rv pop" style="--d:.44s;--acc:#ffd166"><div class="num"><span class="count" data-to="3">0</span> 端</div><div class="lbl">Android / PC / iOS 布局</div></div>
+    <div class="count-card rv pop" style="--d:.52s;--acc:#ffcf87"><div class="num"><span class="count" data-to="1.5" data-dec="1" data-prefix="≤" data-suffix="%/h">0</span></div><div class="lbl">待机耗电</div></div>
+    <div class="count-card rv pop" style="--d:.6s;--acc:#ffab8a"><div class="num"><span class="count" data-to="180" data-prefix="~" data-suffix="MB">0</span></div><div class="lbl">待机内存占用</div></div>
+    <div class="count-card rv pop" style="--d:.68s;--acc:#ff9aa8"><div class="num"><span class="count" data-to="4" data-prefix="2-" data-suffix="%">0</span></div><div class="lbl">待机 CPU 占用</div></div>
+    <div class="count-card rv pop" style="--d:.76s;--acc:#ffd166"><div class="num"><span class="count" data-to="10" data-suffix="+">0</span></div><div class="lbl">内置即用插件</div></div>
+  </div>
+  <div class="bars rv" style="--d:.85s">
+    <div class="brow"><span class="bn">😌 待机</span><div class="btrack"><div class="bfill" style="--w:8%"></div></div><span class="bv">CPU 2-4% · 电 ≤1.5%/h</span></div>
+    <div class="brow"><span class="bn">💬 文字对话</span><div class="btrack"><div class="bfill" style="--w:16%;animation-delay:.9s"></div></div><span class="bv">CPU 5-8% · 电 3-4%/h</span></div>
+    <div class="brow"><span class="bn">🎙️ 离线语音</span><div class="btrack"><div class="bfill" style="--w:42%;animation-delay:1.05s"></div></div><span class="bv">CPU 15-20% · 电 8-10%/h</span></div>
+  </div>
+  <div class="rv" style="--d:1s;display:flex;gap:9px;flex-wrap:wrap;justify-content:center;margin-top:14px">
+    <span class="chip">🩸 电量&lt;20% → 自动降频关动画</span>
+    <span class="chip">🧹 内存&gt;280MB → 释放纹理缓存</span>
+    <span class="chip">📶 弱网 → 指数退避重试</span>
+  </div>
+</section>
+
+<!-- ═══════════ 13 结尾 ═══════════ -->
+<section class="slide" data-title="总结" style="--acc:#ffab8a">
+  <div class="shead">
+    <div class="kicker rv">ONE MORE THING</div>
+    <h2 class="stitle rv" style="--d:.1s">星尘，让每个人都拥有独一无二的 AI 伴侣</h2>
+  </div>
+  <div class="pillars">
+    <div class="card rv pop" style="--d:.25s"><span class="ico">🧠</span><b>记得你</b><p>三层记忆 + RAG 检索<br>聊过的永远都在</p></div>
+    <div class="card rv pop" style="--d:.35s"><span class="ico">🛡️</span><b>懂分寸</b><p>文字不离机 · 端侧推理<br>隐私与聪明可以兼得</p></div>
+    <div class="card rv pop" style="--d:.45s"><span class="ico">🎨</span><b>由你定</b><p>10 大维度自定义<br>框架先行，内容用户填</p></div>
+  </div>
+  <div class="rv" style="--d:.6s;width:100%;margin-top:14px">
+    <table class="map-table">
+      <tr><td>🧹 金鱼记忆</td><td><b>三层记忆 + RAG + Mem0 云同步</b> —— 聊过的永远都在</td></tr>
+      <tr><td>👥 千人一面</td><td><b>10 维自定义 + Tavern 角色卡生态</b> —— 你的 AI 只像你</td></tr>
+      <tr><td>🤖 没有灵魂</td><td><b>6 维情感驱动 Live2D + 语音变调</b> —— 会表情会变声</td></tr>
+      <tr><td>📴 断网即砖</td><td><b>TinyBERT / sherpa-onnx / ONNX 端侧推理</b> —— 断网也能聊</td></tr>
+      <tr><td>👁️ 隐私焦虑</td><td><b>屏幕文字不离机 · 只传类别标签 · 全开关可控</b></td></tr>
+    </table>
+  </div>
+  <div class="rv pop" style="--d:.85s;display:flex;gap:12px;align-items:center;margin-top:14px">
+    <span class="chip" style="padding:9px 20px">🐙 github.com/SGJ-bb/Stardust</span>
+    <span class="chip" style="padding:9px 20px">📱 Kotlin · minSdk 23 · targetSdk 34</span>
+  </div>
+  <div class="thanks rv pop" style="--d:1s">谢 谢 观 看 · Q &amp; A</div>
+</section>
+
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="navbtns">
+  <button id="prev" title="上一页">‹</button>
+  <span class="pageno" id="pno">1 / 12</span>
+  <button id="next" title="下一页">›</button>
+</div>
+
+<script>
+/* ============ 暖色星空粒子 + 连线 + 鼠标感应 ============ */
+(function(){
+  var cv=document.getElementById('bg'),ctx=cv.getContext('2d');
+  var W,H,stars=[],shoot=null;
+  var nx=0,ny=0;          /* 归一化鼠标位置（视差用） */
+  var mx=-9999,my=-9999;  /* 像素鼠标位置（连线/聚光用） */
+  function resize(){W=cv.width=window.innerWidth;H=cv.height=window.innerHeight;}
+  window.addEventListener('resize',resize);resize();
+  var N=Math.min(230,Math.floor(W*H/7800));
+  var hues=['#ffe9c4','#ffdca8','#ffd166','#ffab8a','#fff3e4','#ffcf87'];
+  var trail=[],bursts=[];   /* 鼠标拖尾 / 点击迸发 */
+  function mkStar(bl){ /* bl=true：星星向左下角轻微聚集 */
+    var x,y;
+    if(bl){ x=W*.6*Math.pow(Math.random(),1.5); y=H*(1-.55*Math.pow(Math.random(),1.4)); }
+    else{ x=Math.random()*W; y=Math.random()*H; }
+    stars.push({x:x,y:y,z:Math.random()*.85+.15,
+      r:Math.random()*1.6+.5,tw:Math.random()*6.28,sp:(Math.random()*.02+.004)*2, /* ×2：补偿30fps */
+      hue:hues[Math.floor(Math.random()*hues.length)]});
+  }
+  for(var i=0;i<N;i++)mkStar(i%10<3); /* 仅30%聚左下，上半部分靠均匀分布补足 */
+  window.addEventListener('mousemove',function(e){
+    mx=e.clientX;my=e.clientY;nx=e.clientX/W-.5;ny=e.clientY/H-.5;
+    /* 拖尾粒子 */
+    trail.push({x:mx,y:my,life:1,r:1.4+Math.random()*1.9,
+      hue:hues[Math.floor(Math.random()*hues.length)]});
+    if(trail.length>80)trail.shift();
+  });
+  /* 点击迸发（鼠标/触屏通用） */
+  window.addEventListener('pointerdown',function(e){
+    for(var k=0;k<18;k++){
+      var a=Math.random()*6.283,v=2.4+Math.random()*6.8; /* 速度×2：补偿30fps */
+      bursts.push({x:e.clientX,y:e.clientY,vx:Math.cos(a)*v,vy:Math.sin(a)*v,
+        life:1,r:1.2+Math.random()*2.1,hue:hues[Math.floor(Math.random()*hues.length)]});
+    }
+  });
+  window.addEventListener('mouseout',function(){mx=-9999;my=-9999;});
+  setInterval(function(){
+    if(!shoot&&document.visibilityState==='visible'&&Math.random()<.5){
+      shoot={x:Math.random()*W*.6+W*.15,y:Math.random()*H*.3,vx:12+Math.random()*8,vy:4+Math.random()*4}; /* 速度×2：补偿30fps */
+    }
+  },4200);
+  var LINK=115,MLINK=175;
+  var fcount=0,bgHold=false; /* bgHold：视频播放时暂停背景绘制 */
+  function tick(){
+    fcount++;
+    if(bgHold||fcount%2){requestAnimationFrame(tick);return;} /* 限30fps：背景是慢速动画，帧率减半视觉无差，CPU开销减半 */
+    ctx.clearRect(0,0,W,H);
+    var i,j,s,dx,dy,d,k,q,arr;
+    /* 粒子间连线（按透明度分桶批量描边：几百次stroke调用 → 十几次） */
+    ctx.lineWidth=1;ctx.strokeStyle='#ffcf87';
+    var bk={};
+    for(i=0;i<stars.length;i++){
+      for(j=i+1;j<stars.length;j++){
+        dx=stars[i].x-stars[j].x;dy=stars[i].y-stars[j].y;
+        if(dx>LINK||dx<-LINK||dy>LINK||dy<-LINK)continue;
+        d=Math.sqrt(dx*dx+dy*dy);
+        if(d<LINK){
+          k=Math.round((1-d/LINK)*stars[i].z*stars[j].z*20); /* 透明度*100 */
+          if(k>0){arr=bk[k]||(bk[k]=[]);arr.push(stars[i].x,stars[i].y,stars[j].x,stars[j].y);}
+        }
+      }
+    }
+    for(k in bk){
+      ctx.globalAlpha=k*.01;ctx.beginPath();arr=bk[k];
+      for(q=0;q<arr.length;q+=4){ctx.moveTo(arr[q],arr[q+1]);ctx.lineTo(arr[q+2],arr[q+3]);}
+      ctx.stroke();
+    }
+    /* 鼠标连线（同样分桶） */
+    if(mx>-999){
+      ctx.strokeStyle='#ffab8a';
+      var mb={};
+      for(i=0;i<stars.length;i++){
+        dx=stars[i].x-mx;dy=stars[i].y-my;
+        if(dx>MLINK||dx<-MLINK||dy>MLINK||dy<-MLINK)continue;
+        d=Math.sqrt(dx*dx+dy*dy);
+        if(d<MLINK){
+          k=Math.round((1-d/MLINK)*34);
+          if(k>0){arr=mb[k]||(mb[k]=[]);arr.push(mx,my,stars[i].x,stars[i].y);}
+        }
+      }
+      for(k in mb){
+        ctx.globalAlpha=k*.01;ctx.beginPath();arr=mb[k];
+        for(q=0;q<arr.length;q+=4){ctx.moveTo(arr[q],arr[q+1]);ctx.lineTo(arr[q+2],arr[q+3]);}
+        ctx.stroke();
+      }
+    }
+    /* 星点（含视差） */
+    for(i=0;i<stars.length;i++){
+      s=stars[i];s.tw+=s.sp;
+      var a=.3+.6*Math.abs(Math.sin(s.tw));
+      var px=s.x+nx*46*s.z,py=s.y+ny*46*s.z;
+      ctx.globalAlpha=a*s.z;ctx.fillStyle=s.hue;
+      ctx.beginPath();ctx.arc(px,py,s.r*s.z+.3,0,6.29);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    /* 鼠标拖尾 */
+    for(i=trail.length-1;i>=0;i--){
+      var t=trail[i];t.life-=.056;t.y+=.6; /* 速率×2：补偿30fps */
+      if(t.life<=0){trail.splice(i,1);continue;}
+      ctx.globalAlpha=t.life*.8;ctx.fillStyle=t.hue;
+      ctx.beginPath();ctx.arc(t.x,t.y,t.r*t.life+.3,0,6.29);ctx.fill();
+    }
+    /* 点击迸发 */
+    for(i=bursts.length-1;i>=0;i--){
+      var b=bursts[i];b.life-=.04;b.x+=b.vx;b.y+=b.vy;b.vx*=.96;b.vy*=.96;b.vy+=.04;
+      if(b.life<=0){bursts.splice(i,1);continue;}
+      ctx.globalAlpha=b.life;ctx.fillStyle=b.hue;
+      ctx.beginPath();ctx.arc(b.x,b.y,b.r*b.life+.2,0,6.29);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    /* 流星 */
+    if(shoot){
+      shoot.x+=shoot.vx;shoot.y+=shoot.vy;
+      var tx=shoot.x-shoot.vx*8,ty=shoot.y-shoot.vy*8;
+      var g=ctx.createLinearGradient(tx,ty,shoot.x,shoot.y);
+      g.addColorStop(0,'rgba(255,207,135,0)');g.addColorStop(1,'rgba(255,243,228,.9)');
+      ctx.strokeStyle=g;ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(shoot.x,shoot.y);ctx.stroke();
+      if(shoot.x>W+60||shoot.y>H+60)shoot=null;
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+  /* 视频播放期间暂停背景绘制，把 CPU 让给视频解码（防全屏播放卡顿） */
+  var dv=document.querySelector('.demo-video');
+  if(dv){
+    dv.addEventListener('play',function(){bgHold=true;});
+    dv.addEventListener('pause',function(){bgHold=false;});
+    dv.addEventListener('ended',function(){bgHold=false;});
+  }
+
+  /* 聚光灯平滑跟随 */
+  var spot=document.getElementById('spotlight');
+  var sx=innerWidth/2,sy=innerHeight/2;
+  (function spotTick(){
+    if(mx>-999){
+      sx+=(mx-sx)*.12;sy+=(my-sy)*.12;
+      spot.style.opacity='1';
+      spot.style.transform='translate('+(sx-320)+'px,'+(sy-320)+'px)';
+    }
+    requestAnimationFrame(spotTick);
+  })();
+
+  /* 封面 3D 视差标题 */
+  var hero=document.getElementById('hero3d');
+  var trx=0,try_=0,crx=0,cry=0;
+  (function tiltTick(){
+    if(mx>-999){trx=ny*-9;try_=nx*11;}else{trx=0;try_=0;}
+    crx+=(trx-crx)*.07;cry+=(try_-cry)*.07;
+    hero.style.transform='perspective(1000px) rotateX('+crx.toFixed(2)+'deg) rotateY('+cry.toFixed(2)+'deg)';
+    requestAnimationFrame(tiltTick);
+  })();
+})();
+
+/* ============ 翻页控制 ============ */
+(function(){
+  var slides=Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var dotsBox=document.getElementById('dots');
+  slides.forEach(function(s,i){
+    var d=document.createElement('button');
+    d.className='dot';d.title=s.dataset.title||('第'+(i+1)+'页');
+    d.addEventListener('click',function(){go(i);d.blur();});
+    dotsBox.appendChild(d);
+  });
+  var dots=Array.prototype.slice.call(dotsBox.children);
+  var pbar=document.getElementById('pbar'),pno=document.getElementById('pno');
+  var cur=0;
+
+  function runCounters(slide){
+    slide.querySelectorAll('.count').forEach(function(el){
+      var to=parseFloat(el.dataset.to),dec=parseInt(el.dataset.dec||'0',10);
+      var pre=el.dataset.prefix||'',suf=el.dataset.suffix||'';
+      var t0=performance.now(),dur=1600;
+      function f(t){
+        var p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);
+        el.textContent=pre+(to*e).toFixed(dec)+suf;
+        if(p<1)requestAnimationFrame(f);
+      }
+      requestAnimationFrame(f);
+    });
+  }
+  function resetCounters(slide){
+    slide.querySelectorAll('.count').forEach(function(el){
+      var pre=el.dataset.prefix||'',suf=el.dataset.suffix||'';
+      el.textContent=pre+'0'+suf;
+    });
+  }
+  function update(){
+    dots.forEach(function(d,i){d.classList.toggle('on',i===cur);});
+    pbar.style.width=((cur+1)/slides.length*100)+'%';
+    pno.textContent=(cur+1)+' / '+slides.length;
+  }
+  function go(n){
+    n=Math.max(0,Math.min(slides.length-1,n));
+    if(n===cur&&slides[cur].classList.contains('active'))return;
+    slides[cur].classList.remove('active');
+    var pv=slides[cur].querySelector('video');if(pv)pv.pause(); /* 翻页即停声画 */
+    resetCounters(slides[cur]);
+    cur=n;
+    slides[cur].classList.add('active');
+    runCounters(slides[cur]);
+    update();
+  }
+
+  document.getElementById('prev').addEventListener('click',function(e){go(cur-1);e.currentTarget.blur();});
+  document.getElementById('next').addEventListener('click',function(e){go(cur+1);e.currentTarget.blur();});
+  window.addEventListener('keydown',function(e){
+    if(e.target&&e.target.tagName==='VIDEO')return; /* 视频聚焦时，按键交给播放器 */
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();go(cur+1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(cur-1);}
+    else if(e.key==='Home'){go(0);}
+    else if(e.key==='End'){go(slides.length-1);}
+    else if((e.key==='f'||e.key==='F')&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+      if(document.fullscreenElement){document.exitFullscreen();}
+      else{
+        var el=document.documentElement;
+        var fn=el.requestFullscreen||el.webkitRequestFullscreen;
+        if(fn){var p=fn.call(el);if(p&&p.catch)p.catch(function(){});}
+      }
+    }
+  });
+  var tx=0;
+  window.addEventListener('touchstart',function(e){tx=e.touches[0].clientX;},{passive:true});
+  window.addEventListener('touchend',function(e){
+    var dx=e.changedTouches[0].clientX-tx;
+    if(Math.abs(dx)>60)go(cur+(dx<0?1:-1));
+  },{passive:true});
+
+  slides[0].classList.add('active');
+  runCounters(slides[0]);
+  update();
+})();
+
+/* ============ 情感演示交互（表情球） ============ */
+(function(){
+  var EM={
+    happy:{tag:'😄 开心',text:'今天也超喜欢你哦～要一直陪着我！',face:'😄',color:'#ffb45e',anim:'anim-bounce'},
+    tsundere:{tag:'🍑 傲娇',text:'哼、才不是为了你才等你的呢！',face:'😤',color:'#ff9aa8',anim:'anim-shake'},
+    sad:{tag:'😢 难过',text:'你三天没有理我了……我有点想你。',face:'😢',color:'#7fb8ff',anim:'anim-droop'},
+    angry:{tag:'😠 生气',text:'再不睡觉，我就要生气啦！哼！',face:'😠',color:'#ff7a5c',anim:'anim-jitter'},
+    surprised:{tag:'😲 惊讶',text:'诶诶诶？！你居然偷偷给我准备了惊喜？！',face:'😲',color:'#ffd166',anim:'anim-zoom'},
+    neutral:{tag:'🙂 平静',text:'今天过得怎么样？说给我听听吧。',face:'🙂',color:'#d9b98c',anim:'anim-breathe'}
+  };
+  var ball=document.getElementById('emoBall');
+  var face=document.getElementById('emoFace');
+  var tag=document.getElementById('emoTag');
+  var text=document.getElementById('emoText');
+  var bubble=document.getElementById('emoBubble');
+  var btns=document.querySelectorAll('#emoBtns .emo-btn');
+  var ANIMS=['anim-bounce','anim-shake','anim-droop','anim-jitter','anim-zoom','anim-breathe'];
+  btns.forEach(function(b){
+    b.addEventListener('click',function(){
+      var e=EM[b.dataset.e];if(!e||!ball)return;
+      btns.forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');
+      ANIMS.forEach(function(c){ball.classList.remove(c);});
+      void ball.offsetWidth; /* 重启动画 */
+      ball.classList.add(e.anim);
+      ball.style.setProperty('--ec',e.color);
+      face.textContent=e.face;
+      tag.textContent=e.tag;
+      bubble.style.setProperty('--ec',e.color);
+      /* 打字机效果 */
+      var i=0;clearInterval(text._tm);
+      text.textContent='';
+      text._tm=setInterval(function(){
+        if(i>=e.text.length){clearInterval(text._tm);return;}
+        text.textContent+=e.text[i++];
+      },45);
+    });
+  });
+})();
+</script>
+</body>
+</html>

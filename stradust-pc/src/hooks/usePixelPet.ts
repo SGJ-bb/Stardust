@@ -65,6 +65,8 @@ export function usePixelPet() {
         frameDuration: template.frameDuration,
         loopMode: template.loopMode,
         triggerEvents: template.triggerEvents,
+        isBuiltin: true,
+        sortOrder: 0,
       });
       actions.push(action);
     }

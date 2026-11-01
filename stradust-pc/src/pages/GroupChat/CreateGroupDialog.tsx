@@ -40,7 +40,8 @@ export function CreateGroupDialog({ open, onOpenChange }: CreateGroupDialogProps
   const handleCreate = () => {
     if (!name.trim() || selectedIds.length < 2) return;
 
-    addGroup({
+    // store → engine：真实建群落库（引擎生成 id，这里传入的其余字段仅 members/worldId 生效）
+    void addGroup({
       id: generateId(),
       name: name.trim(),
       avatar: "",

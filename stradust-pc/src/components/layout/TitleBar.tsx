@@ -133,7 +133,7 @@ export function TitleBar() {
         data-tauri-drag-region
       >
         <span
-          className="text-xs"
+          className="text-xs whitespace-nowrap hidden sm:inline"
           style={{ color: "var(--color-muted-foreground)" }}
         >
           AI 伴侣

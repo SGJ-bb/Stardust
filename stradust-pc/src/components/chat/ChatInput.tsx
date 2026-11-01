@@ -194,8 +194,8 @@ export function ChatInput({
             disabled={disabled}
             className={cn(
               "input-field min-h-[42px] max-h-[120px] resize-none rounded-xl",
-              "bg-white/[0.04] border-white/[0.06]",
-              "text-white/80 placeholder:text-white/20 text-[14px] leading-relaxed",
+              "bg-[var(--color-input)] border-[var(--color-border)]",
+              "text-[var(--color-card-foreground)]/90 placeholder:text-[var(--color-muted-foreground)]/60 text-[14px] leading-relaxed",
               compact && "!min-h-[32px] !text-[13px] !rounded-lg"
             )}
             rows={1}

@@ -106,3 +106,30 @@ _*.txt
 _*.py
 _*.xml
 _*.png
+
+# 本地试验/抓取产物（含个人数据，禁止提交）
+/_*.json
+/_*.md
+/_*.bat
+/_*.png
+/_pw_browsers/
+/_pub_imgs/
+
+# 私钥与抓取产物（绝对不要提交）
+android/appkey.xml
+android/a1.xml
+
+# 依赖与构建产物
+node_modules/
+**/node_modules/
+dist/
+*.zip
+
+# 流水线运行产物
+/output/
+
+# 大体积演示视频（GitHub 单文件上限 100MB）
+/assets/*.mp4
+
+# 软件安装包（二进制发行物，不进仓库）
+/software-package/

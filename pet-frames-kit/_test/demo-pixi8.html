@@ -1,0 +1,36 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;background:#1b1e26;color:#eee;font:13px/1.6 "Microsoft YaHei"} .row{display:flex;gap:16px;padding:16px} canvas{border-radius:8px;background:#f7f5f3} pre{font:12px Consolas;color:#8ad;white-space:pre-wrap;max-width:380px}</style></head>
+<body><div class="row"><canvas id="c" width="334" height="562"></canvas><pre id="log">booting…</pre></div>
+<script src="./pixi.min.js"></script>
+<script src="./frameanim.js"></script>
+<script>
+const log=(m)=>{document.getElementById('log').textContent += '\n'+m;};
+window.addEventListener('error',e=>log('ERR '+e.message));
+(async()=>{
+  try{
+    log('PIXI ' + PIXI.VERSION);
+    const app = new PIXI.Application();
+    await app.init({canvas:document.getElementById('c'), width:334, height:562, backgroundAlpha:0, antialias:true});
+    log('app.init ok');
+    // 静态图当"模型"
+    const img = new Image(); img.src='../frames/_model_standin.png';
+    await img.decode();
+    const base = new PIXI.Sprite(PIXI.Texture.from(img));
+    base.width=334; base.height=562; app.stage.addChild(base);
+    // 帧动画层
+    const fx = new PetFrames({ app, PIXI });
+    await fx.load('../frames/hearts.frames.json');
+    log('loaded hearts: ' + fx.names().join(','));
+    const meta = fx.animations.get('hearts').meta;
+    const rect = PetFrames.rectFromAnchorBox(meta, {x:118,y:99,w:110,h:142}, 1.5);
+    fx.play('hearts', { rect });
+    log('played rect=' + JSON.stringify(rect,(k,v)=>typeof v==='number'?Math.round(v):v));
+    window.__probe = () => ({ alpha: fx.alpha, ctAlpha: fx.container.alpha, cur: fx.current, frame: fx.frame, ticks: fx._ticks });
+    setTimeout(()=>{
+      const tex = fx.animations.get('hearts').textures;
+      log('textures=' + tex.length + ' size=' + tex[0].width + 'x' + tex[0].height);
+      log('container visible=' + fx.container.visible + ' alpha=' + fx.container.alpha.toFixed(2) + ' self.alpha=' + fx.alpha.toFixed(2) + ' ticks=' + fx._ticks + ' cur=' + fx.current);
+      log('RESULT ' + (fx.container.visible && tex.length===12 ? 'PASS' : 'FAIL'));
+    }, 900);
+  }catch(e){ log('EXC ' + e.message); }
+})();
+</script></body></html>

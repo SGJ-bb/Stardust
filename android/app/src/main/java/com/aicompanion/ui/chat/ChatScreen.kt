@@ -374,19 +374,16 @@ fun ChatScreen(
         // ===== Live2D 模型层（在气泡上方，长按可拖动） =====
         // 默认屏幕中间，长按 100ms 进入拖动模式（Live2DCoordinator.setupTouch 实现）
         if (live2dEnabled) {
-            // 高度锁定为"键盘未弹出时"的内容区高度，这样键盘弹出时 Live2D 图层的几何
-            // 尺寸完全不变（既不压缩也不位移）。顶部对齐保证尺寸波动时模型原点不漂移。
-            val live2dModifier = if (live2dBaseHeightPx > 0) {
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(with(density) { live2dBaseHeightPx.toDp() })
-            } else {
-                // 首帧尚未测量，先按老行为铺满；测量后立即切到锁定高度（两者此时相等）
-                Modifier
-                    .align(Alignment.Center)
-                    .fillMaxSize()
-            }
+            // 尺寸跟随容器（fillMaxSize），不再锁定成"键盘未弹出时的高度"。
+            //
+            // 之前锁高度是为了避免键盘弹出时模型跳一下，但副作用更糟：View 高度仍是全屏，
+            // 实际可视区域只有上半截 → 画布被拉伸（压扁），多出来的部分还会溢到键盘下面
+            // 继续绘制（因为 clipChildren=false），看起来像"键盘底下糊了一张大脸"。
+            // 现在跟随容器 + Live2DWebView.onSizeChanged → 页面内重算缩放，
+            // 键盘弹出时模型整体缩小但比例正确。
+            val live2dModifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxSize()
             Live2DLayer(
                 viewProvider = live2dViewProvider,
                 onResume = onLive2dResume,
@@ -902,6 +899,20 @@ private fun Live2DLayer(
             view
         },
         update = { view ->
+            // 尺寸变化时主动通知页面重算（否则键盘弹出会把模型压扁，见 forceResize 注释）
+            if (view.tag == null) {
+                view.tag = intArrayOf(0, 0)
+                view.addOnLayoutChangeListener { v, l, t, r, b, ol, ot, ori, ob ->
+                    val last = v.tag as? IntArray ?: return@addOnLayoutChangeListener
+                    val w = r - l
+                    val h = b - t
+                    if (w != last[0] || h != last[1]) {
+                        last[0] = w
+                        last[1] = h
+                        (v as? com.aicompanion.live2d.Live2DWebView)?.forceResize()
+                    }
+                }
+            }
             // 确保视图可见
             view.visibility = android.view.View.VISIBLE
             // 再次确保裁剪被禁用（视图可能被重新附加）

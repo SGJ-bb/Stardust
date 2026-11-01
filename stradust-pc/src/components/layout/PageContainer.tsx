@@ -5,12 +5,16 @@ interface PageContainerProps {
   children: React.ReactNode;
   className?: string;
   padded?: boolean;
+  /** 页面标题（可选） */
+  title?: string;
+  /** 标题下方的说明文字（可选） */
+  description?: string;
 }
 
 /**
  * 页面容器 - 带入场动画
  */
-export function PageContainer({ children, className, padded = true }: PageContainerProps) {
+export function PageContainer({ children, className, padded = true, title, description }: PageContainerProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}

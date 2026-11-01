@@ -22,7 +22,7 @@ export function ChatToolbar({
       <div className="flex items-center gap-3">
         <motion.button
           onClick={onBack}
-          className="h-8 w-8 rounded-lg flex items-center justify-center text-white/30 hover:bg-white/[0.06] hover:text-white/60 transition-all"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--color-muted-foreground)]/70 hover:bg-[var(--color-muted)]/60 hover:text-[var(--color-muted-foreground)] transition-all"
           whileTap={{ scale: 0.9 }}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -37,12 +37,12 @@ export function ChatToolbar({
           </Avatar>
 
           <div>
-            <h2 className="text-sm font-semibold text-white/90 leading-tight">
+            <h2 className="text-sm font-semibold text-[var(--color-card-foreground)] leading-tight">
               {personaName}
             </h2>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <Heart className={`h-3 w-3 ${favorabilityLevel >= 4 ? "text-pink-400 fill-pink-400" : "text-white/20"}`} />
-              <span className="text-[12px] font-medium text-white/30">
+              <Heart className={`h-3 w-3 ${favorabilityLevel >= 4 ? "text-pink-400 fill-pink-400" : "text-[var(--color-muted-foreground)]/60"}`} />
+              <span className="text-[12px] font-medium text-[var(--color-muted-foreground)]/70">
                 好感 Lv.{favorabilityLevel}
               </span>
               <div className="h-1 w-8 rounded-full bg-white/[0.06] overflow-hidden">
@@ -60,13 +60,13 @@ export function ChatToolbar({
 
       <div className="flex items-center gap-1">
         <button
-          className="h-8 w-8 rounded-lg flex items-center justify-center text-white/25 hover:bg-white/[0.06] hover:text-white/50 transition-all"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--color-muted-foreground)]/70 hover:bg-[var(--color-muted)]/60 hover:text-[var(--color-muted-foreground)] transition-all"
         >
           <Sparkles className="h-4 w-4" />
         </button>
         <button
           onClick={onToggleSidebar}
-          className="h-8 w-8 rounded-lg flex items-center justify-center text-white/25 hover:bg-white/[0.06] hover:text-white/50 transition-all"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--color-muted-foreground)]/70 hover:bg-[var(--color-muted)]/60 hover:text-[var(--color-muted-foreground)] transition-all"
         >
           <PanelRight className="h-4 w-4" />
         </button>

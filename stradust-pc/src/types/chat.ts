@@ -43,6 +43,10 @@ export interface ChatMessage {
   memoryId?: string;
   /** 情感标签 */
   emotion?: string;
+  /** 重新生成产生的候选回复列表（消息分支最小实现） */
+  variants?: { content: string; createdAt: number }[];
+  /** 当前显示的变体下标 */
+  variantIdx?: number;
 }
 
 /** 附件 */

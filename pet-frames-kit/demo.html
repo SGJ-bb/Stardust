@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>PetFrames 演示（Canvas2D 后端，无 PIXI 依赖）</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #14161c; color: #e8e8ea; font: 13px/1.6 "Microsoft YaHei", system-ui, sans-serif; }
+  .wrap { display: flex; gap: 18px; padding: 18px; align-items: flex-start; }
+  .stage { position: relative; width: 334px; height: 562px; background: #f7f5f3; border-radius: 10px; overflow: hidden; flex: none; }
+  .stage img { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity .12s linear; }
+  #fx { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .panel { max-width: 420px; }
+  h1 { font-size: 16px; margin: 0 0 8px; }
+  p { color: #a9adb8; margin: 6px 0; }
+  button { background: #2a2f3a; color: #e8e8ea; border: 1px solid #3a4150; border-radius: 7px; padding: 7px 12px; margin: 4px 6px 4px 0; cursor: pointer; font-size: 13px; }
+  button:hover { background: #333a47; }
+  code { background: #232833; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  #log { margin-top: 10px; color: #8ad; font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage">
+    <img id="base" src="./frames/_model_standin.png" alt="model" />
+    <canvas id="fx"></canvas>
+  </div>
+  <div class="panel">
+    <h1>PetFrames · Live2D × 帧动画</h1>
+    <p>左边是"Live2D 模型"（静态图替身，实际接入时换成你的 pixi 模型），
+       右边按钮触发帧动画：<code>overlay</code> 叠在模型上，<code>replace</code> 接管整屏。</p>
+    <div>
+      <button id="btn-hearts">摸头 → 爱心（overlay）</button>
+      <button id="btn-zzz">睡着 → ZZZ（overlay）</button>
+      <button id="btn-sparkle">闪光（overlay）</button>
+      <button id="btn-greet">打招呼（replace）</button>
+      <button id="btn-stop">停止</button>
+    </div>
+    <p>这一页只用 Canvas2D，没有 PIXI、没有 Live2D —— 说明帧动画层可以塞进任何 WebView
+       （安卓壳、Tauri、Electron、浏览器都行）。</p>
+    <div id="log">ready</div>
+  </div>
+</div>
+
+<script src="./frameanim.js"></script>
+<script>
+(function () {
+  const baseImg = document.getElementById('base');
+  const canvas = document.getElementById('fx');
+  const log = (m) => { document.getElementById('log').textContent = m; };
+
+  const fx = new PetFrames({ canvas });
+  const HEAD = { x: 118, y: 99, w: 110, h: 142 };   // 命中区（CSS px，对应 334×562 窗口）
+
+  function box(zone, canvasH) {
+    const k = canvasH / 562;
+    return { x: zone.x * k, y: zone.y * k, w: zone.w * k, h: zone.h * k };
+  }
+
+  let ready = false;
+  fx.loadAll([
+    './frames/hearts.frames.json',
+    './frames/zzz.frames.json',
+    './frames/sparkle.frames.json',
+    './frames/greet.frames.json',
+  ]).then((list) => {
+    ready = true;
+    log('loaded: ' + fx.names().join(', '));
+    // 自动演示：先爱心，再 replace，最后回到待机
+    setTimeout(() => play('hearts'), 60);
+  });
+
+  function play(name) {
+    if (!ready) return;
+    const meta = fx.animations.get(name).meta;
+    const H = canvas.getBoundingClientRect().height;
+    if (meta.space === 'model') {
+      // 烘焙帧：与模型同坐标系。实际接入时 model = { x: live2dModel.x, y: live2dModel.y, scale: live2dModel.scale.x }
+      const model = { x: -69.795, y: 82.59, scale: 0.46249 };
+      const rect = PetFrames.rectFromModel(meta, model);
+      baseImg.style.opacity = '0';       // replace：模型淡出
+      fx.play(name, { rect });
+      fx.onEnd = () => { baseImg.style.opacity = '1'; log(name + ' finished → 模型淡回'); };
+      if (fx.alphaTarget === 0) baseImg.style.opacity = '1';
+      log('play ' + name + ' (replace) rect=' + JSON.stringify(rect, (k, v) => typeof v === 'number' ? Math.round(v) : v));
+    } else {
+      const rect = PetFrames.rectFromAnchorBox(meta, box(HEAD, H));
+      fx.play(name, { rect });
+      fx.onEnd = () => log(name + ' finished');
+      log('play ' + name + ' (overlay) rect=' + JSON.stringify(rect, (k, v) => typeof v === 'number' ? Math.round(v) : v));
+    }
+  }
+
+  document.getElementById('btn-hearts').onclick = () => play('hearts');
+  document.getElementById('btn-zzz').onclick = () => play('zzz');
+  document.getElementById('btn-sparkle').onclick = () => play('sparkle');
+  document.getElementById('btn-greet').onclick = () => play('greet');
+  document.getElementById('btn-stop').onclick = () => { fx.stop(); baseImg.style.opacity = '1'; log('stopped'); };
+
+  // 首屏自动跑一遍，方便截图验收
+  const seq = new URLSearchParams(location.search).get('seq');
+  if (seq) {
+    const steps = seq.split(',');
+    let i = 0;
+    const next = () => {
+      if (i >= steps.length) return;
+      play(steps[i++]);
+      setTimeout(next, 1400);
+    };
+    setTimeout(next, 500);
+  }
+})();
+</script>
+</body>
+</html>
