@@ -33,6 +33,7 @@ object AppContainer {
     private var _stickerManager: StickerManager? = null
     private var _searchMemoryPlugin: SearchMemoryPlugin? = null
     private var _searchDiaryPlugin: SearchDiaryPlugin? = null
+    private var _writeDiaryPlugin: WriteDiaryPlugin? = null
     private var _nicknamePlugin: NicknamePlugin? = null
     private var _generateImagePlugin: GenerateImagePlugin? = null
 
@@ -191,6 +192,8 @@ object AppContainer {
         PluginRegistry.register(_searchMemoryPlugin!!)
         _searchDiaryPlugin = SearchDiaryPlugin()
         PluginRegistry.register(_searchDiaryPlugin!!)
+        _writeDiaryPlugin = WriteDiaryPlugin()
+        PluginRegistry.register(_writeDiaryPlugin!!)
         PluginRegistry.register(CurrentTimePlugin())
         _nicknamePlugin = NicknamePlugin()
         PluginRegistry.register(_nicknamePlugin!!)
@@ -226,6 +229,11 @@ object AppContainer {
 
     fun setSearchMemoryCallback(callback: suspend (String, Int) -> String) {
         _searchMemoryPlugin?.onSearchMemory = callback
+    }
+
+    /** AI 写日记（工具 write_diary）的回调，由 MainActivity 注入（需要 activePersonaId） */
+    fun setWriteDiaryCallback(callback: suspend (String, String, String) -> String) {
+        _writeDiaryPlugin?.onWriteDiary = callback
     }
 
     fun setSearchDiaryCallback(callback: suspend (String, Int) -> String) {

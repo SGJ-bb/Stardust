@@ -46,7 +46,12 @@ class DiaryManager(private val context: Context, private val personaId: String =
 
     // ─── Read operations (SQLite) ──────────────────────────────
 
-    fun getAllDiaries(): List<DiaryEntry> = storage.getAllDiaries(personaId)
+    fun getAllDiaries(): List<DiaryEntry> {
+        // 先把 AI 写在 agent_workspace/diary/*.md 里的日记补进库，
+        // 否则「文件里有、App 里看不见」（2026-11-02 实测）。
+        runCatching { syncWorkspaceDiaries() }
+        return storage.getAllDiaries(personaId)
+    }
 
     fun getTodayDiary(): DiaryEntry? {
         val today = dateFormat.format(Date())
@@ -212,6 +217,72 @@ class DiaryManager(private val context: Context, private val personaId: String =
             updateGraphIndex(today, null, fullContent)
         }
         return ok
+    }
+
+    /**
+     * AI 主动写日记（工具 `write_diary` 走这条）。
+     *
+     * 为什么单独一个方法：
+     * - `saveLlmDiary` 是「定时/自动」路径，今天写过就直接跳过——那是为了防重复；
+     * - 但 AI 被明确要求「写今天的日记」时，已经有内容也应该**覆盖更新**，
+     *   否则用户点了半天日记页还是空的（2026-11-02 实测踩到）。
+     */
+    fun saveAiDiary(content: String, title: String = "", date: String = ""): Boolean {
+        if (content.isBlank()) return false
+        val d = if (date.isBlank()) dateFormat.format(Date()) else date
+        val t = title.ifBlank { "AI 日记" }
+        val entry = DiaryEntry(
+            date = d,
+            title = t,
+            content = content,
+            mood = "normal",
+            moodEmoji = "📖",
+            tags = listOf("ai_written"),
+        )
+        val existing = storage.getDiary(personaId, d)
+        val ok = if (existing != null) storage.updateDiary(personaId, entry)
+        else storage.insertDiary(personaId, entry)
+        if (ok) {
+            lastUpdateTime = System.currentTimeMillis()
+            updateGraphIndex(d, existing?.content, content)
+            AppLogger.i(TAG, "[Diary] AI 写入日记 $d（${if (existing != null) "更新" else "新建"}，${content.length} 字）")
+        }
+        return ok
+    }
+
+    /**
+     * 把 AI 用文件工具写下的日记（`files/agent_workspace/diary/YYYY-MM-DD.md`）导入数据库。
+     *
+     * 背景：日记页读的是 SQLite 的 `diaries` 表，而模型有时会把日记当成「文件」写到工作区
+     * （提示词里没有任何写日记的工具，它只能自己想办法）。结果就是文件里有、App 里看不见。
+     * 这里做一次单向补录：文件存在但库里没有 → 导入；库里有则以库为准。
+     *
+     * @return 新导入的条数
+     */
+    fun syncWorkspaceDiaries(): Int {
+        val dir = java.io.File(context.filesDir, "agent_workspace/diary")
+        if (!dir.isDirectory) return 0
+        var imported = 0
+        val files = dir.listFiles() ?: return 0
+        for (f in files) {
+            if (!f.isFile || !f.name.endsWith(".md")) continue
+            val dateKey = f.name.removeSuffix(".md").trim()
+            if (!Regex("\\d{4}-\\d{2}-\\d{2}").matches(dateKey)) continue
+            if (storage.getDiary(personaId, dateKey) != null) continue
+            val text = runCatching { f.readText() }.getOrNull()?.trim().orEmpty()
+            if (text.isBlank()) continue
+            val entry = DiaryEntry(
+                date = dateKey,
+                title = dateKey,
+                content = text,
+                mood = "normal",
+                moodEmoji = "📖",
+                tags = listOf("workspace_import"),
+            )
+            if (storage.insertDiary(personaId, entry)) imported++
+        }
+        if (imported > 0) AppLogger.i(TAG, "[Diary] 从工作区补录了 $imported 篇日记")
+        return imported
     }
 
     /**

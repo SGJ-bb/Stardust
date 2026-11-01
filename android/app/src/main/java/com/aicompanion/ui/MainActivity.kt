@@ -881,6 +881,22 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
                 AppContainer.setSearchDiaryCallback { query, topK ->
                     searchDiary(query, topK)
                 }
+                // AI 写日记：直接落库（DiaryManager），并让日记页的缓存立刻失效，
+                // 这样"写完 → 切到日记页"就能看见。
+                AppContainer.setWriteDiaryCallback { content, title, date ->
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        runCatching {
+                            val dm = com.aicompanion.diary.DiaryManager(this@MainActivity, activePersonaId)
+                            val ok = dm.saveAiDiary(content, title, date)
+                            if (ok) {
+                                cacheManager.invalidateAll(listOf("diary"))
+                                "已写入日记：${title.ifBlank { "AI 日记" }}（${if (date.isBlank()) "今天" else date}）"
+                            } else {
+                                "写入失败：内容为空或被存储层拒绝"
+                            }
+                        }.getOrElse { "写日记出错：${it.message}" }
+                    }
+                }
                 AppContainer.setStickerCallback { stickerPath ->
                     runOnUiThread {
                         addStickerMessage("ai", stickerPath)
@@ -3707,6 +3723,7 @@ class MainActivity : ComponentActivity(), StradustDestinations.AppHost {
         AppContainer.setNicknameCallback { }
         AppContainer.setSearchMemoryCallback { _, _ -> "" }
         AppContainer.setSearchDiaryCallback { _, _ -> "" }
+        AppContainer.setWriteDiaryCallback { _, _, _ -> "日记功能未就绪（界面已销毁）" }
         AppContainer.setStickerCallback { }
         AppContainer.setImageGeneratedCallback { }
 

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -114,7 +115,9 @@ fun StradustInput(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(modifier = Modifier.weight(1f)) {
+                // 固定最小行高：空态是 hint、有字是 BasicTextField，
+                // 两者行高不完全一样，不加下限会出现"输入瞬间高度跳一下"。
+                Box(modifier = Modifier.weight(1f).heightIn(min = 24.dp)) {
                     if (value.isEmpty()) {
                         Text(text = hint, color = colors.textMuted)
                     }
@@ -122,10 +125,12 @@ fun StradustInput(
                 }
 
                 // 清除按钮：text 非空且聚焦时显示
+                // 尺寸必须和文字行高一致（约 24dp）——以前这里是 48dp，
+                // 一输入字它出现，整行就被顶高 24dp，"敲第一个字输入栏突然变高"（2026-11-02 实测）。
                 if (isFocused && value.isNotEmpty()) {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(24.dp)
                             .clip(CircleShape)
                             .clickable(role = Role.Button) { onValueChange("") },
                         contentAlignment = Alignment.Center,

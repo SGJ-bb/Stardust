@@ -47,7 +47,20 @@ object SecurePrefsHelper {
             return fallbackPool(appContext)
         }
         return try {
-            val created = createSecure(appContext)
+            // createSecure 本身就会去读旧文件解密，密钥对不上时**在这里**抛 AEADBadTagException
+            // （不是读取时），所以要在这一步兜住：清掉解不开的旧池子再建一次。
+            val created: SharedPreferences = try {
+                createSecure(appContext)
+            } catch (e: Exception) {
+                if (!isBadTag(e)) throw e
+                AppLogger.w(TAG, "加密池与当前密钥不匹配（AEADBadTag），清空重建")
+                runCatching { appContext.deleteSharedPreferences(SECURE_POOL) }
+                createSecure(appContext)
+            }
+            if (!probeReadable(created)) {
+                AppLogger.w(TAG, "加密池不可读，清空重建")
+                runCatching { appContext.deleteSharedPreferences(SECURE_POOL) }
+            }
             migrateFallbackInto(appContext, created)
             instance = created
             if (loggedFailure) {
@@ -65,6 +78,18 @@ object SecurePrefsHelper {
             }
             fallbackPool(appContext)
         }
+    }
+
+    /** 异常链里是否有 AEADBadTagException（密钥不匹配的典型表现，可能包了几层） */
+    private fun isBadTag(t: Throwable?): Boolean {
+        var e: Throwable? = t
+        var depth = 0
+        while (e != null && depth < 6) {
+            if (e is javax.crypto.AEADBadTagException) return true
+            e = e.cause
+            depth++
+        }
+        return false
     }
 
     private fun createSecure(appContext: Context): SharedPreferences {
