@@ -202,8 +202,49 @@ class SearchDiaryPlugin : ToolPlugin {
     }
 }
 
-class CurrentTimePlugin : ToolPlugin {
-    override val name = "get_current_time"
+/**
+ * AI 写日记。
+ *
+ * 为什么非要这个工具：模型原本没有写日记的能力，只能自己用 file 工具往
+ * `agent_workspace/diary/2026-11-02.md` 写 markdown —— 而日记页读的是 SQLite 的 diaries 表，
+ * 结果就是「它说写好了，用户在日记页什么都看不到」（2026-11-02 实测）。
+ */
+class WriteDiaryPlugin : ToolPlugin {
+    override val name = "write_diary"
+    override val description = "把日记写进 App 的日记本"
+    var onWriteDiary: (suspend (content: String, title: String, date: String) -> String)? = null
+
+    override fun getDefinition() = ToolDefinition(
+        name = "write_diary",
+        description = "写入 App 内的「日记」。当主人让你记下今天、或你答应写日记时，**必须用这个工具**，" +
+            "不要用文件工具往目录里写 .md —— 那样内容不会出现在日记页。",
+        parameters = mapOf(
+            "type" to "object",
+            "properties" to mapOf(
+                "content" to mapOf("type" to "string", "description" to "日记正文，第一人称，可以分段"),
+                "title" to mapOf("type" to "string", "description" to "可选标题，不填会自动生成"),
+                "date" to mapOf("type" to "string", "description" to "可选日期 yyyy-MM-dd，默认今天")
+            ),
+            "required" to listOf("content")
+        )
+    )
+
+    override suspend fun execute(arguments: String): String {
+        val a = JSONObject(arguments)
+        val content = a.optString("content", "").trim()
+        if (content.isBlank()) return "错误：日记内容不能为空"
+        val title = a.optString("title", "").trim()
+        val date = a.optString("date", "").trim()
+        return try {
+            onWriteDiary?.invoke(content, title, date) ?: "日记功能未初始化"
+        } catch (e: Exception) {
+            com.aicompanion.util.AppLogger.e("WriteDiaryPlugin", "write_diary 失败: ${e.message}")
+            "写日记失败：${e.message}"
+        }
+    }
+}
+
+class CurrentTimePlugin : ToolPlugin {    override val name = "get_current_time"
     override val description = "获取当前系统时间"
     override fun getDefinition() = ToolDefinition(
         name = "get_current_time",
