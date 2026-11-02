@@ -133,3 +133,6 @@ dist/
 
 # 软件安装包（二进制发行物，不进仓库）
 /software-package/
+
+# 本地模型暂存（不入库）
+/_models/
