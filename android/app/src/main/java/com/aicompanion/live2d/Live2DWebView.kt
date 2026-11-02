@@ -2020,6 +2020,17 @@ class Live2DWebView @JvmOverloads constructor(
                             step('LOADED!');
                             model = m;
                             try { startIdleLoop(); } catch (e) { console.log('[L2D] idle loop start failed'); }
+                            // 眨眼节奏：Cubism 默认约 4 秒一次，这里固定成 7 秒（等第一帧跑完再设，
+                            // eyeBlink 是 internalModel 初始化时才建出来的）
+                            setTimeout(function() {
+                                try {
+                                    var im = m.internalModel;
+                                    if (im && im.eyeBlink && im.eyeBlink.setBlinkingInterval) {
+                                        im.eyeBlink.setBlinkingInterval(7000);
+                                        console.log('[L2D] blink interval = 7000ms');
+                                    }
+                                } catch (e) { console.log('[L2D] blink set failed'); }
+                            }, 800);
                             modelNaturalW = m.width; modelNaturalH = m.height;
                             step('Size: ' + m.width + 'x' + m.height);
 
@@ -2367,6 +2378,23 @@ class Live2DWebView @JvmOverloads constructor(
                     }, 9000);
                 };
                 function startIdleLoop() { window.startIdleLoop(); }
+
+                // ===== 参数直通（服装/配件开关用）=====
+                // Live2D 的参数每帧会被动作/物理重写，所以"开着一个开关"不能靠 set 一次就完事，
+                // 这里统一提供 set/get，调用方按需在切衣服时重设即可。
+                window.setL2DParam = function(id, value) {
+                    try {
+                        if (!model) return false;
+                        model.internalModel.coreModel.setParameterValueById(id, value);
+                        return true;
+                    } catch (e) { return false; }
+                };
+                window.getL2DParam = function(id) {
+                    try {
+                        if (!model) return -1;
+                        return model.internalModel.coreModel.getParameterValueById(id);
+                    } catch (e) { return -1; }
+                };
 
                 window.setLive2DEmotion = function(emotion) {
                     if (!model) return;
