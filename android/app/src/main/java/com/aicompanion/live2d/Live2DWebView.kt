@@ -2019,6 +2019,7 @@ class Live2DWebView @JvmOverloads constructor(
                         }).then(function(m) {
                             step('LOADED!');
                             model = m;
+                            try { startIdleLoop(); } catch (e) { console.log('[L2D] idle loop start failed'); }
                             modelNaturalW = m.width; modelNaturalH = m.height;
                             step('Size: ' + m.width + 'x' + m.height);
 
@@ -2335,6 +2336,38 @@ class Live2DWebView @JvmOverloads constructor(
                  * 2) 标准参数配方（模型没有情绪表情时的通用兜底）
                  * 3) 老的 EMOTION_MAP 名字模糊匹配（历史兼容）
                  */
+                // ===== 待机动作 =====
+                // pixi-live2d-display **不会**自己循环播放待机动作：模型加载完只会眨眼+呼吸，
+                // 没人触发动作就一直僵在第一个姿势。这里补一个"闲着就动一下"的循环。
+                // 用 _lastMotionAt 让路：刚播过别的动作（点按/情绪）之后的几秒内不抢戏。
+                var _idleTimer = null;
+                window._lastMotionAt = 0;
+                window.startIdleLoop = function() {
+                    if (_idleTimer) clearInterval(_idleTimer);
+                    _idleTimer = setInterval(function() {
+                        try {
+                            if (!model) return;
+                            if (window._lastMotionAt && Date.now() - window._lastMotionAt < 6000) return;
+                            var mm = model.internalModel && model.internalModel.motionManager;
+                            if (!mm) return;
+                            var defs = mm.definitions || mm.motionGroups || {};
+                            var keys = Object.keys(defs);
+                            if (!keys.length) return;
+                            var grp = null;
+                            for (var i = 0; i < keys.length; i++) {
+                                if (keys[i].toLowerCase() === 'idle') { grp = keys[i]; break; }
+                            }
+                            if (!grp) grp = keys[0];
+                            var arr = defs[grp] || [];
+                            if (!arr || !arr.length) return;
+                            model.motion(grp, Math.floor(Math.random() * arr.length));
+                            window._lastMotionAt = Date.now();
+                            console.log('[L2D] idle motion: ' + grp);
+                        } catch (e) {}
+                    }, 9000);
+                };
+                function startIdleLoop() { window.startIdleLoop(); }
+
                 window.setLive2DEmotion = function(emotion) {
                     if (!model) return;
                     var emo = (emotion || '').toLowerCase();
@@ -2417,6 +2450,7 @@ class Live2DWebView @JvmOverloads constructor(
                         if (motionList && motionList.length > 0) {
                             var idx = Math.floor(Math.random() * motionList.length);
                             model.motion(bestGroup, idx);
+                            window._lastMotionAt = Date.now();
                             try { Live2DBridge.onActionTriggered(bestGroup); } catch(e) {}
                         }
                     } catch(e) {}
