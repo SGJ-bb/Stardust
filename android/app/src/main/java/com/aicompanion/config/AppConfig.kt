@@ -10,7 +10,7 @@ object AppConfig {
     // === Live2D配置 ===
     const val LIVE2D_TOUCH_COOLDOWN_DEFAULT = 3000L
     const val LIVE2D_MODEL_SCALE_MIN = 0.3f
-    const val LIVE2D_MODEL_SCALE_MAX = 3.0f
+    const val LIVE2D_MODEL_SCALE_MAX = 6.0f
     
     // === 记忆配置 ===
     const val MEMORY_MAX_CHARS_DEFAULT = 650

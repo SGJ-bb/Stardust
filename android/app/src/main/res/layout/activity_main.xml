@@ -242,13 +242,14 @@
             android:paddingBottom="@dimen/space_10"
             android:clipToPadding="false" />
 
+        <!-- Live2D 铺满整个窗口：以前这里留了上下的 margin（space_10 / bottom_bar_height），
+             模型一放大就在这两条横线上被直接切断，看着像被"矩形边框"框住。
+             现在去掉 margin，只有屏幕边缘才会裁切。 -->
         <ViewStub
             android:id="@+id/view_stub_live2d"
             android:layout="@layout/stub_live2d"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="@dimen/space_10"
-            android:layout_marginBottom="@dimen/bottom_bar_height" />
+            android:layout_height="match_parent" />
 
         <LinearLayout
             android:id="@+id/layout_bottom_bar"

@@ -3317,8 +3317,8 @@ fun SettingsScreen(
                                     value = live2dScaleState,
                                     onValueChange = { live2dScaleState = it },
                                     onValueChangeFinished = { onLive2DScaleChange(live2dScaleState) },
-                                    valueRange = 0.3f..3.0f,
-                                    steps = 26, // 0.3 到 3.0，步进 0.1（27个点，26个间隔）
+                                    valueRange = 0.3f..6.0f,
+                                    steps = 56, // 0.3 到 6.0，步进 0.1（58个点，57个间隔取56）
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = SliderDefaults.colors(
                                         thumbColor = StradustTheme.colors.primary,
