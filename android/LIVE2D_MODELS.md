@@ -23,3 +23,15 @@
 - 模型目录放在 `live2d_models/<id>/`，里面必须有一个 `*.model3.json`。
 - 列表存在 `shared_prefs/model_manager.xml` 的 `models_list`，激活项写在 `app_prefs.xml` 的
   `active_model_path`；两者不一致时会加载不到。
+
+### 已知问题：鼻子上有一块黑
+
+这个模型的鼻影是**纯黑半透明**贴图（`texture_00.png` 上 x≈3450-3655 / y≈2260-2790 的一块羽化长条），
+在 VTube Studio 里靠「正片叠底」压成柔和阴影；而我们的运行时是 Cubism 4，混合模式没生效，
+被当普通图层盖上 → 鼻子出现黑方块。
+
+处理：`python android/tools/patch_nose_shadow.py <模型目录>`（把该区域 alpha 置 0）。
+贴图改完后要删掉 `files/live2d_cache/<模型id>/` 让 App 重新拷贝，否则会继续用旧缓存。
+
+> 根治需要升级运行时到 Cubism 5（pixi-live2d-display v5 分支 + pixi v8），
+> 或者请作者用 Cubism Editor 按 Cubism 4.2 / SDK for Web 重新导出。
