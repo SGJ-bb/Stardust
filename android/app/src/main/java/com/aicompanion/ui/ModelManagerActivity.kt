@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.aicompanion.R
 import com.aicompanion.models.Live2DModel
 import com.aicompanion.live2d.ModelManager
+import com.aicompanion.live2d.ModelHealthChecker
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -78,6 +79,37 @@ class ModelManagerActivity : Activity() {
         tvModelVersion = findViewById(R.id.tv_model_version)
         btnImport = findViewById(R.id.btn_import_model)
         btnScan = findViewById(R.id.btn_scan_models)
+
+        // 温馨提示里的「都检查些什么？」—— 展开成清单，避免把卡片撑太长
+        findViewById<android.widget.TextView>(R.id.tv_health_tip_more)?.setOnClickListener {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("导入时会检查这些")
+                .setMessage(
+                    """
+                    · 贴图尺寸
+                    超过 4096 的贴图，部分手机 GPU 吃不下，可能整体显示成黑色，或者只显示一个剪影。
+
+                    · 版本兼容
+                    Cubism 5 导出的模型能跑，但少数用了「正片叠底」的效果层可能颜色不对 —— 典型的就是脸上一块黑影。
+
+                    · 待机动作
+                    没有 Idle 动作组的模型，加载后会一直保持同一个姿势。如果包里自带动画文件，App 会自动挑一个当待机。
+
+                    · 眨眼与口型
+                    没配 EyeBlink 就不会自己眨眼，没配 LipSync 说话时嘴不动。
+
+                    · 物理
+                    缺 physics3.json 的话，头发和尾巴不会跟着晃。
+
+                    · 文件完整性
+                    有没有 .moc3 和 .model3.json，体积是不是偏大。
+
+                    检查结果会显示在模型卡片上，点那行小字能看到每一条的详细说明和解决办法。
+                    """.trimIndent()
+                )
+                .setPositiveButton("知道了", null)
+                .show()
+        }
 
         recyclerModels?.layoutManager = LinearLayoutManager(this)
     }
@@ -325,6 +357,14 @@ class ModelManagerActivity : Activity() {
         )
         mm.setActiveModel(name)
         mm.addModel(model)
+
+        // 导入完成立刻体检：这是用户最需要即时反馈的时刻，
+        // 等他自己发现"模型是黑的"再来问就晚了。
+        val report = runCatching { ModelHealthChecker.check(targetDir) }.getOrNull()
+        runOnUiThread {
+            loadModels()
+            if (report != null) showHealthDialog(this, name, report)
+        }
     }
 
     private fun importModelFromUri(uri: Uri) {
@@ -751,6 +791,7 @@ class ModelAdapter(
         val tvName: TextView = view.findViewById(R.id.tv_model_name)
         val tvDesc: TextView = view.findViewById(R.id.tv_model_desc)
         val tvSize: TextView = view.findViewById(R.id.tv_model_size)
+        val tvHealth: TextView = view.findViewById(R.id.tv_model_health)
         val btnUse: Button = view.findViewById(R.id.btn_use_model)
         val btnEdit: Button = view.findViewById(R.id.btn_edit_model)
         val btnDelete: Button = view.findViewById(R.id.btn_delete_model)
@@ -768,6 +809,30 @@ class ModelAdapter(
         holder.tvName.text = model.name
         holder.tvDesc.text = model.description
         holder.tvSize.text = String.format("%.1f MB", model.sizeMB)
+
+        // 体检：静态检查，几毫秒就能出结果，所以随列表一起显示
+        val report = runCatching {
+            val path = model.modelPath
+            if (path.startsWith("file:///android_asset/") || path.startsWith("assets/")) null
+            else java.io.File(path).parentFile?.let { com.aicompanion.live2d.ModelHealthChecker.check(it) }
+        }.getOrNull()
+
+        if (report != null) {
+            holder.tvHealth.visibility = android.view.View.VISIBLE
+            holder.tvHealth.text = report.summary
+            holder.tvHealth.setTextColor(
+                when {
+                    report.blockers.isNotEmpty() -> 0xFFE53935.toInt()
+                    report.warnings.isNotEmpty() -> 0xFFF57C00.toInt()
+                    else -> 0xFF43A047.toInt()
+                }
+            )
+            holder.tvHealth.setOnClickListener {
+                showHealthDialog(holder.itemView.context, model.name, report)
+            }
+        } else {
+            holder.tvHealth.visibility = android.view.View.GONE
+        }
 
         holder.btnUse.setOnClickListener {
             try {
@@ -814,4 +879,42 @@ class ModelAdapter(
     }
 
     override fun getItemCount(): Int = models.size
+}
+
+/**
+ * 体检详情弹窗。
+ *
+ * 放在文件末尾作为顶层函数，方便列表项直接调用。
+ * 排版刻意做得"扫一眼就能懂"：结论一句、逐条列问题、每条都带上"该怎么办"。
+ */
+private fun showHealthDialog(
+    context: android.content.Context,
+    modelName: String,
+    report: com.aicompanion.live2d.ModelHealthChecker.Report
+) {
+    val sb = StringBuilder()
+    if (report.issues.isEmpty()) {
+        sb.append("贴图尺寸、动作、物理、配置文件都正常，可以放心使用。")
+    } else {
+        report.issues.forEach { issue ->
+            val icon = when (issue.level) {
+                com.aicompanion.live2d.ModelHealthChecker.Level.BLOCKER -> "✕"
+                com.aicompanion.live2d.ModelHealthChecker.Level.WARNING -> "!"
+                com.aicompanion.live2d.ModelHealthChecker.Level.INFO -> "·"
+            }
+            sb.append("$icon ").append(issue.title).append("\n")
+            sb.append(issue.detail).append("\n\n")
+        }
+        if (report.blockers.isNotEmpty()) {
+            sb.append("带 ✕ 的问题可能让模型显示不出来，建议先处理再导入。")
+        } else {
+            sb.append("以上都不影响使用，知道了就行。")
+        }
+    }
+
+    android.app.AlertDialog.Builder(context)
+        .setTitle("${report.headline} · $modelName")
+        .setMessage(sb.toString().trim())
+        .setPositiveButton("知道了", null)
+        .show()
 }
