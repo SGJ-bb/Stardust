@@ -35,3 +35,33 @@
 
 > 根治需要升级运行时到 Cubism 5（pixi-live2d-display v5 分支 + pixi v8），
 > 或者请作者用 Cubism Editor 按 Cubism 4.2 / SDK for Web 重新导出。
+
+### 鼻影黑块：真正的根因（2026-11-03 定位）
+
+前面记的「正片叠底没生效」是错的。真实原因是**遮罩数量超限**：
+
+- 这个模型用了 **49 个剪裁遮罩**，单个部件最多同时叠 **13 个**
+- Cubism Web 框架单张遮罩纹理上限 **36 个**（9 区域 × 4 通道，`ClippingMaskMaxCountOnDefault`）
+- 超限后框架降级成「每次清空重画一个遮罩」的分支，遮罩全部错乱
+- 结果就是本该被裁掉的鼻影层整块露出来 —— C4 下是黑块，C5 下是白块
+
+**为什么 VTS 里没问题**：VTS 用的是 Cubism SDK for **Unity**。官方文档《各 Cubism SDK 的比较》写明：
+Unity 与 Native/Web 的遮罩生成方式不同（Web 会生成「包含添加蒙版一侧的矩形」），
+**「在大的图形网格被小遮罩覆盖的模型中，蒙版区域可能被压碎」**。Unity 版没有 36 个的上限。
+
+**真正的修复**（已在 Cubism 5 运行时上验证有效）：
+
+```js
+// Cubism5InternalModel
+this.renderer.initialize(this.coreModel, 2);   // 默认 1 张遮罩纹理 → 给 2 张
+```
+
+2 张 × 32 = 64 > 49，遮罩不再降级。实测鼻子干净，眼睛/嘴的颜色也一并修正了
+（之前遮罩错乱影响的不止鼻子）。
+
+**但 C4 框架做不到**：App 里的 `pixi-live2d-display.min.js` 中
+`_renderTextureCount` 和 `ClippingMaskMaxCountOnMultiRenderTexture` 这两个符号**根本不存在**，
+即 Cubism 4 Web 框架不支持多张遮罩纹理，传参会被忽略。
+
+> 结论：**根治必须升级到 Cubism 5 框架**（pixi-live2d-display v5 / naari3 fork + pixi 8）。
+> 在那之前，`tools/patch_nose_shadow.py` 的贴图级修补是唯一可用方案。
