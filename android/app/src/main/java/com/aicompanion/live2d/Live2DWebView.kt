@@ -2020,6 +2020,19 @@ class Live2DWebView @JvmOverloads constructor(
                             step('LOADED!');
                             model = m;
                             try { startIdleLoop(); } catch (e) { console.log('[L2D] idle loop start failed'); }
+                            // 眨眼节奏：Cubism 默认约 4 秒一次，这里固定成 7 秒。
+                            // 必须等一会儿再设 —— eyeBlink 是 internalModel 初始化完才建出来的。
+                            setTimeout(function() {
+                                try {
+                                    var im = m.internalModel;
+                                    if (im && im.eyeBlink && im.eyeBlink.setBlinkingInterval) {
+                                        im.eyeBlink.setBlinkingInterval(7000);
+                                        console.log('[L2D] blink interval = 7000ms');
+                                    } else {
+                                        console.log('[L2D] blink: eyeBlink 不可用');
+                                    }
+                                } catch (e) { console.log('[L2D] blink set failed'); }
+                            }, 800);
                             modelNaturalW = m.width; modelNaturalH = m.height;
                             step('Size: ' + m.width + 'x' + m.height);
 
