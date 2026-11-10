@@ -136,3 +136,15 @@ dist/
 
 # 本地模型暂存（不入库）
 /_models/
+
+# 凭证与私有业务数据，禁止入库
+cookie_export.txt
+*_cookie*.txt
+*_cookie*.json
+api_key.txt
+**/api_key.txt
+.env
+.env.*
+xianyu-auto-reply-fix/
+xianyu-automation-report/
+wm_create_delivery.py
